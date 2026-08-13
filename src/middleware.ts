@@ -1,73 +1,162 @@
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+import {
+  createServerClient,
+  type CookieOptions,
+} from '@supabase/ssr';
 
+import {
+  NextResponse,
+  type NextRequest,
+} from 'next/server';
+
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: CookieOptions;
+};
+
+/**
+ * Get the Supabase project reference from the URL.
+ */
 function getProjectRef(): string {
   try {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-    return url.match(/https:\/\/([^.]+)\./)?.[1] ?? '';
+    const url =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+
+    return (
+      url.match(
+        /https:\/\/([^.]+)\./
+      )?.[1] ?? ''
+    );
   } catch {
     return '';
   }
 }
 
-function injectTokenFromHeader(request: NextRequest): void {
+/**
+ * Inject the Supabase token from the custom
+ * x-sb-token header when necessary.
+ */
+function injectTokenFromHeader(
+  request: NextRequest
+): void {
   try {
-    const token = request.headers.get('x-sb-token');
-    if (!token) return;
-    const hasCookie = request.cookies.getAll().some((c) => c.name.includes('auth-token'));
-    if (hasCookie) return;
-    const ref = getProjectRef();
-    if (ref) {
-      request.cookies.set(`sb-${ref}-auth-token`, token);
+    const token =
+      request.headers.get('x-sb-token');
+
+    if (!token) {
+      return;
+    }
+
+    const hasCookie = request.cookies
+      .getAll()
+      .some((cookie) =>
+        cookie.name.includes('auth-token')
+      );
+
+    if (hasCookie) {
+      return;
+    }
+
+    const projectRef = getProjectRef();
+
+    if (projectRef) {
+      request.cookies.set(
+        `sb-${projectRef}-auth-token`,
+        token
+      );
     }
   } catch {
-    // ignore
+    // Ignore token injection errors.
   }
 }
 
-export async function middleware(request: NextRequest) {
+/**
+ * Next.js middleware.
+ */
+export async function middleware(
+  request: NextRequest
+) {
   try {
     injectTokenFromHeader(request);
   } catch {
-    // ignore
+    // Ignore errors.
   }
 
-  const supabaseResponse = NextResponse.next({ request });
+  const supabaseResponse =
+    NextResponse.next({
+      request,
+    });
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  // Skip Supabase auth check if env vars are missing
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  /*
+   * Don't crash the application if the
+   * environment variables aren't available.
+   */
   if (!supabaseUrl || !supabaseKey) {
     return supabaseResponse;
   }
 
   try {
-    const supabase = createServerClient(supabaseUrl, supabaseKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              request.cookies.set(name, value);
-              supabaseResponse.cookies.set(name, value, options);
-            });
-          } catch {
-            // ignore cookie errors
-          }
-        },
-      },
-    });
+    const supabase =
+      createServerClient(
+        supabaseUrl,
+        supabaseKey,
+        {
+          cookies: {
+            getAll() {
+              return request.cookies.getAll();
+            },
 
-    // Use Promise.race with a timeout to avoid hanging middleware
+            setAll(
+              cookiesToSet: CookieToSet[]
+            ) {
+              try {
+                cookiesToSet.forEach(
+                  ({
+                    name,
+                    value,
+                    options,
+                  }) => {
+                    request.cookies.set(
+                      name,
+                      value
+                    );
+
+                    supabaseResponse.cookies.set(
+                      name,
+                      value,
+                      options
+                    );
+                  }
+                );
+              } catch {
+                // Ignore cookie errors.
+              }
+            },
+          },
+        }
+      );
+
+    /*
+     * Prevent middleware from hanging forever.
+     */
     await Promise.race([
       supabase.auth.getUser(),
-      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 3000);
+      }),
     ]);
   } catch {
-    // Network errors or fetch failures — continue without auth
+    /*
+     * If Supabase cannot be reached, allow
+     * the request to continue.
+     */
   }
 
   return supabaseResponse;
