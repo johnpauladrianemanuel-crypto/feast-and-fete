@@ -1,9 +1,10 @@
 'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-
 import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import WelcomeSplash from '@/components/WelcomeSplash';
 import { createGuestProfile } from '@/lib/supabase/services';
@@ -16,36 +17,48 @@ interface LoginFormData {
 
 interface Props {
   onSwitchToRegister: () => void;
+  onSuccess?: (userName: string) => void;
 }
 
-// Animated expandable panel
+// Animated expandable panel with dynamic height support
 function AnimatedPanel({ show, children }: { show: boolean; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(0);
+  const [height, setHeight] = useState<number | 'auto'>(0);
   const [visible, setVisible] = useState(show);
 
-  // Step 1: control visibility
   useEffect(() => {
     if (show) {
       setVisible(true);
+      if (ref.current) {
+        setHeight(ref.current.scrollHeight);
+      }
+      const timer = setTimeout(() => {
+        setHeight('auto');
+      }, 300);
+      return () => clearTimeout(timer);
     } else {
-      setHeight(0);
-      const t = setTimeout(() => setVisible(false), 300);
-      return () => clearTimeout(t);
+      if (ref.current) {
+        setHeight(ref.current.scrollHeight);
+      }
+      requestAnimationFrame(() => {
+        setHeight(0);
+      });
+      const timer = setTimeout(() => setVisible(false), 300);
+      return () => clearTimeout(timer);
     }
   }, [show]);
 
-  // Step 2: once visible, measure and set height (runs after DOM paint)
   useEffect(() => {
-    if (visible && show && ref.current) {
+    if (visible && show && ref.current && height !== 'auto') {
       setHeight(ref.current.scrollHeight);
     }
-  }, [visible, show]);
+  }, [children, visible, show, height]);
 
   if (!visible) return null;
 
   return (
     <div
+      aria-hidden={!show}
       style={{
         height: height,
         overflow: 'hidden',
@@ -66,21 +79,40 @@ function AnimatedPanel({ show, children }: { show: boolean; children: React.Reac
   );
 }
 
-// OTP Input — 6 individual boxes
+// OTP Input — 6 individual boxes with keyboard navigation & paste handling
 function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
-  const digits = value.padEnd(6, '').split('').slice(0, 6);
+
+  const arr = value.split('').slice(0, 6);
+  while (arr.length < 6) arr.push('');
 
   function handleChange(i: number, e: React.ChangeEvent<HTMLInputElement>) {
     const char = e.target.value.replace(/\D/g, '').slice(-1);
-    const next = digits.map((d, idx) => (idx === i ? char : d)).join('').replace(/ /g, '');
-    onChange(next);
-    if (char && i < 5) inputs.current[i + 1]?.focus();
+    const nextArr = [...arr];
+    nextArr[i] = char;
+    const nextVal = nextArr.join('').replace(/\s/g, '');
+    onChange(nextVal);
+    if (char && i < 5) {
+      setTimeout(() => inputs.current[i + 1]?.focus(), 0);
+    }
   }
 
   function handleKeyDown(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Backspace' && !digits[i] && i > 0) {
+    if (e.key === 'Backspace') {
+      if (arr[i]) {
+        const nextArr = [...arr];
+        nextArr[i] = '';
+        onChange(nextArr.join('').replace(/\s/g, ''));
+      } else if (i > 0) {
+        const nextArr = [...arr];
+        nextArr[i - 1] = '';
+        onChange(nextArr.join('').replace(/\s/g, ''));
+        inputs.current[i - 1]?.focus();
+      }
+    } else if (e.key === 'ArrowLeft' && i > 0) {
       inputs.current[i - 1]?.focus();
+    } else if (e.key === 'ArrowRight' && i < 5) {
+      inputs.current[i + 1]?.focus();
     }
   }
 
@@ -88,8 +120,8 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
     const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
     if (pasted) {
       onChange(pasted);
-      const nextIdx = Math.min(pasted.length, 5);
-      inputs.current[nextIdx]?.focus();
+      const nextIdx = Math.min(pasted.length - 1, 5);
+      setTimeout(() => inputs.current[nextIdx]?.focus(), 0);
     }
     e.preventDefault();
   }
@@ -98,17 +130,18 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
     <div className="flex gap-2 justify-center">
       {Array.from({ length: 6 }).map((_, i) => (
         <input
-          key={i}
+          key={`otp-digit-${i}`}
           ref={el => { inputs.current[i] = el; }}
           type="text"
           inputMode="numeric"
+          pattern="[0-9]*"
           maxLength={1}
-          value={digits[i] === ' ' ? '' : digits[i] || ''}
+          value={arr[i] || ''}
           onChange={e => handleChange(i, e)}
           onKeyDown={e => handleKeyDown(i, e)}
           onPaste={handlePaste}
+          aria-label={`Digit ${i + 1} of verification code`}
           className="w-10 h-12 text-center text-lg font-bold rounded-xl border-2 border-border bg-card text-foreground focus:outline-none focus:border-primary transition-colors"
-          style={{ caretColor: 'transparent' }}
         />
       ))}
     </div>
@@ -119,13 +152,24 @@ function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-export default function LoginForm({ onSwitchToRegister }: Props) {
+function normalizeGuestPhoneValue(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+
+  const withoutLeadingZero = digits.startsWith('0') ? digits.slice(1) : digits;
+  const withoutCountryCode = withoutLeadingZero.startsWith('63') ? withoutLeadingZero.slice(2) : withoutLeadingZero;
+
+  if (withoutCountryCode.length !== 10) return '';
+  return `+63${withoutCountryCode}`;
+}
+
+export default function LoginForm({ onSwitchToRegister, onSuccess }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [welcomeUser, setWelcomeUser] = useState<string | null>(null);
   const [showGuestOptions, setShowGuestOptions] = useState(false);
   const [guestMethod, setGuestMethod] = useState<'phone' | 'gmail' | null>(null);
-  const [guestPhone, setGuestPhone] = useState('');
+  const [guestPhoneRaw, setGuestPhoneRaw] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhoneError, setGuestPhoneError] = useState('');
   const [guestEmailError, setGuestEmailError] = useState('');
@@ -139,7 +183,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
   const [otpResendCooldown, setOtpResendCooldown] = useState(0);
   const [otpContact, setOtpContact] = useState('');
 
-  const { signIn } = useAuth();
+  const { signIn, signInAsGuest } = useAuth();
   const router = useRouter();
 
   const {
@@ -165,36 +209,60 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
         result?.user?.user_metadata?.name ||
         result?.user?.email?.split('@')[0] ||
         'there';
+
       setWelcomeUser(name);
+
+      if (onSuccess) {
+        onSuccess(name);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Invalid credentials. Please try again.';
       setError('root', { message });
+    } finally {
       setIsLoading(false);
     }
   }
 
-  function sendOtp(contact: string) {
+  async function sendOtp(contact: string) {
     const otp = generateOtp();
+    if (contact && contact.startsWith('+')) {
+      try {
+        const resp = await fetch('/api/send-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: contact, otp }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          console.warn('SMS send failed, falling back to demo:', data);
+          toast.warning('SMS delivery not configured — using demo OTP');
+        }
+      } catch (err) {
+        console.warn('SMS send error, falling back to demo:', err);
+        toast.warning('SMS delivery failed — using demo OTP');
+      }
+    } else {
+      console.log(`[FeastFete OTP] Code for ${contact}: ${otp}`);
+    }
+
     setGeneratedOtp(otp);
     setOtpContact(contact);
     setOtpCode('');
     setOtpError('');
     setOtpStep(true);
     setOtpResendCooldown(30);
-    // In production: call SMS/email API here
-    // For demo, show OTP in console
-    console.log(`[FeastFete OTP] Code for ${contact}: ${otp}`);
   }
 
   function handleGuestPhoneContinue() {
-    if (!guestPhone.trim() || guestPhone.trim().length < 7) {
-      setGuestPhoneError('Please enter a valid phone number.');
+    const normalizedPhone = normalizeGuestPhoneValue(guestPhoneRaw);
+    if (!normalizedPhone) {
+      setGuestPhoneError('Please enter a valid Philippine phone number.');
       return;
     }
     setGuestPhoneError('');
     setOtpSending(true);
     setTimeout(() => {
-      sendOtp(guestPhone.trim());
+      sendOtp(normalizedPhone);
       setOtpSending(false);
     }, 600);
   }
@@ -213,7 +281,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
     }, 600);
   }
 
-  function handleVerifyOtp() {
+  async function handleVerifyOtp() {
     if (otpCode.length < 6) {
       setOtpError('Please enter the full 6-digit code.');
       return;
@@ -225,27 +293,43 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
     }
     setOtpError('');
 
-    // Determine contact type from which method was used
     const contactType = guestMethod === 'phone' ? 'phone' : 'email';
+    setIsLoading(true);
 
-    // Create guest_profile record with verified contact data
-    createGuestProfile(contactType, otpContact)
-      .then((profile) => {
-        // Store guest profile id in localStorage so orders can be linked
-        try {
-          localStorage.setItem('guestProfileId', profile.id);
-          localStorage.setItem('guestContactType', profile.contactType);
-          localStorage.setItem('guestContactValue', profile.contactValue);
-        } catch {
-          // localStorage unavailable — non-critical, proceed anyway
-        }
-      })
-      .catch(() => {
-        // Non-blocking: profile creation failure should not prevent guest access
-      })
-      .finally(() => {
-        setWelcomeUser('Guest');
-      });
+    try {
+      const profile = await createGuestProfile(contactType, otpContact);
+      try {
+        localStorage.setItem('guestProfileId', profile.id);
+        localStorage.setItem('guestContactType', profile.contactType);
+        localStorage.setItem('guestContactValue', profile.contactValue);
+      } catch {}
+
+      if (signInAsGuest) {
+        await signInAsGuest({
+          id: profile.id,
+          contactType: profile.contactType,
+          contactValue: profile.contactValue,
+        });
+      }
+    } catch (err) {
+      console.warn('[LoginForm] createGuestProfile failed, fallback to local guest session', err);
+      if (signInAsGuest) {
+        await signInAsGuest({
+          id: `guest-${Date.now()}`,
+          contactType,
+          contactValue: otpContact,
+        });
+      }
+    } finally {
+      setIsLoading(false);
+      toast.success('Verification successful — continuing as guest');
+      setOtpStep(false);
+      setWelcomeUser('Guest');
+
+      if (onSuccess) {
+        onSuccess('Guest');
+      }
+    }
   }
 
   function handleResendOtp() {
@@ -260,14 +344,26 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
     setGeneratedOtp('');
   }
 
+  function resetGuestFlow() {
+    setShowGuestOptions(false);
+    setGuestMethod(null);
+    setGuestPhoneRaw('');
+    setGuestEmail('');
+    setGuestPhoneError('');
+    setGuestEmailError('');
+  }
+
+  // Welcome Splash view upon login -> Redirects directly to the Landing/Homepage '/'
   if (welcomeUser) {
     return (
-      <WelcomeSplash
-        userName={welcomeUser}
-        onComplete={() => {
-          window.location.href = '/';
-        }}
-      />
+      <div className="py-8 flex flex-col items-center justify-center">
+        <WelcomeSplash
+          userName={welcomeUser}
+          onComplete={() => {
+            router.push('/');
+          }}
+        />
+      </div>
     );
   }
 
@@ -279,18 +375,18 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       <div>
-        <h3 className="font-display text-2xl font-bold text-foreground">Welcome back</h3>
+        <h3 className="font-display text-2xl font-bold text-foreground">Welcome</h3>
         <p className="text-sm text-muted-foreground mt-1">Sign in to your Feast & Fête account.</p>
       </div>
 
-      {/* Root error */}
-      {errors.root && (
+      {/* Root error check */}
+      {errors.root?.message && (
         <div
           className="flex items-start gap-2 px-4 py-3 rounded-xl bg-error/8 border border-error/20"
           style={{ animation: 'slideInError 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}
         >
           <Icon name="ExclamationCircleIcon" size={16} className="text-error mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-error">{errors.root.message}</p>
+          <p className="text-sm text-error">{String(errors.root.message)}</p>
         </div>
       )}
 
@@ -311,7 +407,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
           })}
           aria-invalid={!!errors.email}
         />
-        {errors.email && (
+        {errors.email?.message && (
           <p className="text-xs text-error flex items-center gap-1">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
             {errors.email.message}
@@ -348,7 +444,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
             <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
           </button>
         </div>
-        {errors.password && (
+        {errors.password?.message && (
           <p className="text-xs text-error flex items-center gap-1">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
             {errors.password.message}
@@ -393,7 +489,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
         <div className="flex-1 h-px bg-border" />
       </div>
 
-      {/* Login as Guest button — hide when guest panels are open */}
+      {/* Guest Button */}
       {!showGuestOptions && !guestMethod && !otpStep && (
         <button
           type="button"
@@ -406,7 +502,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
         </button>
       )}
 
-      {/* Guest options — animated expand */}
+      {/* Choice Panel */}
       <AnimatedPanel show={showChoicePanel}>
         <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
           <p className="text-sm font-semibold text-foreground text-center">Continue as Guest with:</p>
@@ -414,6 +510,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
             <button
               type="button"
               onClick={() => { setShowGuestOptions(false); setGuestMethod('phone'); }}
+              aria-label="Continue with Phone"
               className="flex flex-col items-center gap-2 py-4 px-3 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 active:scale-[0.96]"
               style={{ transition: 'border-color 0.2s, background 0.2s, transform 0.15s' }}
             >
@@ -422,6 +519,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
             <button
               type="button"
               onClick={() => { setShowGuestOptions(false); setGuestMethod('gmail'); }}
+              aria-label="Continue with Gmail"
               className="flex flex-col items-center gap-2 py-4 px-3 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 active:scale-[0.96]"
               style={{ transition: 'border-color 0.2s, background 0.2s, transform 0.15s' }}
             >
@@ -436,7 +534,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
           </div>
           <button
             type="button"
-            onClick={() => setShowGuestOptions(false)}
+            onClick={resetGuestFlow}
             className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors text-center"
           >
             Cancel
@@ -444,30 +542,47 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
         </div>
       </AnimatedPanel>
 
-      {/* Guest: Phone input — animated expand */}
+      {/* Phone Panel */}
       <AnimatedPanel show={showPhonePanel}>
         <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setGuestMethod(null)}
+              onClick={resetGuestFlow}
               className="text-muted-foreground hover:text-foreground transition-colors hover:-translate-x-0.5"
               style={{ transition: 'color 0.2s, transform 0.2s' }}
-              aria-label="Back"
+              aria-label="Back to guest options"
             >
               <Icon name="ArrowLeftIcon" size={16} />
             </button>
-            <p className="text-sm font-semibold text-foreground">Enter your phone number</p>
+            <label htmlFor="guest-phone-input" className="text-sm font-semibold text-foreground cursor-pointer">
+              Enter your phone number
+            </label>
           </div>
           <div className="space-y-1.5">
-            <input
-              type="tel"
-              value={guestPhone}
-              onChange={e => { setGuestPhone(e.target.value); setGuestPhoneError(''); }}
-              className="input-field"
-              placeholder="+63 912 345 6789"
-              autoComplete="tel"
-            />
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-sm text-muted-foreground pointer-events-none">
+                <span aria-hidden="true">🇵🇭</span>
+                <span>+63</span>
+              </div>
+              <input
+                id="guest-phone-input"
+                type="tel"
+                value={guestPhoneRaw}
+                onChange={e => {
+                  const cleaned = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setGuestPhoneRaw(cleaned);
+                  setGuestPhoneError('');
+                }}
+                className="input-field"
+                style={{ paddingLeft: '4rem' }}
+                placeholder="9171234567"
+                autoComplete="tel"
+                inputMode="tel"
+                maxLength={10}
+                aria-label="Philippine phone number"
+              />
+            </div>
             {guestPhoneError && (
               <p className="text-xs text-error flex items-center gap-1">
                 <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
@@ -491,16 +606,16 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
         </div>
       </AnimatedPanel>
 
-      {/* Guest: Gmail input — animated expand */}
+      {/* Gmail Panel */}
       <AnimatedPanel show={showGmailPanel}>
         <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setGuestMethod(null)}
+              onClick={resetGuestFlow}
               className="text-muted-foreground hover:text-foreground transition-colors hover:-translate-x-0.5"
               style={{ transition: 'color 0.2s, transform 0.2s' }}
-              aria-label="Back"
+              aria-label="Back to guest options"
             >
               <Icon name="ArrowLeftIcon" size={16} />
             </button>
@@ -514,6 +629,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
               className="input-field"
               placeholder="you@gmail.com"
               autoComplete="email"
+              aria-label="Gmail address"
             />
             {guestEmailError && (
               <p className="text-xs text-error flex items-center gap-1">
@@ -547,7 +663,7 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
               onClick={handleBackFromOtp}
               className="text-muted-foreground hover:text-foreground transition-colors hover:-translate-x-0.5"
               style={{ transition: 'color 0.2s, transform 0.2s' }}
-              aria-label="Back"
+              aria-label="Back to contact input"
             >
               <Icon name="ArrowLeftIcon" size={16} />
             </button>
@@ -555,11 +671,8 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
           </div>
 
           <div className="text-center space-y-1">
-            <p className="text-xs text-muted-foreground">
-              We sent a 6-digit code to
-            </p>
+            <p className="text-xs text-muted-foreground">We sent a 6-digit code to</p>
             <p className="text-sm font-semibold text-foreground">{otpContact}</p>
-            {/* Demo notice */}
             <div className="mt-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
               🔔 Demo mode — your code is: <span className="font-bold tracking-widest">{generatedOtp}</span>
             </div>
@@ -577,12 +690,18 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
           <button
             type="button"
             onClick={handleVerifyOtp}
-            disabled={otpCode.length < 6}
+            disabled={otpCode.length < 6 || isLoading}
             className="w-full py-2.5 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
             style={{ transition: 'opacity 0.2s, transform 0.15s' }}
           >
-            <Icon name="CheckCircleIcon" size={16} />
-            Verify & Continue as Guest
+            {isLoading ? (
+              <><Icon name="ArrowPathIcon" size={16} className="animate-spin" /> Verifying…</>
+            ) : (
+              <>
+                <Icon name="CheckCircleIcon" size={16} />
+                Verify & Continue as Guest
+              </>
+            )}
           </button>
 
           <div className="text-center">
@@ -603,15 +722,13 @@ export default function LoginForm({ onSwitchToRegister }: Props) {
         </div>
       </AnimatedPanel>
 
-      {/* Switch to register */}
-      {!otpStep && (
-        <p className="text-center text-sm text-muted-foreground">
-          No account yet?{' '}
-          <button type="button" onClick={onSwitchToRegister} className="text-primary font-semibold hover:underline transition-all">
-            Create one free
-          </button>
-        </p>
-      )}
+      {/* Switch to Register */}
+      <p className="text-center text-sm text-muted-foreground">
+        Don&apos;t have an account yet?{' '}
+        <button type="button" onClick={onSwitchToRegister} className="text-primary font-semibold hover:underline">
+          Create one
+        </button>
+      </p>
 
       <style jsx>{`
         @keyframes slideInError {

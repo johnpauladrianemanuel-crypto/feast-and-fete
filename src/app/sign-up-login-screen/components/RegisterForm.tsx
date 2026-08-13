@@ -1,8 +1,8 @@
 'use client';
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -18,6 +18,7 @@ interface RegisterFormData {
 
 interface Props {
   onSwitchToLogin: () => void;
+  onSuccess?: (userName: string) => void;
 }
 
 export default function RegisterForm({ onSwitchToLogin }: Props) {
@@ -25,8 +26,8 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const { signUp } = useAuth();
-  const router = useRouter();
 
   const {
     register,
@@ -46,14 +47,31 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
         phone: data.phone,
         address: data.address,
       });
-      toast.success('Account created!', {
-        description: `Welcome to Feast & Fête, ${data.fullName.split(' ')[0]}!`,
-      });
+
+      setRegisteredEmail(data.email);
       setSuccess(true);
-      router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
-      setError('root', { message });
+
+      toast.success('Account created!', {
+        description: 'Please check your email to confirm your account.',
+      });
+    } catch (err: any) {
+      let message = 'Registration failed. Please try again.';
+
+      if (typeof err === 'string') {
+        message = err;
+      } else if (err?.message && typeof err.message === 'string') {
+        message = err.message;
+      } else if (err?.error_description && typeof err.error_description === 'string') {
+        message = err.error_description;
+      } else if (typeof err === 'object' && err !== null) {
+        try {
+          message = JSON.stringify(err) === '{}' ? message : String(err);
+        } catch {
+          message = 'Registration failed. Please try again.';
+        }
+      }
+
+      setError('root', { type: 'manual', message });
     } finally {
       setIsLoading(false);
     }
@@ -66,19 +84,20 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
           className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
           style={{ background: 'rgba(45,122,79,0.12)', border: '2px solid rgba(45,122,79,0.3)' }}
         >
-          <Icon name="CheckCircleIcon" size={32} className="text-success" />
+          <Icon name="EnvelopeIcon" size={32} className="text-primary" />
         </div>
         <div>
-          <h3 className="font-display text-xl font-bold text-foreground">Account Created!</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            You can now sign in and start ordering your feast.
+          <h3 className="font-display text-xl font-bold text-foreground">Check Your Email</h3>
+          <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto leading-relaxed">
+            We sent a confirmation link to <span className="font-semibold text-foreground">{registeredEmail}</span>. Please verify your email address before signing in.
           </p>
         </div>
         <button
+          type="button"
           onClick={onSwitchToLogin}
           className="w-full py-3 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl btn-3d transition-all"
         >
-          Sign In Now
+          Back to Sign In
         </button>
       </div>
     );
@@ -91,11 +110,15 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
         <p className="text-sm text-muted-foreground mt-1">Join Feast & Fête and start pre-ordering today.</p>
       </div>
 
-      {/* Root error */}
-      {errors.root && (
+      {/* Safe Root error display */}
+      {errors.root?.message && (
         <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-error/8 border border-error/20">
           <Icon name="ExclamationCircleIcon" size={16} className="text-error mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-error">{errors.root.message}</p>
+          <p className="text-sm text-error">
+            {typeof errors.root.message === 'string'
+              ? errors.root.message
+              : 'Registration failed. Please try again.'}
+          </p>
         </div>
       )}
 
@@ -116,7 +139,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
           })}
           aria-invalid={!!errors.fullName}
         />
-        {errors.fullName && (
+        {errors.fullName?.message && (
           <p className="text-xs text-error flex items-center gap-1">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
             {errors.fullName.message}
@@ -141,7 +164,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
           })}
           aria-invalid={!!errors.email}
         />
-        {errors.email && (
+        {errors.email?.message && (
           <p className="text-xs text-error flex items-center gap-1">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
             {errors.email.message}
@@ -170,7 +193,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
           })}
           aria-invalid={!!errors.phone}
         />
-        {errors.phone && (
+        {errors.phone?.message && (
           <p className="text-xs text-error flex items-center gap-1">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
             {errors.phone.message}
@@ -223,7 +246,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
             <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
           </button>
         </div>
-        {errors.password && (
+        {errors.password?.message && (
           <p className="text-xs text-error flex items-center gap-1">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
             {errors.password.message}
@@ -258,7 +281,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
             <Icon name={showConfirm ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
           </button>
         </div>
-        {errors.confirmPassword && (
+        {errors.confirmPassword?.message && (
           <p className="text-xs text-error flex items-center gap-1">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
             {errors.confirmPassword.message}
@@ -283,7 +306,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
             No refunds, but payments can be applied to future orders.
           </label>
         </div>
-        {errors.agreeToTerms && (
+        {errors.agreeToTerms?.message && (
           <p className="text-xs text-error flex items-center gap-1 ml-6">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
             {errors.agreeToTerms.message}

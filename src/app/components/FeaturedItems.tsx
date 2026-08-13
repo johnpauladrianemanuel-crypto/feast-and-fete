@@ -1,14 +1,18 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import AppImage from '@/components/ui/AppImage';
 import { useCart } from '@/lib/cartContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { fetchFeaturedMenuItems, MenuItem } from '@/lib/supabase/services';
 import Icon from '@/components/ui/AppIcon';
 import { toast } from 'sonner';
 
 export default function FeaturedItems() {
   const { addItem, openCart } = useCart();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [featured, setFeatured] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,6 +24,15 @@ export default function FeaturedItems() {
   }, []);
 
   function handleAdd(item: MenuItem) {
+    if (authLoading) return;
+    if (!user) {
+      toast.error('Please log in to add items to your cart.', {
+        description: 'Sign in to continue ordering.',
+      });
+      router.push('/sign-up-login-screen');
+      return;
+    }
+
     addItem(item);
     toast.success(`${item.name} added to cart!`, {
       description: `₱${item.price.toLocaleString()} — ${item.servingSize}`,

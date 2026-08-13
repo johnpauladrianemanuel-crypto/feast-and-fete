@@ -1,6 +1,6 @@
 'use client';
-import React, { useState } from 'react';
-import Icon from '@/components/ui/AppIcon';
+
+import React, { useEffect, useState } from 'react';
 
 type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled';
 
@@ -34,457 +34,275 @@ interface Order {
 }
 
 interface OrderDetailModalProps {
-  order: Order;
+  selectedOrder: Order;
   onClose: () => void;
-  onStatusUpdate: (orderId: string, newStatus: OrderStatus) => Promise<void>;
+  onStatusUpdate: (orderId: string, newStatus: OrderStatus, reason?: string) => Promise<void>;
   updatingId: string | null;
 }
 
+const STATUS_STEPS: OrderStatus[] = ['Pending', 'Confirmed', 'Preparing', 'Ready', 'Shipped', 'Completed'];
+
 const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: string }> = {
-  Pending:   { bg: 'rgba(234,179,8,0.15)',    text: '#EAB308', border: 'rgba(234,179,8,0.4)' },
-  Confirmed: { bg: 'rgba(59,130,246,0.15)',   text: '#60A5FA', border: 'rgba(59,130,246,0.4)' },
-  Preparing: { bg: 'rgba(249,115,22,0.15)',   text: '#FB923C', border: 'rgba(249,115,22,0.4)' },
-  Ready:     { bg: 'rgba(34,197,94,0.15)',    text: '#4ADE80', border: 'rgba(34,197,94,0.4)' },
-  Shipped:   { bg: 'rgba(139,92,246,0.15)',   text: '#A78BFA', border: 'rgba(139,92,246,0.4)' },
-  Completed: { bg: 'rgba(100,116,139,0.15)',  text: '#94A3B8', border: 'rgba(100,116,139,0.4)' },
-  Cancelled: { bg: 'rgba(239,68,68,0.1)',     text: '#F87171', border: 'rgba(239,68,68,0.3)' },
+  Pending: { bg: 'rgba(234,179,8,0.15)', text: '#EAB308', border: 'rgba(234,179,8,0.3)' },
+  Confirmed: { bg: 'rgba(59,130,246,0.15)', text: '#60A5FA', border: 'rgba(59,130,246,0.3)' },
+  Preparing: { bg: 'rgba(249,115,22,0.15)', text: '#FB923C', border: 'rgba(249,115,22,0.3)' },
+  Ready: { bg: 'rgba(34,197,94,0.15)', text: '#4ADE80', border: 'rgba(34,197,94,0.3)' },
+  Shipped: { bg: 'rgba(139,92,246,0.15)', text: '#A78BFA', border: 'rgba(139,92,246,0.3)' },
+  Completed: { bg: 'rgba(100,116,139,0.15)', text: '#94A3B8', border: 'rgba(100,116,139,0.3)' },
+  Cancelled: { bg: 'rgba(239,68,68,0.15)', text: '#F87171', border: 'rgba(239,68,68,0.3)' },
 };
 
-const STATUS_FLOW: OrderStatus[] = ['Pending', 'Confirmed', 'Preparing', 'Ready', 'Shipped', 'Completed'];
+export default function OrderDetailModal({
+  selectedOrder,
+  onClose,
+  onStatusUpdate,
+  updatingId,
+}: OrderDetailModalProps) {
+  const [cancelReason, setCancelReason] = useState('');
+  const [showCancelInput, setShowCancelInput] = useState(false);
 
-const PAYMENT_LABELS: Record<string, string> = {
-  gcash: 'GCash',
-  bank_transfer: 'Bank Transfer',
-  cash: 'Cash on Delivery',
-};
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
-const PAYMENT_ICONS: Record<string, string> = {
-  gcash: 'DevicePhoneMobileIcon',
-  bank_transfer: 'BuildingLibraryIcon',
-  cash: 'BanknotesIcon',
-};
+  const currentStepIndex = STATUS_STEPS.indexOf(selectedOrder.status);
+  const isUpdating = updatingId === selectedOrder.id;
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-PH', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatDateTime(dateStr: string) {
-  return new Date(dateStr).toLocaleString('en-PH', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-export default function OrderDetailModal({ order, onClose, onStatusUpdate, updatingId }: OrderDetailModalProps) {
-  const [confirmCancel, setConfirmCancel] = useState(false);
-  const isUpdating = updatingId === order.id;
-
-  const currentStatusIndex = STATUS_FLOW.indexOf(order.status);
-  const isCancelled = order.status === 'Cancelled';
-
-  const handleStatusClick = async (status: OrderStatus) => {
-    if (isUpdating) return;
-    await onStatusUpdate(order.id, status);
+  const handleAction = async (newStatus: OrderStatus, reason?: string) => {
+    await onStatusUpdate(selectedOrder.id, newStatus, reason);
+    if (newStatus === 'Cancelled') {
+      setShowCancelInput(false);
+      setCancelReason('');
+    }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl"
-        style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}
-      >
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="absolute inset-0" onClick={onClose} />
+
+      <div className="relative w-full max-w-2xl bg-[#181512] border border-[#332E2B] rounded-2xl shadow-2xl text-[#F5EDE0] overflow-hidden z-10 max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-4"
-          style={{ background: 'var(--admin-surface)', borderBottom: '1px solid var(--admin-border)' }}
-        >
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-sm font-bold" style={{ color: '#D4A017' }}>
-                  {order.order_number}
-                </span>
-                <span
-                  className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                  style={{
-                    background: STATUS_COLORS[order.status]?.bg,
-                    color: STATUS_COLORS[order.status]?.text,
-                    border: `1px solid ${STATUS_COLORS[order.status]?.border}`,
-                  }}
-                >
-                  {order.status}
-                </span>
-              </div>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--admin-muted)' }}>
-                Placed {formatDateTime(order.created_at)}
-              </p>
-            </div>
+        <div className="p-6 border-b border-[#332E2B] flex items-center justify-between bg-[#120F0D]">
+          <div>
+            <span className="text-xs uppercase tracking-wider text-stone-400">Order Details</span>
+            <h2 className="text-xl font-bold font-mono text-[#D4A017]">{selectedOrder.order_number}</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl transition-colors hover:bg-white/10"
-            style={{ color: 'var(--admin-muted)' }}
+            className="p-2 rounded-lg text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <Icon name="XMarkIcon" size={18} />
+            ✕
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Status Progress Tracker */}
-          {!isCancelled && (
-            <div
-              className="rounded-xl p-4"
-              style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)' }}
-            >
-              <p className="text-xs font-semibold uppercase tracking-wide mb-4" style={{ color: 'var(--admin-muted)' }}>
-                Order Progress
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Customer & Status Header */}
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-[#120F0D] p-4 rounded-xl border border-[#2A2420]">
+            <div>
+              <p className="text-xs text-stone-400">Customer</p>
+              <p className="text-sm font-medium">{selectedOrder.customer_name}</p>
+              <p className="text-xs text-stone-500">{selectedOrder.customer_email}</p>
+              {selectedOrder.customer_phone && (
+                <p className="text-xs text-stone-500">{selectedOrder.customer_phone}</p>
+              )}
+            </div>
+
+            <div className="text-right">
+              <span
+                className="inline-block px-3 py-1 rounded-full text-xs font-semibold"
+                style={{
+                  background: STATUS_COLORS[selectedOrder.status]?.bg,
+                  color: STATUS_COLORS[selectedOrder.status]?.text,
+                  border: `1px solid ${STATUS_COLORS[selectedOrder.status]?.border}`,
+                }}
+              >
+                {selectedOrder.status}
+              </span>
+              <p className="text-[10px] text-stone-500 mt-1">
+                Updated: {new Date(selectedOrder.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
-              <div className="flex items-center gap-0">
-                {STATUS_FLOW.map((status, idx) => {
-                  const isDone = currentStatusIndex >= idx;
-                  const isCurrent = currentStatusIndex === idx;
-                  const isLast = idx === STATUS_FLOW.length - 1;
+            </div>
+          </div>
+
+          {/* Progress Tracker */}
+          {selectedOrder.status !== 'Cancelled' ? (
+            <div className="space-y-2">
+              <h3 className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
+                Order Status
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                {STATUS_STEPS.map((step, idx) => {
+                  const isPassed = idx <= currentStepIndex;
+                  const isCurrent = idx === currentStepIndex;
+
                   return (
-                    <React.Fragment key={status}>
-                      <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
-                          style={{
-                            background: isDone ? STATUS_COLORS[status].bg : 'var(--admin-surface)',
-                            border: `2px solid ${isDone ? STATUS_COLORS[status].text : 'var(--admin-border)'}`,
-                            color: isDone ? STATUS_COLORS[status].text : 'var(--admin-muted)',
-                          }}
-                        >
-                          {isDone && !isCurrent ? (
-                            <Icon name="CheckIcon" size={12} />
-                          ) : (
-                            <span className="text-[10px]">{idx + 1}</span>
-                          )}
-                        </div>
-                        <span
-                          className="text-[10px] font-medium whitespace-nowrap"
-                          style={{ color: isCurrent ? STATUS_COLORS[status].text : isDone ? '#F5EDE0' : 'var(--admin-muted)' }}
-                        >
-                          {status}
-                        </span>
-                      </div>
-                      {!isLast && (
-                        <div
-                          className="flex-1 h-0.5 mx-1 mb-4"
-                          style={{
-                            background: currentStatusIndex > idx ? '#D4A017' : 'var(--admin-border)',
-                          }}
-                        />
-                      )}
-                    </React.Fragment>
+                    <div
+                      key={step}
+                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                        isCurrent
+                          ? 'bg-[#D4A017]/10 border-[#D4A017] text-[#D4A017]'
+                          : isPassed
+                          ? 'bg-white/5 border-stone-700 text-stone-300'
+                          : 'bg-transparent border-stone-800 text-stone-600'
+                      }`}
+                    >
+                      <div className="text-[10px] font-mono mb-0.5">0{idx + 1}</div>
+                      <div className="text-[11px] font-medium leading-tight">{step}</div>
+                    </div>
                   );
                 })}
               </div>
             </div>
-          )}
-
-          {isCancelled && (
-            <div
-              className="flex items-center gap-3 px-4 py-3 rounded-xl"
-              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
-            >
-              <Icon name="XCircleIcon" size={18} style={{ color: '#F87171' }} />
-              <p className="text-sm font-medium" style={{ color: '#F87171' }}>This order has been cancelled.</p>
-            </div>
-          )}
-
-          {/* Two-column layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Customer Info */}
-            <div
-              className="rounded-xl p-4 space-y-3"
-              style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)' }}
-            >
-              <div className="flex items-center gap-2">
-                <Icon name="UserIcon" size={14} style={{ color: '#D4A017' }} />
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--admin-muted)' }}>
-                  Customer
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-semibold" style={{ color: '#F5EDE0' }}>{order.customer_name}</p>
-                {order.customer_email && (
-                  <div className="flex items-center gap-2">
-                    <Icon name="EnvelopeIcon" size={12} style={{ color: 'var(--admin-muted)' }} />
-                    <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>{order.customer_email}</p>
-                  </div>
-                )}
-                {order.customer_phone && (
-                  <div className="flex items-center gap-2">
-                    <Icon name="PhoneIcon" size={12} style={{ color: 'var(--admin-muted)' }} />
-                    <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>{order.customer_phone}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Payment Info */}
-            <div
-              className="rounded-xl p-4 space-y-3"
-              style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)' }}
-            >
-              <div className="flex items-center gap-2">
-                <Icon name="CreditCardIcon" size={14} style={{ color: '#D4A017' }} />
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--admin-muted)' }}>
-                  Payment
-                </p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Icon
-                    name={PAYMENT_ICONS[order.payment_method] || 'CreditCardIcon'}
-                    size={14}
-                    style={{ color: '#4ADE80' }}
-                  />
-                  <p className="text-sm font-semibold" style={{ color: '#F5EDE0' }}>
-                    {PAYMENT_LABELS[order.payment_method] || order.payment_method}
-                  </p>
-                </div>
-                <div className="space-y-1 pt-1" style={{ borderTop: '1px solid var(--admin-border)' }}>
-                  <div className="flex justify-between text-xs">
-                    <span style={{ color: 'var(--admin-muted)' }}>Subtotal</span>
-                    <span style={{ color: '#F5EDE0' }}>₱{Number(order.subtotal).toLocaleString()}</span>
-                  </div>
-                  {Number(order.delivery_fee) > 0 && (
-                    <div className="flex justify-between text-xs">
-                      <span style={{ color: 'var(--admin-muted)' }}>Delivery Fee</span>
-                      <span style={{ color: '#F5EDE0' }}>₱{Number(order.delivery_fee).toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-bold pt-1" style={{ borderTop: '1px solid var(--admin-border)' }}>
-                    <span style={{ color: '#F5EDE0' }}>Total</span>
-                    <span style={{ color: '#D4A017' }}>₱{Number(order.total_amount).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Delivery Info */}
-            <div
-              className="rounded-xl p-4 space-y-3"
-              style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)' }}
-            >
-              <div className="flex items-center gap-2">
-                <Icon name={order.delivery_method === 'delivery' ? 'TruckIcon' : 'ShoppingBagIcon'} size={14} style={{ color: '#D4A017' }} />
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--admin-muted)' }}>
-                  {order.delivery_method === 'delivery' ? 'Delivery' : 'Pickup'}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <span
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium capitalize"
-                  style={{ background: 'rgba(212,160,23,0.15)', color: '#D4A017', border: '1px solid rgba(212,160,23,0.3)' }}
-                >
-                  {order.delivery_method}
-                </span>
-                {order.delivery_address && (
-                  <div className="flex items-start gap-2 mt-1">
-                    <Icon name="MapPinIcon" size={12} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--admin-muted)' }} />
-                    <p className="text-xs" style={{ color: '#F5EDE0' }}>{order.delivery_address}</p>
-                  </div>
-                )}
-                {order.event_date && (
-                  <div className="flex items-center gap-2">
-                    <Icon name="CalendarIcon" size={12} style={{ color: 'var(--admin-muted)' }} />
-                    <p className="text-xs" style={{ color: '#F5EDE0' }}>
-                      {formatDate(order.event_date)}
-                      {order.event_time ? ` at ${order.event_time}` : ''}
-                    </p>
-                  </div>
-                )}
-                {!order.delivery_address && !order.event_date && (
-                  <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>No address specified</p>
-                )}
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div
-              className="rounded-xl p-4 space-y-3"
-              style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)' }}
-            >
-              <div className="flex items-center gap-2">
-                <Icon name="ChatBubbleLeftEllipsisIcon" size={14} style={{ color: '#D4A017' }} />
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--admin-muted)' }}>
-                  Special Notes
-                </p>
-              </div>
-              {order.notes ? (
-                <p className="text-xs leading-relaxed" style={{ color: '#F5EDE0' }}>{order.notes}</p>
-              ) : (
-                <p className="text-xs italic" style={{ color: 'var(--admin-muted)' }}>No special notes</p>
+          ) : (
+            <div className="p-4 bg-red-950/20 border border-red-800/40 rounded-xl text-center">
+              <p className="text-red-400 text-sm font-semibold">This Order Was Cancelled</p>
+              {selectedOrder.notes && (
+                <p className="text-xs text-stone-400 mt-1 whitespace-pre-line">{selectedOrder.notes}</p>
               )}
             </div>
-          </div>
+          )}
 
           {/* Order Items */}
-          <div
-            className="rounded-xl overflow-hidden"
-            style={{ border: '1px solid var(--admin-border)' }}
-          >
-            <div
-              className="flex items-center gap-2 px-4 py-3"
-              style={{ background: 'var(--admin-bg)', borderBottom: '1px solid var(--admin-border)' }}
-            >
-              <Icon name="ShoppingCartIcon" size={14} style={{ color: '#D4A017' }} />
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--admin-muted)' }}>
-                Order Items ({order.order_items?.length ?? 0})
-              </p>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--admin-border)', background: 'var(--admin-bg)' }}>
-                  {['Item', 'Qty', 'Unit Price', 'Subtotal'].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide"
-                      style={{ color: 'var(--admin-muted)' }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {order.order_items?.map((item, i) => (
-                  <tr
-                    key={item.id}
-                    style={{
-                      borderBottom: i < (order.order_items?.length ?? 0) - 1 ? '1px solid var(--admin-border)' : 'none',
-                      background: 'var(--admin-surface)',
-                    }}
-                  >
-                    <td className="px-4 py-3 font-medium text-sm" style={{ color: '#F5EDE0' }}>
-                      {item.menu_item_name}
-                    </td>
-                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--admin-muted)' }}>
-                      ×{item.quantity}
-                    </td>
-                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--admin-muted)' }}>
-                      ₱{Number(item.unit_price).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold" style={{ color: '#F5EDE0' }}>
-                      ₱{Number(item.subtotal).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="flex justify-between items-center px-4 py-3 font-bold text-sm" style={{ background: 'var(--admin-bg)', borderTop: '1px solid var(--admin-border)' }}>
-              <span style={{ color: '#F5EDE0' }}>Total</span>
-              <span style={{ color: '#D4A017' }}>₱{Number(order.total_amount).toLocaleString()}</span>
+          <div className="space-y-3">
+            <h3 className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
+              Items Ordered
+            </h3>
+            <div className="divide-y divide-[#2A2420] border-t border-b border-[#2A2420]">
+              {selectedOrder.order_items?.map((item) => (
+                <div key={item.id} className="py-2.5 flex justify-between items-center text-xs">
+                  <div>
+                    <p className="font-medium text-[#F5EDE0]">{item.menu_item_name}</p>
+                    <p className="text-stone-500">Qty: {item.quantity}</p>
+                  </div>
+                  <span className="font-mono text-stone-300">
+                    ₱{Number(item.subtotal).toLocaleString()}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Status Update Section */}
-          <div
-            className="rounded-xl p-4 space-y-3"
-            style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Icon name="ArrowPathIcon" size={14} style={{ color: '#D4A017' }} />
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--admin-muted)' }}>
-                  Update Status
-                </p>
-              </div>
-              {isUpdating && (
-                <span className="text-xs" style={{ color: 'var(--admin-muted)' }}>Updating…</span>
-              )}
+          {/* Billing Summary */}
+          <div className="bg-[#120F0D] p-4 rounded-xl border border-[#2A2420] space-y-1.5 text-xs">
+            <div className="flex justify-between text-stone-400">
+              <span>Subtotal</span>
+              <span className="font-mono">₱{Number(selectedOrder.subtotal).toLocaleString()}</span>
             </div>
+            <div className="flex justify-between text-stone-400">
+              <span>Delivery Fee</span>
+              <span className="font-mono">₱{Number(selectedOrder.delivery_fee).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold text-[#F5EDE0] pt-2 border-t border-[#2A2420]">
+              <span>Total Amount</span>
+              <span className="font-mono text-[#D4A017]">
+                ₱{Number(selectedOrder.total_amount).toLocaleString()}
+              </span>
+            </div>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Quick Action: Confirm Order Button (Shown when status is Pending) */}
-              {order.status === 'Pending' && (
-                <button
-                  onClick={() => handleStatusClick('Confirmed')}
-                  disabled={isUpdating}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background: '#3B82F6',
-                    color: '#FFFFFF',
-                    border: '1px solid #60A5FA',
-                  }}
-                >
-                  <Icon name="CheckCircleIcon" size={14} />
-                  Confirm Order
-                </button>
-              )}
+          {/* Quick Actions inside Modal */}
+          {selectedOrder.status !== 'Completed' && selectedOrder.status !== 'Cancelled' && (
+            <div className="space-y-3 pt-2">
+              <h3 className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
+                Update Order Status
+              </h3>
 
-              {/* Status Selector Pills */}
-              {(['Pending', 'Confirmed', 'Preparing', 'Ready', 'Shipped', 'Completed'] as OrderStatus[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleStatusClick(s)}
-                  disabled={isUpdating || order.status === s || isCancelled}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background: order.status === s ? STATUS_COLORS[s].bg : 'var(--admin-surface)',
-                    color: STATUS_COLORS[s].text,
-                    border: `1px solid ${order.status === s ? STATUS_COLORS[s].border : 'var(--admin-border)'}`,
-                  }}
-                >
-                  {order.status === s && <span className="mr-1">✓</span>}
-                  {s}
-                </button>
-              ))}
-
-              {/* Cancel button with confirmation */}
-              {!isCancelled && order.status !== 'Completed' && (
-                confirmCancel ? (
-                  <div className="flex items-center gap-2 ml-auto">
-                    <span className="text-xs" style={{ color: '#F87171' }}>Confirm cancel?</span>
+              {showCancelInput ? (
+                <div className="space-y-2 bg-[#120F0D] p-3 rounded-xl border border-red-900/50">
+                  <textarea
+                    rows={2}
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="Enter reason for cancellation..."
+                    className="w-full p-2 rounded-lg text-xs outline-none bg-[#181512] border border-[#332E2B] text-stone-200"
+                  />
+                  <div className="flex justify-end gap-2">
                     <button
-                      onClick={() => { handleStatusClick('Cancelled'); setConfirmCancel(false); }}
-                      disabled={isUpdating}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
-                      style={{ background: 'rgba(239,68,68,0.2)', color: '#F87171', border: '1px solid rgba(239,68,68,0.4)' }}
+                      onClick={() => setShowCancelInput(false)}
+                      className="px-3 py-1 rounded-lg text-xs bg-stone-800 text-stone-300"
                     >
-                      Yes, Cancel
+                      Back
                     </button>
                     <button
-                      onClick={() => setConfirmCancel(false)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                      style={{ background: 'var(--admin-surface)', color: 'var(--admin-muted)', border: '1px solid var(--admin-border)' }}
+                      disabled={!cancelReason.trim() || isUpdating}
+                      onClick={() => handleAction('Cancelled', cancelReason)}
+                      className="px-3 py-1 rounded-lg text-xs bg-red-600 text-white disabled:opacity-50 flex items-center gap-1"
                     >
-                      No
+                      {isUpdating ? 'Saving...' : 'Confirm Cancel'}
                     </button>
                   </div>
-                ) : (
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {selectedOrder.status === 'Pending' && (
+                    <button
+                      disabled={isUpdating}
+                      onClick={() => handleAction('Confirmed')}
+                      className="px-3 py-1.5 rounded-xl text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 transition-all disabled:opacity-50"
+                    >
+                      {isUpdating ? 'Updating...' : 'Mark Confirmed'}
+                    </button>
+                  )}
+                  {(selectedOrder.status === 'Pending' || selectedOrder.status === 'Confirmed') && (
+                    <button
+                      disabled={isUpdating}
+                      onClick={() => handleAction('Preparing')}
+                      className="px-3 py-1.5 rounded-xl text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500/30 transition-all disabled:opacity-50"
+                    >
+                      {isUpdating ? 'Updating...' : 'Mark Preparing'}
+                    </button>
+                  )}
+                  {selectedOrder.status !== 'Ready' && (
+                    <button
+                      disabled={isUpdating}
+                      onClick={() => handleAction('Ready')}
+                      className="px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-all disabled:opacity-50"
+                    >
+                      {isUpdating ? 'Updating...' : 'Mark Ready'}
+                    </button>
+                  )}
+                  {selectedOrder.status !== 'Shipped' && (
+                    <button
+                      disabled={isUpdating}
+                      onClick={() => handleAction('Shipped')}
+                      className="px-3 py-1.5 rounded-xl text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all disabled:opacity-50"
+                    >
+                      {isUpdating ? 'Updating...' : 'Mark Shipped'}
+                    </button>
+                  )}
                   <button
-                    onClick={() => setConfirmCancel(true)}
                     disabled={isUpdating}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 ml-auto"
-                    style={{ background: 'rgba(239,68,68,0.08)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}
+                    onClick={() => handleAction('Completed')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-medium bg-stone-500/20 text-stone-300 border border-stone-500/30 hover:bg-stone-500/30 transition-all disabled:opacity-50"
+                  >
+                    {isUpdating ? 'Updating...' : 'Mark Completed'}
+                  </button>
+                  <button
+                    disabled={isUpdating}
+                    onClick={() => setShowCancelInput(true)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all disabled:opacity-50"
                   >
                     Cancel Order
                   </button>
-                )
+                </div>
               )}
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Timestamps */}
-          <div className="flex items-center justify-between text-xs" style={{ color: 'var(--admin-muted)' }}>
-            <span>Created: {formatDateTime(order.created_at)}</span>
-            <span>Last updated: {formatDateTime(order.updated_at)}</span>
-          </div>
+        {/* Footer */}
+        <div className="p-4 border-t border-[#332E2B] bg-[#120F0D] flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

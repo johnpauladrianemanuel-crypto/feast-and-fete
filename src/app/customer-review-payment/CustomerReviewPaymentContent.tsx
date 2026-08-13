@@ -18,7 +18,9 @@ interface AddressForm {
   phone: string;
   email: string;
   street: string;
+  region?: string;
   city: string;
+  barangay?: string;
   notes: string;
   eventDate: string;
   eventTime: string;
@@ -54,7 +56,9 @@ export default function CustomerReviewPaymentContent() {
     phone: '',
     email: '',
     street: '',
+    region: 'NCR',
     city: '',
+    barangay: '',
     notes: '',
     eventDate: '',
     eventTime: '',
@@ -106,13 +110,133 @@ export default function CustomerReviewPaymentContent() {
       });
   }, [user]);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
     if (errors[name as keyof AddressForm]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
   }
+
+  const REGION_OPTIONS = [
+    { value: 'NCR', label: 'National Capital Region (NCR)' },
+    { value: 'CALABARZON', label: 'Calabarzon (Region IV-A)' },
+    { value: 'CENTRAL_LUZON', label: 'Central Luzon (Region III)' },
+  ];
+
+  const REGION_CITY_MAP: Record<string, string[]> = {
+    NCR: [
+      'Quezon City',
+      'Manila',
+      'Makati',
+      'Pasig',
+      'Taguig',
+      'Mandaluyong',
+      'Parañaque',
+      'Las Piñas',
+      'Muntinlupa',
+      'Marikina',
+      'Caloocan',
+      'Valenzuela',
+      'Malabon',
+      'Navotas',
+      'San Juan',
+      'Pasay'
+    ],
+    CALABARZON: [
+      'San Mateo (Rizal)',
+      'Antipolo City',
+      'Taytay',
+      'Cainta',
+      'Rodriguez (Montalban)',
+      'Bacoor City',
+      'Imus City',
+      'Dasmariñas City',
+      'General Trias City',
+      'Calamba City',
+      'Santa Rosa City',
+      'Biñan City',
+      'Cabuyao City',
+      'San Pedro City',
+      'Lipa City',
+      'Batangas City'
+    ],
+    CENTRAL_LUZON: [
+      'Angeles City',
+      'San Fernando City',
+      'Mabalacat City',
+      'Malolos City',
+      'Meycauayan City',
+      'San Jose del Monte City',
+      'Tarlac City',
+      'Olongapo City',
+      'Cabanatuan City'
+    ],
+  };
+
+  const CITY_BARANGAY_MAP: Record<string, string[]> = {
+    // NCR Cities
+    'Quezon City': ['Barangay San Jose', 'Barangay Holy Spirit', 'Barangay Tatalon', 'Batasan Hills', 'Commonwealth', 'Cubao', 'Diliman', 'Kamuning', 'Loyola Heights', 'New Manila', 'Novaliches', 'Project 6', 'Teachers Village'],
+    'Manila': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Binondo', 'Ermita', 'Intramuros', 'Malate', 'Paco', 'Pandacan', 'Port Area', 'Quiapo', 'Sampaloc', 'San Miguel', 'San Nicolas', 'Santa Cruz', 'Santa Ana', 'Tondo'],
+    'Makati': ['Poblacion', 'San Antonio', 'Bel-Air', 'Dasmariñas', 'Forbes Park', 'Guadalupe Nuevo', 'Guadalupe Viejo', 'Magallanes', 'Pio del Pilar', 'San Lorenzo', 'Urdaneta'],
+    'Pasig': ['Bagong Ilog', 'Pinagbuhatan', 'Caniogan', 'Kapitolyo', 'Manggahan', 'Maybunga', 'Oranbo', 'Rosario', 'San Antonio', 'San Joaquin', 'Ugong'],
+    'Taguig': ['Central Bicutan', 'Ususan', 'Bambang', 'Fort Bonifacio (BGC)', 'Lower Bicutan', 'Napindan', 'Pinagsama', 'Signal Village', 'Tuktukan', 'Upper Bicutan'],
+    'Mandaluyong': ['Addition Hills', 'Barangka Drive', 'Highway Hills', 'Hulo', 'Malamig', 'Plainview', 'Pleasant Hills', 'Poblacion', 'San Jose', 'Wack-Wack Greenhills'],
+    'Parañaque': ['B F Homes', 'Don Bosco', 'Baclaran', 'Don Galo', 'La Huerta', 'Moonwalk', 'San Dionisio', 'San Isidro', 'Santo Niño', 'Sun Valley', 'Tambo'],
+    'Las Piñas': ['Alabang-Zapote', 'BF International', 'Daniel Fajardo', 'Pamplona Uno', 'Pamplona Tres', 'Pilar', 'Pulang Lupa Uno', 'Talon Uno', 'Talon Dos'],
+    'Muntinlupa': ['Alabang', 'Bayanan', 'B declaration', 'Cupang', 'Poblacion', 'Putatan', 'Sucat', 'Tunasan'],
+    'Marikina': ['Barangka', 'Concepcion Uno', 'Concepcion Dos', 'Industrial Valley', 'Fortune', 'Malanday', 'Marikina Heights', 'Nangka', 'Parang', 'San Roque', 'Santa Elena'],
+    'Caloocan': ['Barangay 1 to 188 (North/South Caloocan)', 'Bagong Silang', 'Camarin', 'Deparo', 'Grace Park', 'Monumento', 'Tala'],
+    'Valenzuela': ['Arkong Bato', 'Gen. T. de Leon', 'Karuhatan', 'Lawang Bato', 'Malinta', 'Mapulang Lupa', 'Marulas', 'Paso de Blas', 'Poblacion', 'Punturin'],
+    'Malabon': ['Acacia', 'Catmon', 'Concepcion', 'Dampalit', 'Longos', 'Niugan', 'Potrero', 'San Agustin', 'Tañong', 'Tugatog'],
+    'Navotas': ['Bagumbayan North', 'Bagumbayan South', 'Bangkulasi', 'Daanghari', 'Navotas East', 'Navotas West', 'San Jose', 'San Roque', 'Tangos North', 'Tangos South'],
+    'San Juan': ['Addition Hills', 'Balong-Bato', 'Greenhills', 'Kabayanan', 'Little Baguio', 'Maytunas', 'Onse', 'Pasadena', 'Poblacion', 'Progreso', 'San Perfecta', 'Tibagan'],
+    'Pasay': ['Baclaran', 'Don Carlos Village', 'Malibay', 'Maricaban', 'Poblacion', 'San Jose', 'San Rafael', 'San Roque', 'Villamor Airbase'],
+
+    // CALABARZON Cities / Municipalities
+    'San Mateo (Rizal)': [
+      'Ampid I',
+      'Ampid II',
+      'Banaba',
+      'Dulumbayan',
+      'Guitnang Bayan I',
+      'Guitnang Bayan II',
+      'Gulod Malaya',
+      'Malanday',
+      'Maly',
+      'Pintong Bukawe',
+      'Santa Ana',
+      'Santo Niño',
+      'Silangan',
+      'Kambal'
+    ],
+    'Antipolo City': ['Bagong Nayon', 'Beverly Hills', 'Calawis', 'Cupang', 'Dalig', 'Inarawan', 'Mambugan', 'Mayamot', 'Muntingdilaw', 'San Cruz', 'San Isidro', 'San Jose', 'San Roque'],
+    'Taytay': ['Dolores (Poblacion)', 'Muzon', 'San Juan', 'San Isidro', 'Santa Ana'],
+    'Cainta': ['San Andres', 'San Juan', 'San Roque', 'Santa Rosa', 'Santo Domingo'],
+    'Rodriguez (Montalban)': ['Balite', 'Burgos', 'Geronimo', 'Macabud', 'Manggahan', 'Mascap', 'Rosario', 'San Jose', 'San Rafael'],
+    'Bacoor City': ['Bayanan', 'Habay I', 'Habay II', 'Mambog I', 'Mambog II', 'Molino I', 'Molino II', 'Molino III', 'Molino IV', 'Niog I', 'Niog II', 'Panapaan', 'Salawag', 'Talaba'],
+    'Imus City': ['Anabu I-A', 'Anabu II-A', 'Bucandala', 'Carsadang Bago', 'Malagasang I-A', 'Malagasang II-A', 'Medicion', 'Poblacion', 'Tanzang Luma'],
+    'Dasmariñas City': ['Burol', 'Dasmariñas Bagong Bayan', 'Langkaan I', 'Langkaan II', 'Paliparan I', 'Paliparan II', 'Paliparan III', 'Sabang', 'Salawag', 'Salitran I', 'Salitran II', 'Sampaloc I'],
+    'General Trias City': ['Arnaldo', 'Bacao', 'Manggahan', 'Navarro', 'Pasong Kawayan', 'San Francisco', 'Tejero'],
+    'Calamba City': ['Barandal', 'Bucal', 'Canlubang', 'Halang', 'Lawa', 'Makiling', 'Parian', 'Poblacion', 'Real', 'Saimsim', 'Turbina'],
+    'Santa Rosa City': ['Balibago', 'Dila', 'Dita', 'Don Jose', 'Ibaba', 'Macabling', 'Malitlit', 'Market Area', 'Sinalhan', 'Tagapo'],
+    'Biñan City': ['Caniogan', 'De La Paz', 'Ganado', 'Langkiwa', 'Loma', 'Malaban', 'Platero', 'Poblacion', 'San Antonio', 'San Francisco', 'Santo Tomas'],
+    'Cabuyao City': ['Banaybanay', 'Banlic', 'Bigaa', 'Casile', 'Diezmo', 'Gulod', 'Mamatid', 'Poblacion', 'Pulo', 'Sala'],
+    'San Pedro City': ['Chrysanthemum', 'Cuyab', 'Landayan', 'Langgam', 'Magsaysay', 'Pacita 1', 'Pacita 2', 'Poblacion', 'San Antonio', 'San Vicente', 'United Bayanihan'],
+    'Lipa City': ['Balintawak', 'Inosloban', 'Mataas na Lupa', 'Pangao', 'Poblacion', 'Sabang', 'San Carlos', 'Tambobong', 'Tibig'],
+    'Batangas City': ['Alangilan', 'Balagtas', 'Bolbok', 'Calicanto', 'Cuta', 'Gulod Labac', 'Kumintang Ibaba', 'Kumintang Ilaya', 'Poblacion', 'Soro-soro Karsada'],
+
+    // CENTRAL LUZON Cities
+    'Angeles City': ['Balibago', 'Cutcut', 'Malabanias', 'Margardt', 'Pami', 'Pulung Maragul', 'Salapungan', 'Santo Rosario', 'Sapu Bato'],
+    'San Fernando City': ['Calulut', 'Dolores', 'Lacing', 'Magliman', 'Maimpis', 'Palawe', 'San Agustin', 'San Jose', 'Sindalan', 'Telabastagan'],
+    'Mabalacat City': ['Dau', 'Lakandula', 'Mabiga', 'Macapagal Village', 'Poblacion', 'San Francisco', 'Santa Ines', 'Tabun'],
+    'Malolos City': ['Bulihan', 'Cofradia', 'Guinhawa', 'Ligas', 'Longos', 'Lugam', 'Mojon', 'Panasahan', 'San Gabriel', 'San Vicente'],
+    'Meycauayan City': ['Banga', 'Bayugo', 'Calvario', 'Iba', 'Lawa', 'Libtong', 'Perez', 'Poblacion', 'Saluysoy', 'Zamora'],
+    'San Jose del Monte City': ['Fierce', 'Gumaoc', 'Muzon', 'Poblacion', 'Graceville', 'Kaypian', 'San Manuel', 'Santo Cristo', 'Tungkong Mangga'],
+    'Tarlac City': ['Binauganan', 'Central', 'Matatalaib', 'Poblacion', 'San Nicolas', 'San Rafael', 'San Vicente', 'Sepung Calzada', 'Suizo', 'Tibag'],
+    'Olongapo City': ['Barretto', 'East Bajac-Bajac', 'East Tapinac', 'Gordon Heights', 'Kalaklan', 'New Cabalan', 'Old Cabalan', 'Santa Rita', 'West Bajac-Bajac', 'West Tapinac'],
+    'Cabanatuan City': ['Bitas', 'Cabanatuan', 'Mabini Extension', 'Sangitan', 'San Josef', 'Supermarket', 'Aduas Norte', 'Aduas Sur', 'Barangay 1-10'],
+  };
 
   function validate(): boolean {
     const errs: Partial<AddressForm> = {};
@@ -134,7 +258,7 @@ export default function CustomerReviewPaymentContent() {
     setPlaceError('');
 
     const deliveryAddress = deliveryMethod === 'delivery'
-      ? `${form.street}${form.city ? ', ' + form.city : ''}`
+      ? `${form.street}${form.barangay ? ', ' + form.barangay : ''}${form.city ? ', ' + form.city : ''}${form.region ? ', ' + form.region : ''}`
       : 'Pickup at Feast & Fête Kitchen';
 
     const orderId = `FF-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
@@ -391,6 +515,55 @@ export default function CustomerReviewPaymentContent() {
 
                   {deliveryMethod === 'delivery' && (
                     <>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-foreground mb-1.5">Region</label>
+                          <select
+                            name="region"
+                            value={form.region}
+                            onChange={e => {
+                              // reset city and barangay when region changes
+                              setForm(prev => ({ ...prev, region: e.target.value, city: '', barangay: '' }));
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                          >
+                            {REGION_OPTIONS.map(r => (
+                              <option key={r.value} value={r.value}>{r.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-foreground mb-1.5">City / Municipality</label>
+                          <select
+                            name="city"
+                            value={form.city}
+                            onChange={e => setForm(prev => ({ ...prev, city: e.target.value, barangay: '' }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                          >
+                            <option value="">Select city</option>
+                            {(REGION_CITY_MAP[form.region || 'NCR'] || []).map(city => (
+                              <option key={city} value={city}>{city}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-foreground mb-1.5">Barangay</label>
+                          <select
+                            name="barangay"
+                            value={form.barangay}
+                            onChange={e => setForm(prev => ({ ...prev, barangay: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                          >
+                            <option value="">Select barangay</option>
+                            {((CITY_BARANGAY_MAP as Record<string, string[]>)[form.city] || []).map(b => (
+                              <option key={b} value={b}>{b}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
                           <label className="block text-xs font-semibold text-foreground">Street Address <span className="text-error">*</span></label>
@@ -409,20 +582,10 @@ export default function CustomerReviewPaymentContent() {
                           name="street"
                           value={form.street}
                           onChange={handleChange}
-                          placeholder="123 Rizal St., Barangay San Jose"
+                          placeholder="123 Rizal St., House / Unit No."
                           className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.street ? 'border-error' : 'border-border'}`}
                         />
                         {errors.street && <p className="text-xs text-error mt-1">{errors.street}</p>}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-foreground mb-1.5">City / Municipality</label>
-                        <input
-                          name="city"
-                          value={form.city}
-                          onChange={handleChange}
-                          placeholder="Quezon City"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                        />
                       </div>
                     </>
                   )}

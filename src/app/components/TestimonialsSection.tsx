@@ -1,5 +1,6 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 interface Review {
@@ -31,43 +32,73 @@ export default function TestimonialsSection() {
   const [totalReviews, setTotalReviews] = useState<number | null>(null);
   const [avgRating, setAvgRating] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchReviewsAndStats = useCallback(async () => {
     const supabase = createClient();
-    supabase
+
+    // Fetch live ratings from item_reviews
+    const { data: reviewsData } = await supabase
       .from('item_reviews')
       .select('id, reviewer_name, rating, review_text, created_at')
       .not('review_text', 'is', null)
       .gte('rating', 4)
       .order('created_at', { ascending: false })
-      .limit(3)
-      .then(({ data }) => {
-        if (data && data.length >= 2) {
-          setTestimonials(
-            (data as Review[]).map((r, i) => ({
-              id: r.id,
-              name: r.reviewer_name,
-              role: 'Verified Customer',
-              quote: r.review_text || '',
-              rating: r.rating,
-              location: '',
-            }))
-          );
-        }
-      });
+      .limit(3);
 
-    // Fetch aggregate stats
-    supabase
+    if (reviewsData && reviewsData.length > 0) {
+      const realTestimonials: DisplayTestimonial[] = (reviewsData as Review[]).map((r) => ({
+        id: r.id,
+        name: r.reviewer_name || 'Verified Customer',
+        role: 'Verified Customer',
+        quote: r.review_text || '',
+        rating: Number(r.rating) || 5,
+        location: '',
+      }));
+
+      // Merge real reviews with fallbacks so all 3 card slots stay filled
+      const combined = [
+        ...realTestimonials,
+        ...FALLBACK_TESTIMONIALS.slice(realTestimonials.length),
+      ].slice(0, 3);
+
+      setTestimonials(combined);
+    } else {
+      setTestimonials(FALLBACK_TESTIMONIALS);
+    }
+
+    // Fetch aggregate statistics
+    const { data: statsData } = await supabase
       .from('item_reviews')
-      .select('rating')
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          const total = data.length;
-          const avg = data.reduce((s, r) => s + Number(r.rating), 0) / total;
-          setTotalReviews(total);
-          setAvgRating(Math.round(avg * 10) / 10);
-        }
-      });
+      .select('rating');
+
+    if (statsData && statsData.length > 0) {
+      const total = statsData.length;
+      const sum = statsData.reduce((acc, r) => acc + Number(r.rating || 5), 0);
+      const avg = sum / total;
+      setTotalReviews(total);
+      setAvgRating(Math.round(avg * 10) / 10);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchReviewsAndStats();
+
+    // Subscribe to realtime database updates
+    const supabase = createClient();
+    const channel = supabase
+      .channel('item_reviews_realtime_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'item_reviews' },
+        () => {
+          fetchReviewsAndStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchReviewsAndStats]);
 
   const featured = testimonials?.[0];
   const rest = testimonials?.slice(1);
@@ -169,10 +200,10 @@ export default function TestimonialsSection() {
               <div className="w-px h-12 testi-v2-stat-divider flex-shrink-0" />
               <div className="text-center flex-1">
                 <p className="font-display text-4xl font-black text-primary">
-                  {totalReviews !== null ? `${totalReviews}+` : '1.2K'}
+                  {totalReviews !== null ? `${totalReviews}+` : '3+'}
                 </p>
                 <p className="text-xs text-muted-foreground font-medium mt-1">
-                  {totalReviews !== null ? 'Reviews' : 'Orders This Month'}
+                  Reviews
                 </p>
               </div>
             </div>

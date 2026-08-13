@@ -4,9 +4,13 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthCard from '@/app/sign-up-login-screen/components/AuthCard';
 import { ADMIN_PASSWORD } from '@/app/sign-up-login-screen/components/adminPassword';
+import WelcomeSplash from '@/components/WelcomeSplash';
 
 export default function SignUpLoginClient() {
   const router = useRouter();
+
+  // State for Welcome Splash
+  const [welcomeUser, setWelcomeUser] = useState<string | null>(null);
 
   // Admin Modal State
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -21,9 +25,7 @@ export default function SignUpLoginClient() {
     setError('');
 
     if (adminPassword === ADMIN_PASSWORD) {
-      // Set session cookie for admin protection
       document.cookie = "admin_session=true; path=/; max-age=28800; SameSite=Lax";
-      
       setIsAdminModalOpen(false);
       router.push('/admin-dashboard');
     } else {
@@ -33,9 +35,28 @@ export default function SignUpLoginClient() {
     setLoading(false);
   };
 
+  if (welcomeUser) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ background: 'var(--background)' }}>
+        <WelcomeSplash
+          userName={welcomeUser}
+          onComplete={() => {
+            try {
+              router.push('/');
+            } catch {
+              window.location.href = '/';
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex auth-page-root" style={{ background: 'var(--background)' }}>
-      {/* Left brand panel */}
+    // lg:flex-row-reverse swaps the position: Auth Card goes to the LEFT, Brand Panel goes to the RIGHT
+    <div className="min-h-screen flex flex-col lg:flex-row-reverse auth-page-root" style={{ background: 'var(--background)' }}>
+      
+      {/* Brand panel (Now on the RIGHT side on desktop) */}
       <div
         className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-12 relative overflow-hidden auth-brand-panel"
         style={{ background: 'linear-gradient(160deg, #7B1C2E 0%, #5A1020 45%, #3D0A14 100%)' }}
@@ -61,24 +82,49 @@ export default function SignUpLoginClient() {
           </div>
         </div>
 
-        {/* Middle: Hero image and copy */}
+        {/* Middle: Hero image grid and copy */}
         <div className="relative z-10 space-y-6">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             {[
-              { src: "https://img.rocket.new/generatedImages/rocket_gen_img_15b5bd873-1765211057457.png", alt: 'Lechon Kawali crispy pork belly Filipino food tray', h: 'h-36', delay: '0.3s' },
-              { src: "https://img.rocket.new/generatedImages/rocket_gen_img_14a51a9d3-1772868034765.png", alt: 'Chicken Inasal Bacolod grilled chicken tray', h: 'h-28', delay: '0.45s' },
-              { src: "https://img.rocket.new/generatedImages/rocket_gen_img_1c8439ecd-1771179335894.png", alt: 'Leche Flan Filipino steamed custard dessert', h: 'h-28', delay: '0.6s' },
-              { src: "https://images.unsplash.com/photo-1630393617712-489929103aae", alt: 'Festive Filipino food spread for a celebration', h: 'h-36', delay: '0.75s' }
-            ]?.map((img, i) => (
+              {
+                src: "https://img.rocket.new/generatedImages/rocket_gen_img_15b5bd873-1765211057457.png",
+                alt: 'Lechon Kawali crispy pork belly Filipino food tray',
+                h: 'h-36',
+                delay: '0.3s'
+              },
+              {
+                src: "https://img.rocket.new/generatedImages/rocket_gen_img_14a51a9d3-1772868034765.png",
+                alt: 'Chicken Inasal Bacolod grilled chicken tray',
+                h: 'h-36',
+                delay: '0.45s'
+              },
+              {
+                src: "https://img.rocket.new/generatedImages/rocket_gen_img_1c8439ecd-1771179335894.png",
+                alt: 'Leche Flan Filipino steamed custard dessert',
+                h: 'h-36',
+                delay: '0.6s'
+              },
+              {
+                src: "https://images.unsplash.com/photo-1630393617712-489929103aae?auto=format&fit=crop&w=800&q=80",
+                alt: 'Festive Filipino food spread for a celebration',
+                h: 'h-36',
+                delay: '0.75s'
+              }
+            ].map((img, i) => (
               <div
                 key={`auth-img-${i}`}
-                className={`rounded-xl overflow-hidden ${img?.h} ${i === 1 ? 'mt-6' : ''} ${i === 2 ? '-mt-4' : ''} auth-img-pop`}
-                style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.3)', animationDelay: img?.delay }}
+                className={`rounded-xl overflow-hidden ${img.h} auth-img-pop`}
+                style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.3)', animationDelay: img.delay }}
               >
-                <img src={img?.src} alt={img?.alt} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+                <img
+                  src={img.src}
+                  alt={img.alt}
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+                />
               </div>
             ))}
           </div>
+
           <div className="auth-fade-up" style={{ animationDelay: '0.85s' }}>
             <h2 className="font-display text-3xl font-bold text-white leading-tight">
               Your Celebration,<br />
@@ -96,22 +142,22 @@ export default function SignUpLoginClient() {
             { value: '500+', label: 'Happy customers', delay: '1s' },
             { value: '22', label: 'Menu items', delay: '1.1s' },
             { value: '4.9★', label: 'Average rating', delay: '1.2s' }
-          ]?.map((stat) => (
+          ].map((stat) => (
             <div
-              key={`auth-stat-${stat?.label}`}
+              key={`auth-stat-${stat.label}`}
               className="auth-fade-up"
-              style={{ animationDelay: stat?.delay }}
+              style={{ animationDelay: stat.delay }}
             >
-              <p className="font-display text-xl font-bold text-secondary">{stat?.value}</p>
-              <p className="text-xs text-white/40">{stat?.label}</p>
+              <p className="font-display text-xl font-bold text-secondary">{stat.value}</p>
+              <p className="text-xs text-white/40">{stat.label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Right: Auth Card */}
+      {/* Auth Card Panel (Now on the LEFT side on desktop) */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 auth-right-panel relative">
-        <AuthCard />
+        <AuthCard onSuccess={(name) => setWelcomeUser(name)} />
 
         {/* Admin Link at Bottom */}
         <button
@@ -124,7 +170,7 @@ export default function SignUpLoginClient() {
         {/* Admin Access Modal */}
         {isAdminModalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-[#ffffff] border border-stone-200 text-stone-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative">
+            <div className="bg-white border border-stone-200 text-stone-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative">
               <button
                 type="button"
                 onClick={() => {
@@ -187,6 +233,7 @@ export default function SignUpLoginClient() {
           </div>
         )}
       </div>
+
     </div>
   );
 }

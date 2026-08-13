@@ -15,6 +15,7 @@ export interface MenuItem {
   image: string;
   imageAlt: string;
   isActive: boolean;
+  unavailableReason?: string;
   stock: number;
   soldCount: number;
   featured: boolean;
@@ -71,6 +72,8 @@ export interface AdminNotification {
 // ─── Row → App type mappers ───────────────────────────────────────────────────
 
 function rowToMenuItem(row: Record<string, unknown>): MenuItem {
+  const rawActive = row.is_active ?? row.isActive;
+  
   return {
     id: row.id as string,
     name: row.name as string,
@@ -78,13 +81,14 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
     categorySlug: row.category_slug as string,
     description: row.description as string,
     price: Number(row.price),
-    servingSize: row.serving_size as string,
+    servingSize: (row.serving_size as string) || (row.servingSize as string) || '',
     image: row.image as string,
     imageAlt: row.image_alt as string,
-    isActive: row.is_active as boolean,
+    isActive: rawActive !== undefined && rawActive !== null ? Boolean(rawActive) : true,
+    unavailableReason: (row.unavailable_reason as string) || (row.unavailableReason as string) || '',
     stock: Number(row.stock),
     soldCount: Number(row.sold_count),
-    featured: row.featured as boolean,
+    featured: Boolean(row.featured),
     customizations: row.customizations ? (row.customizations as MenuCustomization[]) : undefined,
   };
 }
@@ -113,7 +117,24 @@ function rowToExpense(row: Record<string, unknown>): Expense {
 
 // ─── Menu Items ───────────────────────────────────────────────────────────────
 
+/**
+ * Fetch all menu items for public customer view (includes deactivated with reasons)
+ */
 export async function fetchMenuItems(): Promise<MenuItem[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('menu_items')
+    .select('*')
+    .order('featured', { ascending: false })
+    .order('sold_count', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data || []).map(rowToMenuItem);
+}
+
+/**
+ * Fetch all menu items for Admin view
+ */
+export async function fetchAdminMenuItems(): Promise<MenuItem[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('menu_items')
@@ -130,7 +151,6 @@ export async function fetchFeaturedMenuItems(limit = 4): Promise<MenuItem[]> {
     .from('menu_items')
     .select('*')
     .eq('featured', true)
-    .eq('is_active', true)
     .order('sold_count', { ascending: false })
     .limit(limit);
   if (error) throw new Error(error.message);
@@ -139,14 +159,11 @@ export async function fetchFeaturedMenuItems(limit = 4): Promise<MenuItem[]> {
 
 export async function fetchCategories(): Promise<Category[]> {
   const supabase = createClient();
-  // Derive categories from menu_items table
   const { data, error } = await supabase
     .from('menu_items')
-    .select('category, category_slug')
-    .eq('is_active', true);
+    .select('category, category_slug');
   if (error) throw new Error(error.message);
 
-  // Category icons map
   const ICONS: Record<string, string> = {
     beef: '🥩',
     pork: '🐷',
@@ -184,13 +201,53 @@ export async function updateMenuItem(
     price: number;
     stock: number;
     serving_size: string;
+    servingSize: string;
     description: string;
     is_active: boolean;
+    isActive: boolean;
+    unavailable_reason: string | null;
+    unavailableReason: string | null;
+    deactivation_reason: string | null;
+    deactivationReason: string | null;
     featured: boolean;
   }>
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from('menu_items').update(updates).eq('id', id);
+
+  // Normalize incoming fields to Database snake_case columns
+  const payload: Record<string, unknown> = {};
+
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.price !== undefined) payload.price = Number(updates.price);
+  if (updates.stock !== undefined) payload.stock = Number(updates.stock);
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.featured !== undefined) payload.featured = Boolean(updates.featured);
+
+  if (updates.serving_size !== undefined) {
+    payload.serving_size = updates.serving_size;
+  } else if (updates.servingSize !== undefined) {
+    payload.serving_size = updates.servingSize;
+  }
+
+  if (updates.is_active !== undefined) {
+    payload.is_active = Boolean(updates.is_active);
+  } else if (updates.isActive !== undefined) {
+    payload.is_active = Boolean(updates.isActive);
+  }
+
+  if (updates.unavailable_reason !== undefined) {
+    payload.unavailable_reason = updates.unavailable_reason;
+  } else if (updates.unavailableReason !== undefined) {
+    payload.unavailable_reason = updates.unavailableReason;
+  } else if (updates.deactivation_reason !== undefined) {
+    payload.unavailable_reason = updates.deactivation_reason;
+  } else if (updates.deactivationReason !== undefined) {
+    payload.unavailable_reason = updates.deactivationReason;
+  }
+
+  if (Object.keys(payload).length === 0) return;
+
+  const { error } = await supabase.from('menu_items').update(payload).eq('id', id);
   if (error) throw new Error(error.message);
 }
 
@@ -308,11 +365,6 @@ export interface GuestProfile {
   createdAt: string;
 }
 
-/**
- * Creates a guest_profile record after successful OTP verification.
- * Returns the created profile (including its id) so it can be stored
- * in localStorage and linked to subsequent orders.
- */
 export async function createGuestProfile(
   contactType: 'phone' | 'email',
   contactValue: string
@@ -359,7 +411,7 @@ export async function fetchDashboardKPIs(): Promise<DashboardKPIs> {
       .from('orders')
       .select('status, delivery_method, total_amount, created_at')
       .gte('created_at', `${today}T00:00:00`)
-      .lte('created_at', `${today}T23:59:59`),
+      .lte('created_at', `${today}T23:59:59.999Z`),
     supabase.from('inventory_items').select('status'),
   ]);
 
@@ -414,11 +466,11 @@ export async function fetchSalesData(days: number): Promise<DailySalesData[]> {
 
   if (error) throw new Error(error.message);
 
-  // Group by date
   const map: Record<string, { revenue: number; orders: number }> = {};
   (data || []).forEach((o: Record<string, unknown>) => {
     const d = (o.created_at as string).split('T')[0];
-    const label = new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
+    const [year, month, day] = d.split('-');
+    const label = `${month}/${day}`;
     if (!map[label]) map[label] = { revenue: 0, orders: 0 };
     map[label].revenue += Number(o.total_amount);
     map[label].orders += 1;
@@ -446,7 +498,7 @@ export async function fetchTopItems(): Promise<{ name: string; orders: number }[
     .slice(0, 8);
 }
 
-// ─── Customers (derived from user_profiles + orders) ─────────────────────────
+// ─── Customers ────────────────────────────────────────────────────────────────
 
 export interface CustomerRow {
   id: string;
@@ -461,14 +513,30 @@ export interface CustomerRow {
 
 export async function fetchCustomers(): Promise<CustomerRow[]> {
   const supabase = createClient();
-  const { data: profiles, error } = await supabase
+
+  let { data: profiles, error } = await supabase
     .from('user_profiles')
-    .select('id, full_name, email, phone, address, created_at')
-    .eq('role', 'customer')
+    .select('id, full_name, email, phone, address, created_at, role')
     .order('created_at', { ascending: false });
+
+  if (error || !profiles || profiles.length === 0) {
+    const { data: fallbackProfiles, error: fallbackError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, phone, address, created_at')
+      .order('created_at', { ascending: false });
+
+    if (!fallbackError && fallbackProfiles && fallbackProfiles.length > 0) {
+      profiles = fallbackProfiles.map((p) => ({ ...p, role: 'customer' }));
+      error = null;
+    }
+  }
 
   if (error) throw new Error(error.message);
   if (!profiles || profiles.length === 0) return [];
+
+  const customerProfiles = profiles.filter(
+    (p: any) => !p.role || p.role === 'customer' || p.role !== 'admin'
+  );
 
   const { data: orders } = await supabase
     .from('orders')
@@ -480,21 +548,30 @@ export async function fetchCustomers(): Promise<CustomerRow[]> {
     const uid = o.user_id as string;
     if (!orderMap[uid]) orderMap[uid] = { count: 0, spent: 0 };
     orderMap[uid].count += 1;
-    if (o.status !== 'Cancelled') {
-      orderMap[uid].spent += Number(o.total_amount);
+    const statusStr = String(o.status || '').toLowerCase();
+    if (statusStr !== 'cancelled') {
+      orderMap[uid].spent += Number(o.total_amount || 0);
     }
   });
 
-  return profiles.map((p: Record<string, unknown>) => ({
-    id: p.id as string,
-    name: (p.full_name as string) || (p.email as string),
-    email: p.email as string,
-    phone: (p.phone as string) || '',
-    address: (p.address as string) || '',
-    totalOrders: orderMap[p.id as string]?.count || 0,
-    totalSpent: orderMap[p.id as string]?.spent || 0,
-    joinDate: ((p.created_at as string) || '').split('T')[0],
-  }));
+  return customerProfiles.map((p: Record<string, unknown>) => {
+    const email = (p.email as string) || '';
+    const rawName = (p.full_name as string) || '';
+    const name = rawName.trim() ? rawName : (email ? email.split('@')[0] : 'Customer');
+    const createdAt = (p.created_at as string) || '';
+    const joinDate = createdAt ? createdAt.split('T')[0] : 'N/A';
+
+    return {
+      id: String(p.id || ''),
+      name,
+      email,
+      phone: (p.phone as string) || '',
+      address: (p.address as string) || '',
+      totalOrders: orderMap[p.id as string]?.count || 0,
+      totalSpent: orderMap[p.id as string]?.spent || 0,
+      joinDate,
+    };
+  });
 }
 
 // ─── Item Reviews ─────────────────────────────────────────────────────────────

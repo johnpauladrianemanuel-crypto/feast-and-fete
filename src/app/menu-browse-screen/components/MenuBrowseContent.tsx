@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { fetchMenuItems, fetchAllMenuItemRatings, fetchCategories, MenuItemRatingSummary, MenuItem, Category } from '@/lib/supabase/services';
+import { createClient } from '@/lib/supabase/client';
 import MenuGrid from './MenuGrid';
 import MenuFilters from './MenuFilters';
 import MenuSearch from './MenuSearch';
@@ -28,9 +29,10 @@ export default function MenuBrowseContent() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
+  // Initial fetch
   useEffect(() => {
     Promise.all([
-      fetchMenuItems().then(items => items.filter(i => i.isActive)),
+      fetchMenuItems(),
       fetchAllMenuItemRatings(),
       fetchCategories(),
     ])
@@ -40,10 +42,35 @@ export default function MenuBrowseContent() {
         setCategories(cats);
       })
       .catch(() => {
-        // On error, leave empty — show empty state
         setMenuItems([]);
       })
       .finally(() => setLoading(false));
+  }, []);
+
+  // Realtime subscription for instant updates when admin deactivates/activates items
+  useEffect(() => {
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel('menu_items_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'menu_items' },
+        async () => {
+          // Re-fetch items seamlessly whenever admin makes changes
+          try {
+            const updatedItems = await fetchMenuItems();
+            setMenuItems(updatedItems);
+          } catch (err) {
+            console.error('Failed to sync menu items realtime:', err);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const filteredItems = useMemo(() => {
@@ -101,6 +128,7 @@ export default function MenuBrowseContent() {
     image: item.image,
     imageAlt: item.imageAlt,
     isActive: item.isActive,
+    unavailableReason: item.unavailableReason,
     stock: item.stock,
     soldCount: item.soldCount,
     featured: item.featured,
@@ -206,7 +234,14 @@ export default function MenuBrowseContent() {
       )}
 
       {/* Grid */}
-      {!loading && <MenuGrid items={mappedItems} searchQuery={searchQuery} ratingsMap={ratingsMap} onOpenDetail={item => setSelectedItem(item as unknown as MenuItem)} />}
+      {!loading && (
+        <MenuGrid
+          items={mappedItems}
+          searchQuery={searchQuery}
+          ratingsMap={ratingsMap}
+          onOpenDetail={item => setSelectedItem(item as unknown as MenuItem)}
+        />
+      )}
 
       {/* Item Detail Modal */}
       <MenuItemDetailModal

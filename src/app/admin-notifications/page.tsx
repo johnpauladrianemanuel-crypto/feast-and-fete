@@ -9,6 +9,7 @@ import {
   deleteAdminNotification,
   AdminNotification,
 } from '@/lib/supabase/services';
+import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
 
 const TYPE_STYLES: Record<AdminNotification['type'], { icon: string; color: string; bg: string }> = {
@@ -50,6 +51,23 @@ export default function AdminNotificationsPage() {
 
   useEffect(() => {
     loadNotifications();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel('admin_notifications_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'admin_notifications' },
+        (payload) => {
+          const newNotif = payload.new as AdminNotification;
+          setNotifications(prev => [newNotif, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [loadNotifications]);
 
   const unreadCount = notifications.filter(n => !n.read).length;

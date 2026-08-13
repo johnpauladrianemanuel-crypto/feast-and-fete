@@ -1,11 +1,12 @@
 'use client';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import CustomerNavbar from '@/components/CustomerNavbar';
-import CartDrawer from '@/components/CartDrawer';
+import { useRouter } from 'next/navigation';
+import AppLogo from '@/components/ui/AppLogo';
+import { useCart } from '@/lib/cartContext';
 import Icon from '@/components/ui/AppIcon';
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { createClient } from '@/lib/supabase/client';
 
 type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled';
 
@@ -107,7 +108,6 @@ function buildNotificationsFromOrders(orders: Order[]): CustomerNotification[] {
     }
   });
 
-  // Sort by date descending
   return notifications.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -124,48 +124,149 @@ function timeAgo(dateStr: string): string {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
-export default function CustomerNotificationsContent() {
-  const { user, loading: authLoading } = useAuth();
-  const supabase = createClient();
+export default function CustomerNavbar() {
+  const { totalItems, toggleCart } = useCart();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
-  const [loading, setLoading] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
-  const fetchOrders = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, order_number, status, total_amount, created_at, updated_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [dbAvatarUrl, setDbAvatarUrl] = useState<string | null>(null);
+  const [dbFullName, setDbFullName] = useState<string | null>(null);
 
-      if (!error && data) {
-        const built = buildNotificationsFromOrders(data as Order[]);
-        setNotifications(built);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
+
+  // Initialize dark mode from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)')?.matches;
+    const shouldBeDark = saved === 'dark' || (!saved && prefersDark);
+    setIsDarkMode(shouldBeDark);
+    if (shouldBeDark) {
+      document.documentElement?.classList?.add('dark');
+    } else {
+      document.documentElement?.classList?.remove('dark');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    if (next) {
+      document.documentElement?.classList?.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement?.classList?.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+        setProfileOpen(false);
       }
-    } finally {
-      setLoading(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch user profile (avatar and name)
+  useEffect(() => {
+    if (!user) {
+      setDbAvatarUrl(null);
+      setDbFullName(null);
+      return;
+    }
+
+    const fetchUserProfile = async () => {
+      const { data } = await supabase
+        ?.from('user_profiles')
+        ?.select('avatar_url, full_name')
+        ?.eq('id', user.id)
+        ?.single();
+
+      if (data) {
+        if (data.avatar_url) {
+          const freshUrl = `${data.avatar_url}${data.avatar_url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+          setDbAvatarUrl(freshUrl);
+        } else {
+          setDbAvatarUrl(null);
+        }
+        setDbFullName(data.full_name || null);
+      }
+    };
+
+    fetchUserProfile();
+
+    const channel = supabase
+      ?.channel(`navbar_profile_watch_${user.id}`)
+      ?.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload?.new) {
+            const rawUrl = payload.new.avatar_url;
+            setDbAvatarUrl(rawUrl ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${Date.now()}` : null);
+            setDbFullName(payload.new.full_name || null);
+          }
+        }
+      )
+      ?.subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  }, [user, supabase]);
+
+  // Fetch orders and build real-time notifications matching CustomerNotificationsContent
+  const fetchOrdersAndNotifications = useCallback(async () => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, order_number, status, total_amount, created_at, updated_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      const built = buildNotificationsFromOrders(data as Order[]);
+      setNotifications(built);
     }
   }, [user, supabase]);
 
   useEffect(() => {
-    if (user) fetchOrders();
-  }, [user, fetchOrders]);
+    fetchOrdersAndNotifications();
+  }, [fetchOrdersAndNotifications]);
 
-  // Real-time: re-fetch when any of user's orders update
+  // Real-time: re-fetch notifications when any of user's orders update or insert
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
-      .channel('customer_orders_realtime')
+      .channel('navbar_customer_orders_realtime')
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        { event: '*', schema: 'public', table: 'orders' },
         () => {
-          fetchOrders();
+          fetchOrdersAndNotifications();
         }
       )
       .subscribe();
@@ -173,7 +274,7 @@ export default function CustomerNotificationsContent() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, supabase, fetchOrders]);
+  }, [user, supabase, fetchOrdersAndNotifications]);
 
   const markRead = (id: string) => {
     setReadIds((prev) => new Set([...prev, id]));
@@ -186,158 +287,325 @@ export default function CustomerNotificationsContent() {
   const isRead = (n: CustomerNotification) => n.read || readIds.has(n.id);
   const unreadCount = notifications.filter((n) => !isRead(n)).length;
 
-  return (
-    <div className="min-h-screen bg-background">
-      <CustomerNavbar />
-      <CartDrawer />
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setProfileOpen(false);
+      setNotificationsOpen(false);
+      router?.push('/');
+    } catch {
+      // ignore
+    }
+  };
 
-      <div className="max-w-2xl mx-auto px-4 py-10 lg:px-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-xl gradient-brand flex items-center justify-center">
-                <Icon name="BellIcon" size={20} className="text-primary-foreground" />
-              </div>
-              <h1 className="font-display text-2xl font-bold text-foreground">Notifications</h1>
+  const avatarUrl = dbAvatarUrl || user?.avatar_url || user?.photoURL || user?.user_metadata?.avatar_url || user?.user_metadata?.photoURL;
+  const rawName = dbFullName || user?.user_metadata?.full_name || user?.name;
+
+  const displayName = rawName
+    ? rawName?.split(' ')?.map((w: string) => w?.[0])?.join('')?.slice(0, 2)?.toUpperCase()
+    : user?.email?.slice(0, 2)?.toUpperCase() ?? 'MS';
+
+  const firstName = rawName
+    ? rawName?.split(' ')?.[0]
+    : user?.email?.split('@')?.[0] ?? 'Account';
+
+  return (
+    <nav className="sticky top-0 z-40 bg-card border-b border-border" style={{ boxShadow: '0 2px 12px rgba(44,24,16,0.08)' }} ref={dropdownRef}>
+      <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 xl:px-10">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+            <AppLogo size={36} />
+            <span className="font-display text-xl font-bold text-primary hidden sm:block" style={{ letterSpacing: '-0.01em' }}>
+              Feast & Fête
+            </span>
+          </Link>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-6">
+            <Link href="/menu-browse-screen" className="text-sm font-medium text-foreground hover:text-primary transition-colors duration-150">
+              Menu
+            </Link>
+            <Link href="/cart-review" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-150">
+              My Cart
+            </Link>
+            <Link href="/order-status" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-150">
+              Track Order
+            </Link>
+          </div>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-2">
+            {/* Notifications Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setNotificationsOpen(!notificationsOpen);
+                  setProfileOpen(false);
+                }}
+                className="relative flex items-center justify-center w-10 h-10 rounded-xl hover:bg-muted transition-colors duration-150"
+                aria-label="Notifications"
+              >
+                <Icon name="BellIcon" size={22} className="text-foreground" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 gradient-brand text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Real-time Notification Dropdown Panel */}
+              {notificationsOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-80 sm:w-96 bg-card border border-border rounded-2xl shadow-xl py-2 z-50 animate-fade-in"
+                  style={{ boxShadow: 'var(--shadow-3d)' }}
+                >
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm text-foreground">Notifications</h3>
+                      {unreadCount > 0 && (
+                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold gradient-brand text-primary-foreground">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllRead}
+                        className="text-xs text-primary font-medium hover:underline"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto divide-y divide-border">
+                    {notifications.length > 0 ? (
+                      notifications.map((notif) => {
+                        const statusKey = notif.type === 'order_placed' ? 'Pending' : (
+                          Object.keys(STATUS_MESSAGES).find(
+                            (k) => STATUS_MESSAGES[k as OrderStatus].title === notif.title
+                          ) as OrderStatus | undefined
+                        );
+                        const style = statusKey
+                          ? STATUS_MESSAGES[statusKey]
+                          : { icon: 'BellIcon', color: '#6B7280', bg: 'rgba(107,114,128,0.12)' };
+
+                        const read = isRead(notif);
+
+                        return (
+                          <div
+                            key={notif.id}
+                            onClick={() => markRead(notif.id)}
+                            className={`flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer ${
+                              !read ? 'bg-primary/5' : ''
+                            }`}
+                          >
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                              style={{ background: style.bg }}
+                            >
+                              <Icon
+                                name={style.icon as Parameters<typeof Icon>[0]['name']}
+                                size={16}
+                                style={{ color: style.color }}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-semibold text-foreground truncate">{notif.title}</p>
+                                {!read && (
+                                  <span className="w-2 h-2 rounded-full flex-shrink-0 gradient-brand" />
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-snug">
+                                {notif.message}
+                              </p>
+                              <div className="flex items-center justify-between mt-1.5">
+                                <span className="text-[10px] text-muted-foreground opacity-70">
+                                  {timeAgo(notif.created_at)}
+                                </span>
+                                <Link
+                                  href="/order-status"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setNotificationsOpen(false);
+                                  }}
+                                  className="text-[11px] text-primary font-medium hover:underline"
+                                >
+                                  View order →
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="py-8 text-center text-xs text-muted-foreground">
+                        No notifications yet.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-border pt-2 text-center">
+                    <Link
+                      href="/customer-notifications"
+                      onClick={() => setNotificationsOpen(false)}
+                      className="text-xs font-medium text-primary hover:underline block py-1"
+                    >
+                      View All Notifications
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Cart Button */}
+            <button
+              onClick={toggleCart}
+              className="relative flex items-center justify-center w-10 h-10 rounded-xl hover:bg-muted transition-colors duration-150"
+              aria-label="Open cart"
+            >
+              <Icon name="ShoppingCartIcon" size={22} className="text-foreground" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 gradient-brand text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
+                  {totalItems > 9 ? '9+' : totalItems}
+                </span>
+              )}
+            </button>
+
+            {/* Profile Dropdown */}
+            <div className="relative hidden md:block">
+              {user ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setProfileOpen(!profileOpen);
+                      setNotificationsOpen(false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors duration-150"
+                  >
+                    <div className="w-8 h-8 gradient-brand rounded-full flex items-center justify-center overflow-hidden">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt={firstName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-primary-foreground text-xs font-bold">{displayName}</span>
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{firstName}</span>
+                    <Icon name="ChevronDownIcon" size={16} className="text-muted-foreground" />
+                  </button>
+                  {profileOpen && (
+                    <div
+                      className="absolute right-0 mt-2 w-52 bg-card border border-border rounded-xl py-1 z-50 animate-fade-in"
+                      style={{ boxShadow: 'var(--shadow-3d)' }}
+                    >
+                      <Link href="/customer-profile" className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
+                        <Icon name="UserIcon" size={16} className="text-muted-foreground" />
+                        My Profile
+                      </Link>
+                      <Link href="/customer-orders" className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
+                        <Icon name="ClipboardDocumentListIcon" size={16} className="text-muted-foreground" />
+                        My Orders
+                      </Link>
+                      <hr className="my-1 border-border" />
+                      {/* Dark Mode Toggle */}
+                      <button
+                        onClick={toggleDarkMode}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Icon name={isDarkMode ? 'SunIcon' : 'MoonIcon'} size={16} className="text-muted-foreground" />
+                        <span className="flex-1 text-left">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                        <span className={`w-8 h-4 rounded-full transition-colors duration-200 flex items-center px-0.5 ${isDarkMode ? 'bg-primary' : 'bg-border'}`}>
+                          <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${isDarkMode ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </span>
+                      </button>
+                      <hr className="my-1 border-border" />
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-error hover:bg-muted transition-colors"
+                      >
+                        <Icon name="ArrowRightOnRectangleIcon" size={16} className="text-error" />
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Link
+                  href="/sign-up-login-screen"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity duration-150"
+                >
+                  <Icon name="ArrowRightOnRectangleIcon" size={16} className="text-primary-foreground" />
+                  Login
+                </Link>
+              )}
+            </div>
+
+            {/* Mobile Menu Toggle */}
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="flex md:hidden items-center justify-center w-10 h-10 rounded-xl hover:bg-muted transition-colors"
+              aria-label="Open menu"
+            >
+              <Icon name={mobileOpen ? 'XMarkIcon' : 'Bars3Icon'} size={22} className="text-foreground" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Nav */}
+        {mobileOpen && (
+          <div className="md:hidden border-t border-border py-3 animate-fade-in">
+            <Link href="/menu-browse-screen" className="flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors" onClick={() => setMobileOpen(false)}>
+              <Icon name="BookOpenIcon" size={18} className="text-primary" />
+              Menu
+            </Link>
+            <Link href="/customer-orders" className="flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors" onClick={() => setMobileOpen(false)}>
+              <Icon name="ClipboardDocumentListIcon" size={18} className="text-primary" />
+              My Orders
+            </Link>
+            <Link href="/customer-notifications" className="flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors" onClick={() => setMobileOpen(false)}>
+              <Icon name="BellIcon" size={18} className="text-primary" />
+              Notifications
               {unreadCount > 0 && (
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold">
+                <span className="ml-auto w-5 h-5 gradient-brand text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
                   {unreadCount}
                 </span>
               )}
-            </div>
-            <p className="text-sm text-muted-foreground ml-13">
-              {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up!'}
-            </p>
-          </div>
-          {unreadCount > 0 && (
+            </Link>
+            <Link href="/customer-profile" className="flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors" onClick={() => setMobileOpen(false)}>
+              <div className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-bold">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={firstName} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{displayName}</span>
+                )}
+              </div>
+              My Profile
+            </Link>
+            {/* Mobile Dark Mode Toggle */}
             <button
-              onClick={markAllRead}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-border hover:bg-muted transition-colors text-foreground"
+              onClick={toggleDarkMode}
+              className="w-full flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
             >
-              <Icon name="CheckIcon" size={14} />
-              Mark all read
+              <Icon name={isDarkMode ? 'SunIcon' : 'MoonIcon'} size={18} className="text-primary" />
+              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+              <span className={`ml-auto w-8 h-4 rounded-full transition-colors duration-200 flex items-center px-0.5 ${isDarkMode ? 'bg-primary' : 'bg-border'}`}>
+                <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${isDarkMode ? 'translate-x-4' : 'translate-x-0'}`} />
+              </span>
             </button>
-          )}
-        </div>
-
-        {/* Auth loading */}
-        {authLoading && (
-          <div className="space-y-3 animate-pulse">
-            {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-muted rounded-2xl" />)}
-          </div>
-        )}
-
-        {/* Not logged in */}
-        {!authLoading && !user && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-              <Icon name="BellSlashIcon" size={28} className="text-muted-foreground" />
-            </div>
-            <h2 className="font-display text-lg font-bold text-foreground mb-2">Sign in to see notifications</h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              Get real-time updates about your orders — confirmations, preparation status, and more.
-            </p>
-            <Link
-              href="/sign-up-login-screen"
-              className="inline-flex items-center gap-2 px-6 py-3 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl btn-3d transition-all"
-            >
-              <Icon name="UserCircleIcon" size={16} />
-              Sign In
-            </Link>
-          </div>
-        )}
-
-        {/* Loading */}
-        {!authLoading && user && loading && (
-          <div className="space-y-3 animate-pulse">
-            {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 bg-muted rounded-2xl" />)}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!authLoading && user && !loading && notifications.length === 0 && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-              <Icon name="BellIcon" size={28} className="text-muted-foreground opacity-40" />
-            </div>
-            <h2 className="font-display text-lg font-bold text-foreground mb-2">No notifications yet</h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              Place an order and we'll notify you every step of the way.
-            </p>
-            <Link
-              href="/menu-browse-screen"
-              className="inline-flex items-center gap-2 px-6 py-3 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl btn-3d transition-all"
-            >
-              <Icon name="BookOpenIcon" size={16} />
-              Browse Menu
-            </Link>
-          </div>
-        )}
-
-        {/* Notifications List */}
-        {!authLoading && user && !loading && notifications.length > 0 && (
-          <div className="space-y-2">
-            {notifications.map((notif) => {
-              const statusKey = notif.type === 'order_placed' ? 'Pending' : (
-                Object.keys(STATUS_MESSAGES).find(
-                  (k) => STATUS_MESSAGES[k as OrderStatus].title === notif.title
-                ) as OrderStatus | undefined
-              );
-              const style = statusKey
-                ? STATUS_MESSAGES[statusKey]
-                : { icon: 'BellIcon', color: '#6B7280', bg: 'rgba(107,114,128,0.12)' };
-
-              const read = isRead(notif);
-
-              return (
-                <div
-                  key={notif.id}
-                  className={`flex items-start gap-4 p-4 rounded-2xl transition-all cursor-pointer group border ${
-                    read
-                      ? 'bg-card border-border' :'bg-primary/5 border-primary/20'
-                  }`}
-                  style={{ boxShadow: read ? 'none' : '0 0 0 1px rgba(var(--primary-rgb),0.1)' }}
-                  onClick={() => markRead(notif.id)}
-                >
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: style.bg }}
-                  >
-                    <Icon
-                      name={style.icon as Parameters<typeof Icon>[0]['name']}
-                      size={18}
-                      style={{ color: style.color }}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-semibold text-foreground">{notif.title}</p>
-                      {!read && (
-                        <span className="w-2 h-2 rounded-full flex-shrink-0 gradient-brand" />
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{notif.message}</p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <p className="text-xs text-muted-foreground opacity-70">{timeAgo(notif.created_at)}</p>
-                      <Link
-                        href="/order-status"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-primary font-medium hover:underline"
-                      >
-                        View order →
-                      </Link>
-                    </div>
-                  </div>
-                  {!read && (
-                    <div className="w-2 h-2 rounded-full gradient-brand flex-shrink-0 mt-1.5" />
-                  )}
-                </div>
-              );
-            })}
+            {user && (
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-error hover:bg-muted transition-colors mt-2 border-t border-border pt-3"
+              >
+                <Icon name="ArrowRightOnRectangleIcon" size={18} className="text-error" />
+                Logout
+              </button>
+            )}
           </div>
         )}
       </div>
-    </div>
+    </nav>
   );
 }

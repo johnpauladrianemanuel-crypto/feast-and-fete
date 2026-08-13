@@ -1,5 +1,6 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 
 interface WelcomeSplashProps {
@@ -9,6 +10,12 @@ interface WelcomeSplashProps {
 
 export default function WelcomeSplash({ userName, onComplete }: WelcomeSplashProps) {
   const [phase, setPhase] = useState<'enter' | 'show' | 'exit'>('enter');
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep reference to onComplete fresh without re-triggering effect
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     // Phase 1: fade in (0 → 400ms)
@@ -16,17 +23,20 @@ export default function WelcomeSplash({ userName, onComplete }: WelcomeSplashPro
     // Phase 2: hold (400ms → 2400ms)
     const t2 = setTimeout(() => setPhase('exit'), 2400);
     // Phase 3: fade out complete → call onComplete
-    const t3 = setTimeout(() => onComplete(), 3100);
+    const t3 = setTimeout(() => onCompleteRef.current(), 3100);
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [onComplete]);
+  }, []);
 
   return (
     <div
       className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+      role="dialog"
+      aria-live="polite"
       style={{
         background: 'linear-gradient(135deg, #1a0a00 0%, #3d1a00 40%, #6b2d00 70%, #8b3a00 100%)',
         opacity: phase === 'exit' ? 0 : 1,
@@ -73,6 +83,7 @@ export default function WelcomeSplash({ userName, onComplete }: WelcomeSplashPro
             width={64}
             height={64}
             className="object-contain"
+            priority
           />
         </div>
 

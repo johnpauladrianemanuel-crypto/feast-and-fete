@@ -1,5 +1,6 @@
 'use client';
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { MenuItem } from '@/lib/supabase/services';
 
 export interface CartItem {
@@ -85,7 +86,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
 interface CartContextValue {
   state: CartState;
-  addItem: (item: MenuItem, customizations?: Record<string, string>) => void;
+  addItem: (item: MenuItem, customizations?: Record<string, string>) => boolean;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -100,6 +101,7 @@ const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [], isOpen: false });
+  const { user } = useAuth();
 
   const totalItems = state.items.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = state.items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0);
@@ -108,7 +110,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     <CartContext.Provider
       value={{
         state,
-        addItem: (item, customizations) => dispatch({ type: 'ADD_ITEM', payload: { item, customizations } }),
+        addItem: (item, customizations) => {
+          // Allow adding to cart for authenticated users or guests with a stored guest profile
+          let hasAccess = false;
+          try {
+            const guestProfileId = localStorage.getItem('guestProfileId');
+            hasAccess = !!user || !!guestProfileId;
+          } catch {
+            hasAccess = !!user;
+          }
+          if (!hasAccess) return false;
+          dispatch({ type: 'ADD_ITEM', payload: { item, customizations } });
+          return true;
+        },
         removeItem: (id) => dispatch({ type: 'REMOVE_ITEM', payload: id }),
         updateQuantity: (id, quantity) => dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } }),
         clearCart: () => dispatch({ type: 'CLEAR_CART' }),

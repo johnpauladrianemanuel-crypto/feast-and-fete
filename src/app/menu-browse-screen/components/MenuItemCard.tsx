@@ -68,6 +68,20 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
   const cardRef = useRef<HTMLDivElement>(null);
   const catColor = CATEGORY_COLORS[item.categorySlug] ?? { bg: 'rgba(100,100,100,0.1)', text: '#555' };
 
+  // Checks both camelCase (isActive) and snake_case (is_active) from Supabase
+  const rawIsActive = item.isActive ?? (item as { is_active?: boolean }).is_active;
+  const isInactive = rawIsActive === false;
+
+  // Extract deactivation reason from item (supporting both camelCase and snake_case)
+  const deactivationReason =
+    (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivationReason ??
+    (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivation_reason ??
+    (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailable_reason ??
+    (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailableReason;
+
+  const isLowStock = item.stock > 0 && item.stock <= 5;
+  const isOutOfStock = item.stock === 0;
+
   // Intersection Observer for scroll-triggered entrance
   useEffect(() => {
     const el = cardRef.current;
@@ -86,7 +100,16 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
     return () => observer.disconnect();
   }, [index]);
 
-  function handleAdd() {
+  function handleAdd(e?: React.MouseEvent) {
+    if (e) e.stopPropagation();
+
+    if (isInactive) {
+      toast.error('Temporarily Unavailable', {
+        description: deactivationReason || 'This product is currently not available for order.',
+      });
+      return;
+    }
+
     addItem(item);
     setAddedPulse(true);
     setTimeout(() => setAddedPulse(false), 700);
@@ -96,22 +119,44 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
     });
   }
 
-  const isLowStock = item.stock > 0 && item.stock <= 5;
-  const isOutOfStock = item.stock === 0;
+  function handleCardClick(e: React.MouseEvent) {
+    e.preventDefault();
+    if (isInactive) {
+      toast.error('Temporarily Unavailable', {
+        description: deactivationReason || 'This product is currently not available for order.',
+      });
+      return;
+    }
+    onOpenDetail?.(item);
+  }
 
   return (
     <div
       ref={cardRef}
-      className="bg-card border border-border rounded-2xl overflow-hidden menu-card-3d group flex flex-col cursor-pointer"
+      className={`bg-card border rounded-2xl overflow-hidden menu-card-3d group flex flex-col ${
+        isInactive ? 'cursor-not-allowed select-none border-stone-800' : 'border-border cursor-pointer'
+      }`}
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0) scale(1)' : 'translateY(28px) scale(0.96)',
         transition: `opacity 480ms cubic-bezier(0.22,1,0.36,1), transform 480ms cubic-bezier(0.34,1.56,0.64,1)`,
+        background: isInactive ? '#0F0B08' : undefined,
       }}
-      onClick={e => { e.preventDefault(); onOpenDetail?.(item); }}
+      onClick={handleCardClick}
       role="button"
-      tabIndex={0}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenDetail?.(item); } }}
+      tabIndex={isInactive ? -1 : 0}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (isInactive) {
+            toast.error('Temporarily Unavailable', {
+              description: deactivationReason || 'This product is currently not available for order.',
+            });
+            return;
+          }
+          onOpenDetail?.(item);
+        }
+      }}
       aria-label={`View details for ${item.name}`}
     >
       {/* Image */}
@@ -121,10 +166,12 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           alt={item.imageAlt}
           width={320}
           height={192}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-108"
+          className={`w-full h-full object-cover transition-transform duration-500 ${
+            isInactive ? 'filter grayscale contrast-125 brightness-30 blur-[2px]' : 'group-hover:scale-108'
+          }`}
           style={{
             opacity: imageLoaded ? 1 : 0,
-            transition: 'opacity 350ms ease, transform 500ms ease',
+            transition: 'opacity 350ms ease, transform 500ms ease, filter 350ms ease',
           }}
           onLoad={() => setImageLoaded(true)}
         />
@@ -140,14 +187,24 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           />
         )}
 
+        {/* Dark overlay gradient for deactivated item */}
+        {isInactive && (
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(10, 5, 3, 0.75)' }}
+          />
+        )}
+
         {/* Hover gradient overlay */}
-        <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none"
-          style={{
-            background: 'linear-gradient(180deg, transparent 40%, rgba(44,24,16,0.35) 100%)',
-            transition: 'opacity 350ms ease',
-          }}
-        />
+        {!isInactive && (
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none"
+            style={{
+              background: 'linear-gradient(180deg, transparent 40%, rgba(44,24,16,0.35) 100%)',
+              transition: 'opacity 350ms ease',
+            }}
+          />
+        )}
 
         {/* Category badge */}
         <div className="absolute top-3 left-3">
@@ -160,7 +217,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
         </div>
 
         {/* Featured badge */}
-        {item.featured && (
+        {item.featured && !isInactive && (
           <div className="absolute top-3 right-3">
             <span
               className="px-2 py-1 text-xs font-bold rounded-full"
@@ -176,8 +233,18 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           </div>
         )}
 
+        {/* Temporarily Unavailable badge overlay */}
+        {isInactive && (
+          <div className="absolute top-3 right-3">
+            <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-red-950/90 text-red-200 border border-red-800/50 shadow-md backdrop-blur-sm flex items-center gap-1">
+              <Icon name="ExclamationTriangleIcon" size={12} className="text-red-400" />
+              Unavailable
+            </span>
+          </div>
+        )}
+
         {/* Out of stock overlay */}
-        {isOutOfStock && (
+        {isOutOfStock && !isInactive && (
           <div className="absolute inset-0 bg-foreground/50 flex items-center justify-center backdrop-blur-sm">
             <span className="px-3 py-1.5 bg-error text-white text-xs font-bold rounded-full">
               Out of Stock
@@ -189,13 +256,32 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
       {/* Content */}
       <div className="p-4 flex flex-col flex-1 space-y-3">
         <div className="flex-1">
-          <h3 className="font-display text-base font-bold text-foreground leading-snug line-clamp-2">
+          <h3 className={`font-display text-base font-bold leading-snug line-clamp-2 ${isInactive ? 'text-stone-400' : 'text-foreground'}`}>
             {item.name}
           </h3>
-          <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
+          <p className={`text-xs mt-1.5 line-clamp-2 leading-relaxed ${isInactive ? 'text-stone-500' : 'text-muted-foreground'}`}>
             {item.description}
           </p>
         </div>
+
+        {/* Deactivation reason banner when inactive */}
+        {isInactive && (
+          <div className="p-3 rounded-xl border border-red-900/40 bg-stone-950/90 backdrop-blur-sm space-y-1">
+            <div className="flex items-center gap-1.5 text-red-400 font-semibold text-xs">
+              <Icon name="ExclamationCircleIcon" size={15} className="shrink-0" />
+              <span>This Item is not available right now</span>
+            </div>
+            {deactivationReason ? (
+              <p className="text-xs text-stone-300 italic pl-5">
+                Reason: {deactivationReason}
+              </p>
+            ) : (
+              <p className="text-xs text-stone-400 italic pl-5">
+                Reason: Temporarily unavailable
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Rating display */}
         {ratingSummary && ratingSummary.reviewCount > 0 && (
@@ -209,7 +295,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
         </div>
 
         {/* Low stock warning */}
-        {isLowStock && !isOutOfStock && (
+        {isLowStock && !isOutOfStock && !isInactive && (
           <div
             className="flex items-center gap-1.5 text-xs font-medium"
             style={{ color: 'var(--warning)', animation: 'lowStockPulse 1.8s ease-in-out infinite' }}
@@ -222,21 +308,29 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
         {/* Price + Add to Cart */}
         <div className="flex items-center justify-between pt-1">
           <div>
-            <span className="font-display text-xl font-bold text-primary tabular-nums">
+            <span className={`font-display text-xl font-bold tabular-nums ${isInactive ? 'text-stone-500' : 'text-primary'}`}>
               ₱{item.price.toLocaleString()}
             </span>
             <span className="text-xs text-muted-foreground ml-1">/ tray</span>
           </div>
           <button
-            onClick={e => { e.stopPropagation(); handleAdd(); }}
-            disabled={isOutOfStock}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed add-cart-btn"
+            onClick={handleAdd}
+            disabled={isInactive || isOutOfStock}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl transition-all ${
+              isInactive
+                ? 'bg-stone-900/90 text-stone-500 border border-stone-800/60 cursor-not-allowed opacity-80'
+                : 'disabled:opacity-40 disabled:cursor-not-allowed add-cart-btn'
+            }`}
             style={{
-              background: addedPulse
+              background: isInactive
+                ? undefined
+                : addedPulse
                 ? 'linear-gradient(135deg, #2D7A4F 0%, #3DA866 100%)'
                 : 'linear-gradient(135deg, #7B1C2E 0%, #9B2C3E 100%)',
-              color: 'var(--primary-foreground)',
-              boxShadow: addedPulse
+              color: isInactive ? undefined : 'var(--primary-foreground)',
+              boxShadow: isInactive
+                ? 'none'
+                : addedPulse
                 ? '0 4px 16px rgba(45,122,79,0.5)'
                 : '0 4px 12px rgba(123,28,46,0.3)',
               transform: addedPulse ? 'scale(0.93)' : undefined,
@@ -244,8 +338,8 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
             }}
             aria-label={`Add ${item.name} to cart`}
           >
-            <Icon name={addedPulse ? 'CheckIcon' : 'PlusIcon'} size={14} />
-            {addedPulse ? 'Added!' : 'Add to Cart'}
+            <Icon name={isInactive ? 'ExclamationTriangleIcon' : addedPulse ? 'CheckIcon' : 'PlusIcon'} size={14} />
+            {isInactive ? 'Unavailable' : addedPulse ? 'Added!' : 'Add to Cart'}
           </button>
         </div>
       </div>

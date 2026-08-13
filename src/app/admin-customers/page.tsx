@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
@@ -29,7 +30,7 @@ export default function AdminCustomersPage() {
     try {
       const data = await fetchCustomers();
       setCustomers(data);
-    } catch (err) {
+    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load customers');
     } finally {
       setLoading(false);
@@ -57,14 +58,20 @@ export default function AdminCustomersPage() {
   };
 
   const filtered = customers
-    .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.email.toLowerCase().includes(search.toLowerCase()))
+    .filter(c => {
+      const nameMatch = (c.name || '').toLowerCase().includes(search.toLowerCase());
+      const emailMatch = (c.email || '').toLowerCase().includes(search.toLowerCase());
+      return nameMatch || emailMatch;
+    })
     .sort((a, b) => {
-      if (sortBy === 'joinDate') return new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
-      return b[sortBy] - a[sortBy];
+      if (sortBy === 'joinDate') {
+        return new Date(b.joinDate || 0).getTime() - new Date(a.joinDate || 0).getTime();
+      }
+      return (b[sortBy] || 0) - (a[sortBy] || 0);
     });
 
-  const totalRevenue = customers.reduce((s, c) => s + c.totalSpent, 0);
-  const totalOrdersAll = customers.reduce((s, c) => s + c.totalOrders, 0);
+  const totalRevenue = customers.reduce((s, c) => s + (c.totalSpent || 0), 0);
+  const totalOrdersAll = customers.reduce((s, c) => s + (c.totalOrders || 0), 0);
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--admin-bg)' }}>
@@ -119,9 +126,16 @@ export default function AdminCustomersPage() {
                 { key: 'totalOrders' as const, label: 'Most Orders' },
                 { key: 'joinDate' as const, label: 'Newest' },
               ].map(s => (
-                <button key={s.key} onClick={() => setSortBy(s.key)}
+                <button
+                  key={s.key}
+                  onClick={() => setSortBy(s.key)}
                   className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-                  style={{ background: sortBy === s.key ? '#D4A017' : 'var(--admin-surface)', color: sortBy === s.key ? '#1A0F0A' : 'var(--admin-muted)', border: '1px solid var(--admin-border)' }}>
+                  style={{
+                    background: sortBy === s.key ? '#D4A017' : 'var(--admin-surface)',
+                    color: sortBy === s.key ? '#1A0F0A' : 'var(--admin-muted)',
+                    border: '1px solid var(--admin-border)'
+                  }}
+                >
                   {s.label}
                 </button>
               ))}
@@ -145,30 +159,40 @@ export default function AdminCustomersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((customer, i) => (
-                      <tr
-                        key={customer.id}
-                        className="cursor-pointer transition-colors hover:bg-white/5"
-                        style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--admin-border)' : 'none', background: selectedCustomer?.id === customer.id ? 'rgba(212,160,23,0.06)' : 'transparent' }}
-                        onClick={() => handleSelectCustomer(customer)}
-                      >
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 gradient-brand">
-                              <span className="text-xs font-bold text-primary-foreground">{customer.name.charAt(0)}</span>
+                    {filtered.map((customer, i) => {
+                      const displayName = customer.name || customer.email || 'User';
+                      const initial = displayName.charAt(0).toUpperCase();
+
+                      return (
+                        <tr
+                          key={customer.id}
+                          className="cursor-pointer transition-colors hover:bg-white/5"
+                          style={{
+                            borderBottom: i < filtered.length - 1 ? '1px solid var(--admin-border)' : 'none',
+                            background: selectedCustomer?.id === customer.id ? 'rgba(212,160,23,0.06)' : 'transparent'
+                          }}
+                          onClick={() => handleSelectCustomer(customer)}
+                        >
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 gradient-brand">
+                                <span className="text-xs font-bold text-primary-foreground">{initial}</span>
+                              </div>
+                              <span className="font-medium" style={{ color: '#F5EDE0' }}>{displayName}</span>
                             </div>
-                            <span className="font-medium" style={{ color: '#F5EDE0' }}>{customer.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>{customer.email}</p>
-                          <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>{customer.phone}</p>
-                        </td>
-                        <td className="px-5 py-3.5 font-semibold" style={{ color: '#60A5FA' }}>{customer.totalOrders}</td>
-                        <td className="px-5 py-3.5 font-semibold" style={{ color: '#D4A017' }}>₱{customer.totalSpent.toLocaleString()}</td>
-                        <td className="px-5 py-3.5 text-xs" style={{ color: 'var(--admin-muted)' }}>{customer.joinDate}</td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>{customer.email || '—'}</p>
+                            <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>{customer.phone || '—'}</p>
+                          </td>
+                          <td className="px-5 py-3.5 font-semibold" style={{ color: '#60A5FA' }}>{customer.totalOrders || 0}</td>
+                          <td className="px-5 py-3.5 font-semibold" style={{ color: '#D4A017' }}>₱{(customer.totalSpent || 0).toLocaleString()}</td>
+                          <td className="px-5 py-3.5 text-xs" style={{ color: 'var(--admin-muted)' }}>
+                            {customer.joinDate ? new Date(customer.joinDate).toLocaleDateString() : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {filtered.length === 0 && (
                       <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--admin-muted)' }}>No customers found.</td></tr>
                     )}
@@ -176,20 +200,26 @@ export default function AdminCustomersPage() {
                 </table>
               </div>
 
-              {/* Customer Detail */}
+              {/* Customer Detail Drawer */}
               {selectedCustomer && (
                 <div className="w-72 flex-shrink-0 rounded-2xl p-5 space-y-4" style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}>
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-sm" style={{ color: '#F5EDE0' }}>Customer Profile</h3>
-                    <button onClick={() => setSelectedCustomer(null)} style={{ color: 'var(--admin-muted)' }}><Icon name="XMarkIcon" size={16} /></button>
+                    <button onClick={() => setSelectedCustomer(null)} style={{ color: 'var(--admin-muted)' }}>
+                      <Icon name="XMarkIcon" size={16} />
+                    </button>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full flex items-center justify-center gradient-brand">
-                      <span className="text-lg font-bold text-primary-foreground">{selectedCustomer.name.charAt(0)}</span>
+                      <span className="text-lg font-bold text-primary-foreground">
+                        {(selectedCustomer.name || selectedCustomer.email || 'U').charAt(0).toUpperCase()}
+                      </span>
                     </div>
                     <div>
-                      <p className="font-semibold" style={{ color: '#F5EDE0' }}>{selectedCustomer.name}</p>
-                      <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>Since {selectedCustomer.joinDate}</p>
+                      <p className="font-semibold" style={{ color: '#F5EDE0' }}>{selectedCustomer.name || 'Unnamed Customer'}</p>
+                      <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>
+                        Since {selectedCustomer.joinDate ? new Date(selectedCustomer.joinDate).toLocaleDateString() : 'N/A'}
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-2 pt-2" style={{ borderTop: '1px solid var(--admin-border)' }}>
@@ -200,17 +230,17 @@ export default function AdminCustomersPage() {
                     ].map(row => (
                       <div key={row.label}>
                         <p className="text-xs font-medium" style={{ color: 'var(--admin-muted)' }}>{row.label}</p>
-                        <p className="text-xs mt-0.5" style={{ color: '#F5EDE0' }}>{row.value}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#F5EDE0' }}>{row.value || '—'}</p>
                       </div>
                     ))}
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-2" style={{ borderTop: '1px solid var(--admin-border)' }}>
                     <div className="rounded-xl p-3 text-center" style={{ background: 'var(--admin-bg)' }}>
-                      <p className="text-xl font-bold" style={{ color: '#60A5FA' }}>{selectedCustomer.totalOrders}</p>
+                      <p className="text-xl font-bold" style={{ color: '#60A5FA' }}>{selectedCustomer.totalOrders || 0}</p>
                       <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>Orders</p>
                     </div>
                     <div className="rounded-xl p-3 text-center" style={{ background: 'var(--admin-bg)' }}>
-                      <p className="text-lg font-bold" style={{ color: '#D4A017' }}>₱{(selectedCustomer.totalSpent / 1000).toFixed(1)}k</p>
+                      <p className="text-lg font-bold" style={{ color: '#D4A017' }}>₱{((selectedCustomer.totalSpent || 0) / 1000).toFixed(1)}k</p>
                       <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>Spent</p>
                     </div>
                   </div>

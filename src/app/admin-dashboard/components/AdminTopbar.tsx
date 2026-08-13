@@ -1,10 +1,108 @@
 'use client';
-import React, { useState } from 'react';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
+import {
+  fetchAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
+  AdminNotification,
+} from '@/lib/supabase/services';
+import { createClient } from '@/lib/supabase/client';
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} mins ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs > 1 ? 's' : ''} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days > 1 ? 's' : ''} ago`;
+}
+
+function getNotificationIcon(type: AdminNotification['type']): string {
+  switch (type) {
+    case 'order':
+      return '🛒';
+    case 'payment':
+      return '💳';
+    case 'inventory':
+      return '⚠️';
+    case 'system':
+    default:
+      return 'ℹ️';
+  }
+}
 
 export default function AdminTopbar() {
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const data = await fetchAdminNotifications();
+      setNotifications(data);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel('admin_topbar_notifications_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'admin_notifications' },
+        (payload) => {
+          const newNotif = payload.new as AdminNotification;
+          setNotifications((prev) => [newNotif, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadNotifications]);
+
+  // Close popover when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await markAdminNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch {
+      // silently fail
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllAdminNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch {
+      // silently fail
+    }
+  };
 
   return (
     <header
@@ -31,7 +129,7 @@ export default function AdminTopbar() {
         </div>
 
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative" ref={popoverRef}>
           <button
             onClick={() => setNotifOpen(!notifOpen)}
             className="relative flex items-center justify-center w-9 h-9 rounded-xl transition-colors"
@@ -39,7 +137,7 @@ export default function AdminTopbar() {
             aria-label="Notifications"
           >
             <Icon name="BellIcon" size={16} style={{ color: '#C8A99A' }} />
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-secondary" />
+            {unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-secondary" />}
           </button>
           {notifOpen && (
             <div
@@ -48,34 +146,45 @@ export default function AdminTopbar() {
             >
               <div className="px-4 py-2 flex items-center justify-between border-b" style={{ borderColor: 'var(--admin-border)' }}>
                 <span className="text-sm font-semibold" style={{ color: '#F5EDE0' }}>Notifications</span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(212,160,23,0.15)', color: '#D4A017' }}>5 new</span>
+                {unreadCount > 0 && (
+                  <button onClick={handleMarkAllRead} className="text-xs px-2 py-0.5 rounded-full font-bold transition-opacity hover:opacity-80" style={{ background: 'rgba(212,160,23,0.15)', color: '#D4A017' }}>
+                    {unreadCount} new
+                  </button>
+                )}
               </div>
-              {[
-                { id: 'notif-001', icon: '🛒', text: 'New order #FF-2026-0704 from Roberto Lim', time: '10 mins ago', unread: true },
-                { id: 'notif-002', icon: '💳', text: 'Payment proof uploaded for order #FF-2026-0702', time: '25 mins ago', unread: true },
-                { id: 'notif-003', icon: '⚠️', text: 'Shrimp stock is OUT — reorder immediately', time: '1 hr ago', unread: true },
-                { id: 'notif-004', icon: '⚠️', text: 'Pork Belly stock critically low (8 kg left)', time: '2 hrs ago', unread: false },
-                { id: 'notif-005', icon: '✅', text: 'Order #FF-2026-0701 marked as Confirmed', time: '3 hrs ago', unread: false },
-              ]?.map(n => (
-                <div
-                  key={n?.id}
-                  className="flex items-start gap-3 px-4 py-3 transition-colors cursor-pointer"
-                  style={{ background: n?.unread ? 'rgba(212,160,23,0.04)' : 'transparent' }}
-                >
-                  <span className="text-base flex-shrink-0 mt-0.5">{n?.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs leading-snug" style={{ color: n?.unread ? '#F5EDE0' : 'var(--admin-muted)' }}>
-                      {n?.text}
-                    </p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--admin-muted)' }}>{n?.time}</p>
+              <div className="max-h-80 overflow-y-auto scrollbar-thin">
+                {notifications.slice(0, 5).map(n => (
+                  <div
+                    key={n.id}
+                    onClick={() => handleMarkRead(n.id)}
+                    className="flex items-start gap-3 px-4 py-3 transition-colors cursor-pointer hover:bg-white/5"
+                    style={{ background: !n.read ? 'rgba(212,160,23,0.04)' : 'transparent' }}
+                  >
+                    <span className="text-base flex-shrink-0 mt-0.5">{getNotificationIcon(n.type)}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs leading-snug" style={{ color: !n.read ? '#F5EDE0' : 'var(--admin-muted)' }}>
+                        {n.title}: {n.message}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--admin-muted)' }}>{timeAgo(n.created_at)}</p>
+                    </div>
+                    {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0 mt-1.5" />}
                   </div>
-                  {n?.unread && <span className="w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0 mt-1.5" />}
-                </div>
-              ))}
+                ))}
+                {notifications.length === 0 && (
+                  <div className="px-4 py-6 text-center text-xs" style={{ color: 'var(--admin-muted)' }}>
+                    No notifications
+                  </div>
+                )}
+              </div>
               <div className="px-4 pt-2 border-t" style={{ borderColor: 'var(--admin-border)' }}>
-                <button className="w-full text-center text-xs font-semibold py-2 rounded-lg transition-colors" style={{ color: '#D4A017' }}>
+                <Link
+                  href="/admin-notifications"
+                  onClick={() => setNotifOpen(false)}
+                  className="block w-full text-center text-xs font-semibold py-2 rounded-lg transition-colors hover:bg-white/5"
+                  style={{ color: '#D4A017' }}
+                >
                   View all notifications
-                </button>
+                </Link>
               </div>
             </div>
           )}

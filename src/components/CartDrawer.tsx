@@ -29,7 +29,7 @@ export default function CartDrawer() {
       />
       {/* Drawer */}
       <div
-        className="fixed right-0 top-0 h-full w-full max-w-sm bg-card z-50 flex flex-col animate-fade-in"
+        className="fixed right-0 top-0 h-full w-full max-w-sm bg-card z-50 flex flex-col min-h-0 animate-fade-in"
         style={{ boxShadow: '-8px 0 32px rgba(44,24,16,0.18)' }}
         role="dialog"
         aria-label="Shopping cart"
@@ -55,7 +55,7 @@ export default function CartDrawer() {
         </div>
 
         {/* Items */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin py-3 px-4 space-y-3">
+        <div className="flex-1 overflow-y-auto scrollbar-thin py-3 px-4 space-y-3 pb-36">
           {state?.items?.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
               <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
@@ -140,7 +140,7 @@ export default function CartDrawer() {
 
         {/* Footer */}
         {hasItems && (
-          <div className="border-t border-border px-5 py-4 space-y-3">
+          <div className="border-t border-border px-5 py-4 space-y-3 sticky bottom-0 bg-card" style={{ zIndex: 2 }}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-muted-foreground">Subtotal</span>
               <span className="text-base font-bold text-foreground tabular-nums">₱{totalAmount?.toLocaleString()}</span>

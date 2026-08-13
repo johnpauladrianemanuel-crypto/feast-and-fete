@@ -1,11 +1,17 @@
 'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import Icon from '@/components/ui/AppIcon';
 import { ADMIN_PASSWORD } from './adminPassword';
+import { useRouter } from 'next/navigation';
 
-export default function AuthCard() {
+interface AuthCardProps {
+  onSuccess?: (userName: string) => void;
+}
+
+export default function AuthCard({ onSuccess }: AuthCardProps) {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [prevTab, setPrevTab] = useState<'login' | 'register' | null>(null);
   const [animating, setAnimating] = useState(false);
@@ -14,7 +20,25 @@ export default function AuthCard() {
   const [adminPassword, setAdminPassword] = useState('');
   const [adminPasswordError, setAdminPasswordError] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
+
   const animTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeAdminTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const redirectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef1 = useRef<number | null>(null);
+  const rafRef2 = useRef<number | null>(null);
+
+  const router = useRouter();
+
+  // Cleanup all active timeouts and RAFs on unmount
+  useEffect(() => {
+    return () => {
+      if (animTimeout.current) clearTimeout(animTimeout.current);
+      if (closeAdminTimeout.current) clearTimeout(closeAdminTimeout.current);
+      if (redirectTimeout.current) clearTimeout(redirectTimeout.current);
+      if (rafRef1.current) cancelAnimationFrame(rafRef1.current);
+      if (rafRef2.current) cancelAnimationFrame(rafRef2.current);
+    };
+  }, []);
 
   // Animate tab switch
   function switchTab(tab: 'login' | 'register') {
@@ -31,23 +55,41 @@ export default function AuthCard() {
 
   // Modal open/close with animation
   function openAdminGate() {
+    if (closeAdminTimeout.current) clearTimeout(closeAdminTimeout.current);
     setShowAdminGate(true);
     setAdminPassword('');
     setAdminPasswordError('');
-    requestAnimationFrame(() => requestAnimationFrame(() => setAdminGateVisible(true)));
+    
+    if (rafRef1.current) cancelAnimationFrame(rafRef1.current);
+    if (rafRef2.current) cancelAnimationFrame(rafRef2.current);
+
+    rafRef1.current = requestAnimationFrame(() => {
+      rafRef2.current = requestAnimationFrame(() => setAdminGateVisible(true));
+    });
   }
 
   function closeAdminGate() {
     setAdminGateVisible(false);
-    setTimeout(() => setShowAdminGate(false), 280);
+    if (closeAdminTimeout.current) clearTimeout(closeAdminTimeout.current);
+    closeAdminTimeout.current = setTimeout(() => setShowAdminGate(false), 280);
   }
 
-  function handleAdminAccess() {
+  function handleAdminAccess(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     if (adminPassword === ADMIN_PASSWORD) {
       setAdminPasswordError('');
+      // Set session cookie for admin protection
+      document.cookie = "admin_session=true; path=/; max-age=28800; SameSite=Lax";
       window.location.href = '/admin-dashboard';
     } else {
       setAdminPasswordError('Incorrect password. Please try again.');
+    }
+  }
+
+  // Common successful auth handler
+  function handleAuthSuccess(userName: string) {
+    if (onSuccess) {
+      onSuccess(userName);
     }
   }
 
@@ -55,21 +97,20 @@ export default function AuthCard() {
   const direction = prevTab === 'login' ? -1 : 1;
 
   return (
-    <div className="w-full max-w-md">
-      {/* Mobile Logo */}
-      <div className="flex items-center gap-3 mb-8 lg:hidden animate-card-in">
-        <div className="w-10 h-10 gradient-brand rounded-xl flex items-center justify-center">
-          <span className="text-lg">🍽️</span>
-        </div>
-        <div>
-          <p className="font-display text-xl font-bold text-primary">Feast & Fête</p>
-          <p className="text-xs text-muted-foreground">Filipino Food Tray Catering</p>
-        </div>
+    <div className="w-full max-w-md flex flex-col items-center">
+      {/* 1. DESKTOP & MOBILE BRAND HEADING (Fixed Position Above Card) */}
+      <div className="text-center mb-8 animate-card-in">
+        <span className="text-xs font-bold tracking-widest text-[#9B2C3E] uppercase">
+      
+        </span>
+        <h1 className="font-display text-4xl sm:text-5xl font-bold text-[#541212] mt-1 tracking-tight">
+         
+        </h1>
       </div>
 
-      {/* Card */}
+      {/* 2. CARD CONTAINER */}
       <div
-        className="bg-card rounded-3xl overflow-hidden animate-card-in"
+        className="w-full bg-card rounded-3xl overflow-hidden animate-card-in"
         style={{ boxShadow: '0 20px 60px rgba(123,28,46,0.15), 0 8px 20px rgba(0,0,0,0.1)' }}
       >
         {/* Tab switcher */}
@@ -77,6 +118,7 @@ export default function AuthCard() {
           {(['login', 'register'] as const).map(tab => (
             <button
               key={`tab-${tab}`}
+              type="button"
               onClick={() => switchTab(tab)}
               className="flex-1 py-4 text-sm font-semibold relative overflow-hidden"
               style={{
@@ -108,19 +150,26 @@ export default function AuthCard() {
                 : 'translateX(0)',
               opacity: animating ? 0 : 1,
               transition: animating
-                ? 'none' :'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease',
+                ? 'none'
+                : 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease',
             }}
           >
             {activeTab === 'login' ? (
-              <LoginForm onSwitchToRegister={() => switchTab('register')} />
+              <LoginForm
+                onSwitchToRegister={() => switchTab('register')}
+                onSuccess={handleAuthSuccess}
+              />
             ) : (
-              <RegisterForm onSwitchToLogin={() => switchTab('login')} />
+              <RegisterForm
+                onSwitchToLogin={() => switchTab('login')}
+                onSuccess={handleAuthSuccess}
+              />
             )}
           </div>
         </div>
       </div>
 
-      {/* Admin link */}
+      {/* 3. ADMIN LINK */}
       <p className="text-center text-xs text-muted-foreground mt-6 animate-card-in" style={{ animationDelay: '0.15s', animationFillMode: 'both' }}>
         Are you the admin?{' '}
         <button
@@ -141,6 +190,8 @@ export default function AuthCard() {
             transition: 'background 0.28s ease',
           }}
           onClick={e => { if (e.target === e.currentTarget) closeAdminGate(); }}
+          role="dialog"
+          aria-modal="true"
         >
           <div
             className="bg-card rounded-2xl p-6 w-full max-w-sm shadow-2xl"
@@ -173,13 +224,12 @@ export default function AuthCard() {
             </div>
 
             {/* Password field */}
-            <div className="space-y-3">
+            <form onSubmit={handleAdminAccess} className="space-y-3">
               <div className="relative">
                 <input
                   type={showAdminPassword ? 'text' : 'password'}
                   value={adminPassword}
                   onChange={e => { setAdminPassword(e.target.value); setAdminPasswordError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && handleAdminAccess()}
                   className="input-field pr-10"
                   placeholder="Admin password"
                   autoFocus
@@ -206,8 +256,7 @@ export default function AuthCard() {
               )}
 
               <button
-                type="button"
-                onClick={handleAdminAccess}
+                type="submit"
                 className="w-full py-2.5 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ transition: 'opacity 0.2s, transform 0.15s' }}
               >
@@ -221,7 +270,7 @@ export default function AuthCard() {
               >
                 Cancel
               </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
@@ -233,10 +282,10 @@ export default function AuthCard() {
         }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
-          20%       { transform: translateX(-6px); }
-          40%       { transform: translateX(6px); }
-          60%       { transform: translateX(-4px); }
-          80%       { transform: translateX(4px); }
+          20%      { transform: translateX(-6px); }
+          40%      { transform: translateX(6px); }
+          60%      { transform: translateX(-4px); }
+          80%      { transform: translateX(4px); }
         }
         .animate-card-in {
           animation: cardIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
