@@ -3,13 +3,12 @@ import { Resend } from 'resend';
 
 export const dynamic = 'force-dynamic';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(req: Request) {
   console.log('--------------------------------------------------');
   console.log('>>> [RESEND ROUTE HIT] Sending receipt...');
 
   try {
+    const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
     const body = await req.json();
     const { order } = body;
 

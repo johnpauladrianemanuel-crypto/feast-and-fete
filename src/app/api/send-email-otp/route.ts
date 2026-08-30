@@ -3,8 +3,6 @@ import { Resend } from 'resend';
 
 export const dynamic = 'force-dynamic';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(req: Request) {
   try {
     const { email, otp } = await req.json();
@@ -28,6 +26,8 @@ export async function POST(req: Request) {
         debugOtp: otp,
       });
     }
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const data = await resend.emails.send({
       from: 'Feast & Fête <onboarding@resend.dev>',
