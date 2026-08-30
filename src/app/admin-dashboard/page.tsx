@@ -25,14 +25,14 @@ export default function AdminDashboardPage() {
 
         if (error || !session || (!session.user && !adminProfile && userRole !== 'admin')) {
           setIsAuthenticated(false);
-          router.replace('/sign-up-login-screen');
+          router.replace('/admin-signin');
           return;
         }
 
         setIsAuthenticated(true);
       } catch (err) {
         console.error('Auth verification error:', err);
-        router.replace('/sign-up-login-screen');
+        router.replace('/admin-signin');
       } finally {
         setLoading(false);
       }
