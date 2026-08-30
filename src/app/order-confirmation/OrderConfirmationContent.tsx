@@ -34,7 +34,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 };
 
 const TIMELINE_STEPS = [
-  { label: 'Order Received', desc: "We\'ve received your order and are reviewing it.", icon: 'ClipboardDocumentCheckIcon', time: 'Now' },
+  { label: 'Order Received', desc: "We've received your order and are reviewing it.", icon: 'ClipboardDocumentCheckIcon', time: 'Now' },
   { label: 'Order Confirmed', desc: 'Our team confirms availability and prepares your tray.', icon: 'CheckBadgeIcon', time: '~2 hours' },
   { label: 'Preparation', desc: 'Our chefs begin cooking your Filipino food trays.', icon: 'FireIcon', time: '1–2 days before event' },
   { label: 'Ready for Delivery / Pickup', desc: 'Your order is packed and ready to go.', icon: 'TruckIcon', time: 'Event day' },
@@ -279,7 +279,7 @@ export default function OrderConfirmationContent() {
             href="/menu-browse-screen"
             className="flex-1 text-center py-3 border border-border text-foreground font-semibold text-sm rounded-xl hover:bg-muted transition-colors"
           >
-            Order More Items
+            Order New Items
           </Link>
           <Link
             href="/"

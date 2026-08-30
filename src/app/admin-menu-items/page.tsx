@@ -9,12 +9,36 @@ import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 
 const CATEGORIES = ['All', 'Beef', 'Pork', 'Chicken', 'Seafood', 'Pasta & Noodles', 'Vegetables', 'Desserts', 'Packages'];
+const FORM_CATEGORIES = CATEGORIES.filter(c => c !== 'All');
+
 const PRESET_REASONS = [
   'Out of ingredients for today',
   'Kitchen maintenance',
   'Temporarily out of stock',
   'Seasonal dish unavailable',
 ];
+
+interface NewMenuItemData {
+  name: string;
+  category: string;
+  price: number | '';
+  stock: number | '';
+  servingSize: string;
+  description: string;
+  image: string;
+  featured: boolean;
+}
+
+const INITIAL_NEW_ITEM: NewMenuItemData = {
+  name: '',
+  category: 'Beef',
+  price: '',
+  stock: '',
+  servingSize: 'Per Tray',
+  description: '',
+  image: '',
+  featured: false,
+};
 
 export default function AdminMenuItemsPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -24,6 +48,11 @@ export default function AdminMenuItemsPage() {
   const [search, setSearch] = useState('');
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Add Item Modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newItem, setNewItem] = useState<NewMenuItemData>(INITIAL_NEW_ITEM);
+  const [adding, setAdding] = useState(false);
 
   // Deactivate Modal state
   const [deactivateModalItem, setDeactivateModalItem] = useState<MenuItem | null>(null);
@@ -64,16 +93,16 @@ export default function AdminMenuItemsPage() {
   }, [loadItems]);
 
   const getItemActiveStatus = (item: MenuItem): boolean => {
-    const rawIsActive = item.isActive ?? (item as { is_active?: boolean }).is_active;
+    const rawIsActive = item.isActive ?? (item as unknown as { is_active?: boolean }).is_active;
     return rawIsActive !== false;
   };
 
   const getItemReason = (item: MenuItem): string => {
     return (
       item.unavailableReason ??
-      (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string }).deactivationReason ??
-      (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string }).deactivation_reason ??
-      (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string }).unavailable_reason ??
+      (item as unknown as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string }).deactivationReason ??
+      (item as unknown as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string }).deactivation_reason ??
+      (item as unknown as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string }).unavailable_reason ??
       ''
     );
   };
@@ -105,13 +134,11 @@ export default function AdminMenuItemsPage() {
       setItems(prev =>
         prev.map(i =>
           i.id === id
-            ? {
+            ? ({
                 ...i,
                 isActive: true,
-                is_active: true,
                 unavailableReason: '',
-                deactivationReason: '',
-              }
+              } as MenuItem)
             : i
         )
       );
@@ -138,13 +165,11 @@ export default function AdminMenuItemsPage() {
       setItems(prev =>
         prev.map(i =>
           i.id === deactivateModalItem.id
-            ? {
+            ? ({
                 ...i,
                 isActive: false,
-                is_active: false,
                 unavailableReason: finalReason,
-                deactivationReason: finalReason,
-              }
+              } as MenuItem)
             : i
         )
       );
@@ -157,7 +182,7 @@ export default function AdminMenuItemsPage() {
   const toggleFeatured = async (id: string, current: boolean) => {
     try {
       await updateMenuItem(id, { featured: !current });
-      setItems(prev => prev.map(i => (i.id === id ? { ...i, featured: !current } : i)));
+      setItems(prev => prev.map(i => (i.id === id ? ({ ...i, featured: !current } as MenuItem) : i)));
     } catch {
       // silently fail
     }
@@ -183,6 +208,63 @@ export default function AdminMenuItemsPage() {
     }
   };
 
+  const handleCreateMenuItem = async () => {
+    if (!newItem.name.trim()) {
+      alert('Please enter an item name.');
+      return;
+    }
+    if (newItem.price === '' || Number(newItem.price) < 0) {
+      alert('Please enter a valid price.');
+      return;
+    }
+
+    setAdding(true);
+    try {
+      const supabase = createClient();
+      const payload = {
+        name: newItem.name.trim(),
+        category: newItem.category,
+        price: Number(newItem.price),
+        stock: newItem.stock === '' ? 0 : Number(newItem.stock),
+        serving_size: newItem.servingSize || 'Per Tray',
+        description: newItem.description.trim(),
+        image: newItem.image.trim() || '/images/placeholder.jpg',
+        featured: newItem.featured,
+        is_active: true,
+      };
+
+      const { data, error } = await supabase.from('menu_items').insert([payload]).select().single();
+
+      if (error) throw error;
+
+      if (data) {
+        const createdItem: MenuItem = {
+          id: data.id,
+          name: data.name,
+          category: data.category,
+          categorySlug: data.category_slug || data.category.toLowerCase().replace(/\s+/g, '-'),
+          price: Number(data.price),
+          stock: Number(data.stock || 0),
+          servingSize: data.serving_size || 'Per Tray',
+          description: data.description || '',
+          image: data.image || '/images/placeholder.jpg',
+          featured: Boolean(data.featured),
+          isActive: true,
+          unavailableReason: '',
+        } as MenuItem;
+
+        setItems(prev => [createdItem, ...prev]);
+      }
+
+      setIsAddModalOpen(false);
+      setNewItem(INITIAL_NEW_ITEM);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to add menu item');
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--admin-bg)' }}>
       <AdminSidebar />
@@ -198,15 +280,30 @@ export default function AdminMenuItemsPage() {
                 {loading ? 'Loading…' : `${items.length} items`}
               </p>
             </div>
-            <button
-              onClick={loadItems}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
-              style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
-            >
-              <Icon name="ArrowPathIcon" size={15} className={loading ? 'animate-spin' : ''} />
-              Refresh
-            </button>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+                style={{
+                  background: '#D4A017',
+                  color: '#1A0F0A',
+                }}
+              >
+                <Icon name="PlusCircleIcon" size={16} />
+                Add Menu Item
+              </button>
+
+              <button
+                onClick={loadItems}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+              >
+                <Icon name="ArrowPathIcon" size={15} className={loading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -358,6 +455,158 @@ export default function AdminMenuItemsPage() {
         </div>
       </main>
 
+      {/* Add New Menu Item Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto scrollbar-thin" style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-display font-bold text-lg" style={{ color: '#F5EDE0' }}>
+                Add New Menu Item
+              </h3>
+              <button onClick={() => setIsAddModalOpen(false)} style={{ color: 'var(--admin-muted)' }}>
+                <Icon name="XMarkIcon" size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>
+                  Dish Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Crispy Pata Extra"
+                  value={newItem.name}
+                  onChange={e => setNewItem(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>
+                    Category
+                  </label>
+                  <select
+                    value={newItem.category}
+                    onChange={e => setNewItem(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl text-sm outline-none cursor-pointer"
+                    style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                  >
+                    {FORM_CATEGORIES.map(c => (
+                      <option key={c} value={c} style={{ background: '#1A0F0A', color: '#F5EDE0' }}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>
+                    Serving Size
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Per Tray, 4-6 Pax"
+                    value={newItem.servingSize}
+                    onChange={e => setNewItem(prev => ({ ...prev, servingSize: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                    style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>
+                    Price (₱) *
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="850"
+                    value={newItem.price}
+                    onChange={e => setNewItem(prev => ({ ...prev, price: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                    style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>
+                    Initial Stock
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="20"
+                    value={newItem.stock}
+                    onChange={e => setNewItem(prev => ({ ...prev, stock: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                    style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>
+                  Image URL / Path
+                </label>
+                <input
+                  type="text"
+                  placeholder="/images/menu/dish.jpg or https://..."
+                  value={newItem.image}
+                  onChange={e => setNewItem(prev => ({ ...prev, image: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Enter detailed description..."
+                  value={newItem.description}
+                  onChange={e => setNewItem(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
+                  style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer pt-1 text-sm text-stone-300">
+                <input
+                  type="checkbox"
+                  checked={newItem.featured}
+                  onChange={e => setNewItem(prev => ({ ...prev, featured: e.target.checked }))}
+                  className="rounded accent-[#D4A017]"
+                />
+                Mark as Featured Dish
+              </label>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="flex-1 py-2 rounded-xl text-sm font-medium"
+                style={{ background: 'var(--admin-bg)', color: 'var(--admin-muted)', border: '1px solid var(--admin-border)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateMenuItem}
+                disabled={adding}
+                className="flex-1 py-2 rounded-xl text-sm font-bold disabled:opacity-60"
+                style={{ background: '#D4A017', color: '#1A0F0A' }}
+              >
+                {adding ? 'Adding…' : 'Add Item'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Deactivation Reason Modal */}
       {deactivateModalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
@@ -453,7 +702,7 @@ export default function AdminMenuItemsPage() {
                     value={editItem[key as keyof MenuItem] as string | number}
                     onChange={e =>
                       setEditItem(prev =>
-                        prev ? { ...prev, [key]: type === 'number' ? Number(e.target.value) : e.target.value } : null
+                        prev ? ({ ...prev, [key]: type === 'number' ? Number(e.target.value) : e.target.value } as MenuItem) : null
                       )
                     }
                     className="w-full px-3 py-2 rounded-xl text-sm outline-none"
@@ -468,7 +717,7 @@ export default function AdminMenuItemsPage() {
                 <textarea
                   rows={3}
                   value={editItem.description || ''}
-                  onChange={e => setEditItem(prev => (prev ? { ...prev, description: e.target.value } : null))}
+                  onChange={e => setEditItem(prev => (prev ? ({ ...prev, description: e.target.value } as MenuItem) : null))}
                   className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
                   style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
                 />

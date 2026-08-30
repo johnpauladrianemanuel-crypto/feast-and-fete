@@ -1,18 +1,22 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import Icon from '@/components/ui/AppIcon';
+import { createClient } from '@/lib/supabase/client';
 
-type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled';
+export type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled' | string;
 
-interface OrderItem {
+export interface OrderItem {
   id: string;
+  menu_item_id: string;
   menu_item_name: string;
   quantity: number;
   unit_price: number;
   subtotal: number;
 }
 
-interface Order {
+export interface Order {
   id: string;
   order_number: string;
   customer_name: string;
@@ -34,277 +38,294 @@ interface Order {
 }
 
 interface OrderDetailModalProps {
-  selectedOrder: Order;
+  order: Order | null;
   onClose: () => void;
-  onStatusUpdate: (orderId: string, newStatus: OrderStatus, reason?: string) => Promise<void>;
-  updatingId: string | null;
+  onStatusUpdate?: (orderId: string, newStatus: OrderStatus) => void;
+  updatingId?: string | null;
 }
 
-const STATUS_STEPS: OrderStatus[] = ['Pending', 'Confirmed', 'Preparing', 'Ready', 'Shipped', 'Completed'];
+const STATUS_OPTIONS: OrderStatus[] = [
+  'Pending',
+  'Confirmed',
+  'Preparing',
+  'Ready',
+  'Shipped',
+  'Completed',
+  'Cancelled',
+];
 
-const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; border: string }> = {
-  Pending: { bg: 'rgba(234,179,8,0.15)', text: '#EAB308', border: 'rgba(234,179,8,0.3)' },
-  Confirmed: { bg: 'rgba(59,130,246,0.15)', text: '#60A5FA', border: 'rgba(59,130,246,0.3)' },
-  Preparing: { bg: 'rgba(249,115,22,0.15)', text: '#FB923C', border: 'rgba(249,115,22,0.3)' },
-  Ready: { bg: 'rgba(34,197,94,0.15)', text: '#4ADE80', border: 'rgba(34,197,94,0.3)' },
-  Shipped: { bg: 'rgba(139,92,246,0.15)', text: '#A78BFA', border: 'rgba(139,92,246,0.3)' },
-  Completed: { bg: 'rgba(100,116,139,0.15)', text: '#94A3B8', border: 'rgba(100,116,139,0.3)' },
-  Cancelled: { bg: 'rgba(239,68,68,0.15)', text: '#F87171', border: 'rgba(239,68,68,0.3)' },
+const PAYMENT_LABELS: Record<string, string> = {
+  gcash: 'GCash',
+  bank_transfer: 'Bank Transfer',
+  cash: 'Cash on Pickup',
+  cash_on_delivery: 'Cash on Delivery',
+};
+
+const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
+  pending: { bg: 'bg-amber-100 border-amber-200', text: 'text-amber-700' },
+  confirmed: { bg: 'bg-blue-100 border-blue-200', text: 'text-blue-700' },
+  preparing: { bg: 'bg-orange-100 border-orange-200', text: 'text-orange-700' },
+  ready: { bg: 'bg-emerald-100 border-emerald-200', text: 'text-emerald-700' },
+  shipped: { bg: 'bg-purple-100 border-purple-200', text: 'text-purple-700' },
+  completed: { bg: 'bg-green-100 border-green-200', text: 'text-green-700' },
+  cancelled: { bg: 'bg-red-100 border-red-200', text: 'text-red-700' },
 };
 
 export default function OrderDetailModal({
-  selectedOrder,
+  order,
   onClose,
   onStatusUpdate,
   updatingId,
 }: OrderDetailModalProps) {
-  const [cancelReason, setCancelReason] = useState('');
-  const [showCancelInput, setShowCancelInput] = useState(false);
+  const supabase = createClient();
+  const [mounted, setMounted] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<string>('Pending');
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+    setMounted(true);
+    if (order) {
+      setCurrentStatus(order.status || 'Pending');
+    }
+  }, [order]);
 
-  const currentStepIndex = STATUS_STEPS.indexOf(selectedOrder.status);
-  const isUpdating = updatingId === selectedOrder.id;
+  if (!mounted || !order) return null;
 
-  const handleAction = async (newStatus: OrderStatus, reason?: string) => {
-    await onStatusUpdate(selectedOrder.id, newStatus, reason);
-    if (newStatus === 'Cancelled') {
-      setShowCancelInput(false);
-      setCancelReason('');
+  const handleStatusChange = async (newStatus: OrderStatus) => {
+    if (newStatus === currentStatus) return;
+
+    setUpdating(true);
+    setEmailStatus('idle');
+
+    try {
+      // 1. Update status in Supabase (avoiding RLS select blocks)
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', order.id);
+
+      if (error) {
+        console.error('Supabase status update error:', error);
+        throw error;
+      }
+
+      setCurrentStatus(newStatus);
+
+      // 2. If status is set to Completed, trigger email receipt API
+      if (newStatus.toLowerCase() === 'completed') {
+        setEmailStatus('sending');
+
+        const orderPayload = {
+          ...order,
+          status: newStatus,
+        };
+
+        try {
+          const res = await fetch('/api/admin/orders/send-receipt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: orderPayload }),
+          });
+
+          const result = await res.json();
+
+          if (res.ok) {
+            setEmailStatus('sent');
+            console.log('Receipt email sent successfully:', result);
+          } else {
+            console.error('Failed to send receipt email:', result);
+            setEmailStatus('error');
+          }
+        } catch (err) {
+          console.error('Error triggering receipt API:', err);
+          setEmailStatus('error');
+        }
+      }
+
+      // 3. Notify parent page.tsx
+      if (onStatusUpdate) {
+        onStatusUpdate(order.id, newStatus);
+      }
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+      alert('Failed to update order status. Please try again.');
+    } finally {
+      setUpdating(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="absolute inset-0" onClick={onClose} />
+  const normStatus = currentStatus.toLowerCase();
+  const badge = STATUS_BADGE[normStatus] || STATUS_BADGE.pending;
 
-      <div className="relative w-full max-w-2xl bg-[#181512] border border-[#332E2B] rounded-2xl shadow-2xl text-[#F5EDE0] overflow-hidden z-10 max-h-[90vh] flex flex-col">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-[#332E2B] flex items-center justify-between bg-[#120F0D]">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/30">
           <div>
-            <span className="text-xs uppercase tracking-wider text-stone-400">Order Details</span>
-            <h2 className="text-xl font-bold font-mono text-[#D4A017]">{selectedOrder.order_number}</h2>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-lg font-bold text-primary">#{order.order_number}</span>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text}`}>
+                {currentStatus}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Placed on {new Date(order.created_at).toLocaleString('en-PH')}
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
-            ✕
+            <Icon name="XMarkIcon" size={20} />
           </button>
         </div>
 
-        {/* Content */}
+        {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
-          {/* Customer & Status Header */}
-          <div className="flex flex-wrap items-center justify-between gap-4 bg-[#120F0D] p-4 rounded-xl border border-[#2A2420]">
-            <div>
-              <p className="text-xs text-stone-400">Customer</p>
-              <p className="text-sm font-medium">{selectedOrder.customer_name}</p>
-              <p className="text-xs text-stone-500">{selectedOrder.customer_email}</p>
-              {selectedOrder.customer_phone && (
-                <p className="text-xs text-stone-500">{selectedOrder.customer_phone}</p>
-              )}
+          {/* Status Updater */}
+          <div className="bg-muted/40 p-4 rounded-xl border border-border">
+            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Update Order Status
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {STATUS_OPTIONS.map((status) => {
+                const isActive = currentStatus.toLowerCase() === status.toLowerCase();
+                const isCurrentlyUpdating = updating || updatingId === order.id;
+
+                return (
+                  <button
+                    key={status}
+                    disabled={isCurrentlyUpdating}
+                    onClick={() => handleStatusChange(status)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-card border border-border text-foreground hover:bg-muted'
+                    } disabled:opacity-50`}
+                  >
+                    {status}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="text-right">
-              <span
-                className="inline-block px-3 py-1 rounded-full text-xs font-semibold"
-                style={{
-                  background: STATUS_COLORS[selectedOrder.status]?.bg,
-                  color: STATUS_COLORS[selectedOrder.status]?.text,
-                  border: `1px solid ${STATUS_COLORS[selectedOrder.status]?.border}`,
-                }}
-              >
-                {selectedOrder.status}
-              </span>
-              <p className="text-[10px] text-stone-500 mt-1">
-                Updated: {new Date(selectedOrder.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {/* Email status indicator */}
+            {emailStatus === 'sending' && (
+              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5 font-medium">
+                <Icon name="ArrowPathIcon" size={14} className="animate-spin" />
+                Sending receipt email to customer...
               </p>
+            )}
+            {emailStatus === 'sent' && (
+              <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1.5 font-medium">
+                <Icon name="CheckCircleIcon" size={14} />
+                Receipt email sent successfully to {order.customer_email}!
+              </p>
+            )}
+            {emailStatus === 'error' && (
+              <p className="text-xs text-red-600 mt-2 flex items-center gap-1.5 font-medium">
+                <Icon name="ExclamationCircleIcon" size={14} />
+                Status updated, but failed to send email receipt.
+              </p>
+            )}
+          </div>
+
+          {/* Customer & Fulfillment Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-card border border-border rounded-xl p-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <Icon name="UserIcon" size={14} />
+                Customer Details
+              </h4>
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold text-foreground">{order.customer_name}</p>
+                <p className="text-muted-foreground">{order.customer_email}</p>
+                <p className="text-muted-foreground">{order.customer_phone}</p>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <Icon name="TruckIcon" size={14} />
+                Fulfillment Details
+              </h4>
+              <div className="space-y-1 text-sm">
+                <p className="capitalize">
+                  <span className="font-medium text-foreground">Type:</span> {order.delivery_method}
+                </p>
+                {order.delivery_address && (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Address:</span> {order.delivery_address}
+                  </p>
+                )}
+                {order.event_date && (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Event Date:</span> {order.event_date} {order.event_time ? `(${order.event_time})` : ''}
+                  </p>
+                )}
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Payment:</span> {PAYMENT_LABELS[order.payment_method] || order.payment_method}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Progress Tracker */}
-          {selectedOrder.status !== 'Cancelled' ? (
-            <div className="space-y-2">
-              <h3 className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
-                Order Status
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                {STATUS_STEPS.map((step, idx) => {
-                  const isPassed = idx <= currentStepIndex;
-                  const isCurrent = idx === currentStepIndex;
-
-                  return (
-                    <div
-                      key={step}
-                      className={`p-2.5 rounded-xl border text-center transition-all ${
-                        isCurrent
-                          ? 'bg-[#D4A017]/10 border-[#D4A017] text-[#D4A017]'
-                          : isPassed
-                          ? 'bg-white/5 border-stone-700 text-stone-300'
-                          : 'bg-transparent border-stone-800 text-stone-600'
-                      }`}
-                    >
-                      <div className="text-[10px] font-mono mb-0.5">0{idx + 1}</div>
-                      <div className="text-[11px] font-medium leading-tight">{step}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="p-4 bg-red-950/20 border border-red-800/40 rounded-xl text-center">
-              <p className="text-red-400 text-sm font-semibold">This Order Was Cancelled</p>
-              {selectedOrder.notes && (
-                <p className="text-xs text-stone-400 mt-1 whitespace-pre-line">{selectedOrder.notes}</p>
-              )}
-            </div>
-          )}
-
-          {/* Order Items */}
-          <div className="space-y-3">
-            <h3 className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
-              Items Ordered
-            </h3>
-            <div className="divide-y divide-[#2A2420] border-t border-b border-[#2A2420]">
-              {selectedOrder.order_items?.map((item) => (
-                <div key={item.id} className="py-2.5 flex justify-between items-center text-xs">
+          {/* Order Items Table */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Icon name="ShoppingBagIcon" size={14} />
+              Ordered Items
+            </h4>
+            <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
+              {order.order_items?.map((item) => (
+                <div key={item.id} className="p-3.5 flex items-center justify-between text-sm bg-card">
                   <div>
-                    <p className="font-medium text-[#F5EDE0]">{item.menu_item_name}</p>
-                    <p className="text-stone-500">Qty: {item.quantity}</p>
+                    <p className="font-medium text-foreground">{item.menu_item_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Qty: {item.quantity} × ₱{Number(item.unit_price).toLocaleString()}
+                    </p>
                   </div>
-                  <span className="font-mono text-stone-300">
-                    ₱{Number(item.subtotal).toLocaleString()}
-                  </span>
+                  <p className="font-semibold text-foreground">₱{Number(item.subtotal).toLocaleString()}</p>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Billing Summary */}
-          <div className="bg-[#120F0D] p-4 rounded-xl border border-[#2A2420] space-y-1.5 text-xs">
-            <div className="flex justify-between text-stone-400">
-              <span>Subtotal</span>
-              <span className="font-mono">₱{Number(selectedOrder.subtotal).toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between text-stone-400">
-              <span>Delivery Fee</span>
-              <span className="font-mono">₱{Number(selectedOrder.delivery_fee).toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between text-sm font-bold text-[#F5EDE0] pt-2 border-t border-[#2A2420]">
-              <span>Total Amount</span>
-              <span className="font-mono text-[#D4A017]">
-                ₱{Number(selectedOrder.total_amount).toLocaleString()}
-              </span>
-            </div>
-          </div>
-
-          {/* Quick Actions inside Modal */}
-          {selectedOrder.status !== 'Completed' && selectedOrder.status !== 'Cancelled' && (
-            <div className="space-y-3 pt-2">
-              <h3 className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
-                Update Order Status
-              </h3>
-
-              {showCancelInput ? (
-                <div className="space-y-2 bg-[#120F0D] p-3 rounded-xl border border-red-900/50">
-                  <textarea
-                    rows={2}
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                    placeholder="Enter reason for cancellation..."
-                    className="w-full p-2 rounded-lg text-xs outline-none bg-[#181512] border border-[#332E2B] text-stone-200"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => setShowCancelInput(false)}
-                      className="px-3 py-1 rounded-lg text-xs bg-stone-800 text-stone-300"
-                    >
-                      Back
-                    </button>
-                    <button
-                      disabled={!cancelReason.trim() || isUpdating}
-                      onClick={() => handleAction('Cancelled', cancelReason)}
-                      className="px-3 py-1 rounded-lg text-xs bg-red-600 text-white disabled:opacity-50 flex items-center gap-1"
-                    >
-                      {isUpdating ? 'Saving...' : 'Confirm Cancel'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {selectedOrder.status === 'Pending' && (
-                    <button
-                      disabled={isUpdating}
-                      onClick={() => handleAction('Confirmed')}
-                      className="px-3 py-1.5 rounded-xl text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 transition-all disabled:opacity-50"
-                    >
-                      {isUpdating ? 'Updating...' : 'Mark Confirmed'}
-                    </button>
-                  )}
-                  {(selectedOrder.status === 'Pending' || selectedOrder.status === 'Confirmed') && (
-                    <button
-                      disabled={isUpdating}
-                      onClick={() => handleAction('Preparing')}
-                      className="px-3 py-1.5 rounded-xl text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500/30 transition-all disabled:opacity-50"
-                    >
-                      {isUpdating ? 'Updating...' : 'Mark Preparing'}
-                    </button>
-                  )}
-                  {selectedOrder.status !== 'Ready' && (
-                    <button
-                      disabled={isUpdating}
-                      onClick={() => handleAction('Ready')}
-                      className="px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-all disabled:opacity-50"
-                    >
-                      {isUpdating ? 'Updating...' : 'Mark Ready'}
-                    </button>
-                  )}
-                  {selectedOrder.status !== 'Shipped' && (
-                    <button
-                      disabled={isUpdating}
-                      onClick={() => handleAction('Shipped')}
-                      className="px-3 py-1.5 rounded-xl text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all disabled:opacity-50"
-                    >
-                      {isUpdating ? 'Updating...' : 'Mark Shipped'}
-                    </button>
-                  )}
-                  <button
-                    disabled={isUpdating}
-                    onClick={() => handleAction('Completed')}
-                    className="px-3 py-1.5 rounded-xl text-xs font-medium bg-stone-500/20 text-stone-300 border border-stone-500/30 hover:bg-stone-500/30 transition-all disabled:opacity-50"
-                  >
-                    {isUpdating ? 'Updating...' : 'Mark Completed'}
-                  </button>
-                  <button
-                    disabled={isUpdating}
-                    onClick={() => setShowCancelInput(true)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all disabled:opacity-50"
-                  >
-                    Cancel Order
-                  </button>
+            {/* Total Summary */}
+            <div className="mt-4 p-4 rounded-xl bg-muted/20 border border-border space-y-1.5 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span>₱{Number(order.subtotal || 0).toLocaleString()}</span>
+              </div>
+              {Number(order.delivery_fee) > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Delivery Fee</span>
+                  <span>₱{Number(order.delivery_fee).toLocaleString()}</span>
                 </div>
               )}
+              <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border mt-2">
+                <span>Total Amount</span>
+                <span className="text-primary">₱{Number(order.total_amount || 0).toLocaleString()}</span>
+              </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#332E2B] bg-[#120F0D] flex justify-end">
+        <div className="px-6 py-4 border-t border-border flex justify-end bg-muted/20">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors"
+            className="px-5 py-2 bg-muted hover:bg-muted/80 text-foreground text-sm font-medium rounded-xl transition-colors"
           >
             Close
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

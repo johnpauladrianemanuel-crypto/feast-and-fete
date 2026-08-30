@@ -51,7 +51,7 @@ export default function FeaturedItems() {
           <div className="flex items-end justify-between mb-12">
             <div>
               <p className="feat-v2-eyebrow text-xs font-bold tracking-[0.3em] uppercase mb-2">Most Loved</p>
-              <h2 className="font-display text-4xl lg:text-5xl font-black text-black leading-tight">
+              <h2 className="font-display text-4xl lg:text-5xl font-black text-gray-900 dark:text-white leading-tight">
                 Featured <span className="feat-v2-title-accent">Trays</span>
               </h2>
             </div>
@@ -79,7 +79,7 @@ export default function FeaturedItems() {
         <div className="flex items-end justify-between mb-12">
           <div>
             <p className="feat-v2-eyebrow text-xs font-bold tracking-[0.3em] uppercase mb-2">Most Loved</p>
-            <h2 className="font-display text-4xl lg:text-5xl font-black text-black leading-tight">
+            <h2 className="font-display text-4xl lg:text-5xl font-black text-gray-900 dark:text-white leading-tight">
               Featured <span className="feat-v2-title-accent">Trays</span>
             </h2>
           </div>
@@ -116,13 +116,13 @@ export default function FeaturedItems() {
               <div className="p-6 space-y-4">
                 <div>
                   <span className="text-xs font-bold text-primary/70 uppercase tracking-widest">{hero.category}</span>
-                  <h3 className="font-display text-2xl font-black text-black mt-1 leading-tight">{hero.name}</h3>
-                  <p className="text-sm text-gray-700 mt-2 line-clamp-2">{hero.description}</p>
+                  <h3 className="font-display text-2xl font-black text-gray-900 dark:text-white mt-1 leading-tight">{hero.name}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">{hero.description}</p>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="font-display text-3xl font-black text-primary tabular-nums">₱{hero.price.toLocaleString()}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{hero.servingSize}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">{hero.servingSize}</span>
                   </div>
                   <button
                     onClick={() => handleAdd(hero)}
@@ -157,7 +157,7 @@ export default function FeaturedItems() {
                 <div className="p-4 flex flex-col flex-1 space-y-3">
                   <div className="flex-1">
                     <span className="text-xs font-bold text-primary/70 uppercase tracking-widest">{item.category}</span>
-                    <h3 className="font-display text-sm font-bold text-black mt-0.5 leading-snug line-clamp-2">{item.name}</h3>
+                    <h3 className="font-display text-sm font-bold text-gray-900 dark:text-white mt-0.5 leading-snug line-clamp-2">{item.name}</h3>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-display text-lg font-black text-primary tabular-nums">₱{item.price.toLocaleString()}</span>
@@ -178,8 +178,8 @@ export default function FeaturedItems() {
                 🍽️
               </div>
               <div>
-                <p className="font-display text-base font-black text-black">22+ More Trays</p>
-                <p className="text-xs text-gray-700 mt-1">Explore the full menu</p>
+                <p className="font-display text-base font-black text-gray-900 dark:text-white">22+ More Trays</p>
+                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">Explore the full menu</p>
               </div>
               <Link
                 href="/menu-browse-screen"

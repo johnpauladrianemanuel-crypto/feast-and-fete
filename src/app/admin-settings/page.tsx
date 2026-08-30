@@ -87,7 +87,6 @@ function Toggle({ checked, onChange, color = '#D4A017' }: { checked: boolean; on
       style={{
         background: checked ? color : 'var(--muted)',
         boxShadow: checked ? `0 0 8px ${color}60` : undefined,
-        focusRingColor: color,
       }}
     >
       <span

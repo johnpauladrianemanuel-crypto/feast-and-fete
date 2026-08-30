@@ -12,7 +12,7 @@ export default function HowItWorks() {
     <section className="hiw-v2-root py-24 relative overflow-hidden">
       {/* Large watermark text */}
       <div className="hiw-v2-watermark absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-        <span className="font-display font-black text-[20vw] leading-none opacity-[0.025] text-foreground whitespace-nowrap">
+        <span className="font-display font-black text-[20vw] leading-none opacity-[0.025] text-gray-900 dark:text-white whitespace-nowrap">
           HOW IT WORKS
         </span>
       </div>
@@ -20,10 +20,10 @@ export default function HowItWorks() {
         {/* Header */}
         <div className="text-center mb-16">
           <p className="hiw-v2-eyebrow text-xs font-bold tracking-[0.3em] uppercase mb-3">Simple Process</p>
-          <h2 className="font-display text-4xl lg:text-5xl font-black text-black leading-tight">
+          <h2 className="font-display text-4xl lg:text-5xl font-black text-gray-900 dark:text-white leading-tight">
             How It <span className="hiw-v2-accent">Works</span>
           </h2>
-          <p className="text-muted-foreground mt-4 max-w-md mx-auto">
+          <p className="text-gray-600 dark:text-gray-300 mt-4 max-w-md mx-auto">
             No more Messenger threads or missed calls — ordering your feast is now effortless.
           </p>
         </div>
@@ -54,8 +54,8 @@ export default function HowItWorks() {
 
                 {/* Content */}
                 <div className="relative z-10 space-y-2">
-                  <h3 className="font-display text-lg font-black text-black leading-tight">{step?.title}</h3>
-                  <p className="text-sm text-gray-700 leading-relaxed">{step?.desc}</p>
+                  <h3 className="font-display text-lg font-black text-gray-900 dark:text-white leading-tight">{step?.title}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{step?.desc}</p>
                 </div>
 
                 {/* Step indicator dot */}

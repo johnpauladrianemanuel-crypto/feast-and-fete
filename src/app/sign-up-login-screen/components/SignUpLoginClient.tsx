@@ -8,8 +8,6 @@ import WelcomeSplash from '@/components/WelcomeSplash';
 
 export default function SignUpLoginClient() {
   const router = useRouter();
-
-  // State for Welcome Splash
   const [welcomeUser, setWelcomeUser] = useState<string | null>(null);
 
   // Admin Modal State
@@ -53,10 +51,8 @@ export default function SignUpLoginClient() {
   }
 
   return (
-    // lg:flex-row-reverse swaps the position: Auth Card goes to the LEFT, Brand Panel goes to the RIGHT
     <div className="min-h-screen flex flex-col lg:flex-row-reverse auth-page-root" style={{ background: 'var(--background)' }}>
-      
-      {/* Brand panel (Now on the RIGHT side on desktop) */}
+      {/* Brand panel (Right side on desktop) */}
       <div
         className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-12 relative overflow-hidden auth-brand-panel"
         style={{ background: 'linear-gradient(160deg, #7B1C2E 0%, #5A1020 45%, #3D0A14 100%)' }}
@@ -155,17 +151,9 @@ export default function SignUpLoginClient() {
         </div>
       </div>
 
-      {/* Auth Card Panel (Now on the LEFT side on desktop) */}
+      {/* Auth Card Panel (Left side on desktop) */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 auth-right-panel relative">
         <AuthCard onSuccess={(name) => setWelcomeUser(name)} />
-
-        {/* Admin Link at Bottom */}
-        <button
-          onClick={() => setIsAdminModalOpen(true)}
-          className="mt-6 text-xs text-stone-500 hover:text-stone-700 underline transition"
-        >
-          Are you the admin? Go to Admin Panel →
-        </button>
 
         {/* Admin Access Modal */}
         {isAdminModalOpen && (
@@ -233,7 +221,6 @@ export default function SignUpLoginClient() {
           </div>
         )}
       </div>
-
     </div>
   );
 }

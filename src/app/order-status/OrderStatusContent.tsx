@@ -9,7 +9,7 @@ import ReviewModal from '@/app/components/ReviewModal';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled' | string;
+type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled' | string;
 
 interface OrderItem {
   id: string;
@@ -89,17 +89,27 @@ const TIMELINE_STEPS: {
   },
   {
     status: 'ready',
+    label: 'Ready for Pickup / Delivery',
+    desc: 'Your order is freshly packed and ready!',
+    icon: 'SparklesIcon',
+    activeIcon: 'SparklesIcon',
+    estimatedTime: 'Event day',
+    etaLabel: 'Ready',
+    color: '#22c55e',
+  },
+  {
+    status: 'shipped',
     label: 'On the Way',
     desc: 'Your order is packed and heading to you!',
     icon: 'TruckIcon',
     activeIcon: 'TruckIcon',
     estimatedTime: 'Event day',
-    etaLabel: 'Delivered',
-    color: '#D4A017',
+    etaLabel: 'Shipped',
+    color: '#8b5cf6',
   },
 ];
 
-const STATUS_ORDER = ['pending', 'confirmed', 'preparing', 'ready'];
+const STATUS_ORDER = ['pending', 'confirmed', 'preparing', 'ready', 'shipped', 'completed'];
 
 const PAYMENT_LABELS: Record<string, string> = {
   gcash: 'GCash',
@@ -112,7 +122,8 @@ const STATUS_BADGE: Record<string, { bg: string; text: string; dot?: boolean }> 
   pending: { bg: 'bg-amber-100 border-amber-200', text: 'text-amber-700', dot: true },
   confirmed: { bg: 'bg-blue-100 border-blue-200', text: 'text-blue-700', dot: true },
   preparing: { bg: 'bg-orange-100 border-orange-200', text: 'text-orange-700', dot: true },
-  ready: { bg: 'bg-primary/10 border-primary/20', text: 'text-primary', dot: true },
+  ready: { bg: 'bg-emerald-100 border-emerald-200', text: 'text-emerald-700', dot: true },
+  shipped: { bg: 'bg-purple-100 border-purple-200', text: 'text-purple-700', dot: true },
   completed: { bg: 'bg-green-100 border-green-200', text: 'text-green-700' },
   cancelled: { bg: 'bg-red-100 border-red-200', text: 'text-red-700' },
 };
@@ -127,6 +138,7 @@ function getStepState(stepStatus: string, currentStatus: string): 'completed' | 
   const normStep = normalizeStatus(stepStatus);
 
   if (normCurrent === 'cancelled') return 'upcoming';
+  if (normCurrent === 'completed') return 'completed';
 
   const stepIdx = STATUS_ORDER.indexOf(normStep);
   const currentIdx = STATUS_ORDER.indexOf(normCurrent);
@@ -151,7 +163,8 @@ function AnimatedProgressBar({ percent, status }: { percent: number; status: str
     };
   }, [percent]);
 
-  const stepPercents = [0, 33, 66, 100];
+  const totalSteps = TIMELINE_STEPS.length;
+  const stepPercents = TIMELINE_STEPS.map((_, i) => Math.round((i / (totalSteps - 1)) * 100));
 
   return (
     <div className="mb-8">
@@ -159,7 +172,7 @@ function AnimatedProgressBar({ percent, status }: { percent: number; status: str
         {TIMELINE_STEPS.map((step) => {
           const state = getStepState(step.status, status);
           return (
-            <div key={step.status} className="flex flex-col items-center gap-1" style={{ width: '25%' }}>
+            <div key={step.status} className="flex flex-col items-center gap-1" style={{ width: `${100 / totalSteps}%` }}>
               <div
                 className={`relative flex items-center justify-center rounded-full transition-all duration-500 ${
                   state === 'active'
@@ -250,7 +263,7 @@ function AnimatedProgressBar({ percent, status }: { percent: number; status: str
         <span className="text-xs font-semibold" style={{ color: '#D4A017' }}>
           {displayPercent}% Complete
         </span>
-        <span className="text-xs text-muted-foreground">Delivered</span>
+        <span className="text-xs text-muted-foreground">Completed</span>
       </div>
 
       <style>{`
@@ -266,7 +279,7 @@ function AnimatedProgressBar({ percent, status }: { percent: number; status: str
 function StageCard({ order }: { order: Order }) {
   const normStatus = normalizeStatus(order.status);
   const currentIdx = STATUS_ORDER.indexOf(normStatus);
-  const currentStep = TIMELINE_STEPS[currentIdx >= 0 ? currentIdx : 0];
+  const currentStep = TIMELINE_STEPS[currentIdx >= 0 && currentIdx < TIMELINE_STEPS.length ? currentIdx : 0];
   const nextStep = TIMELINE_STEPS[currentIdx + 1];
 
   if (normStatus === 'cancelled' || normStatus === 'completed') return null;
@@ -298,7 +311,7 @@ function StageCard({ order }: { order: Order }) {
             name={currentStep.activeIcon as Parameters<typeof Icon>[0]['name']}
             size={26}
             style={{ color: currentStep.color }}
-            className={normStatus === 'preparing' ? 'animate-bounce' : normStatus === 'ready' ? 'animate-pulse' : ''}
+            className={normStatus === 'preparing' ? 'animate-bounce' : normStatus === 'shipped' || normStatus === 'ready' ? 'animate-pulse' : ''}
           />
         </div>
 
@@ -353,14 +366,9 @@ export default function OrderStatusContent() {
   const [showReview, setShowReview] = useState(false);
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
 
-  const [inputValue, setInputValue] = useState('');
-  const [orderNumber, setOrderNumber] = useState('');
-  const [guestOrder, setGuestOrder] = useState<Order | null>(null);
-  const [guestLoading, setGuestLoading] = useState(false);
-  const [guestError, setGuestError] = useState<string | null>(null);
-
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -382,7 +390,7 @@ export default function OrderStatusContent() {
     sessionStorage.setItem('feastfete_reviewed_orders', JSON.stringify(Array.from(reviewedOrders)));
   }, [reviewedOrders]);
 
-  const activeOrder = user ? selectedOrder : guestOrder;
+  const activeOrder = selectedOrder;
 
   const fetchMyOrders = useCallback(async () => {
     if (!user) return;
@@ -397,7 +405,6 @@ export default function OrderStatusContent() {
       if (!error && data) {
         setMyOrders(data as Order[]);
         
-        // Match order via URL query parameter ?order=...
         const urlParams = new URLSearchParams(window.location.search);
         const queryOrderNum = urlParams.get('order');
 
@@ -415,80 +422,28 @@ export default function OrderStatusContent() {
         const active = (data as Order[]).find(
           (o) => !['completed', 'cancelled'].includes(normalizeStatus(o.status))
         );
-        if (active) setSelectedOrder(active);
-        else if (data.length > 0) setSelectedOrder(data[0] as Order);
+        
+        if (active) {
+          setSelectedOrder(active);
+        } else if (data.length > 0) {
+          const isFirstReviewed = reviewedOrders.has(data[0].id);
+          setSelectedOrder(data[0] as Order);
+          if (isFirstReviewed) {
+            setShowHistory(true);
+          }
+        }
       }
     } finally {
       setMyOrdersLoading(false);
     }
-  }, [user, supabase]);
+  }, [user, supabase, reviewedOrders]);
 
   useEffect(() => {
     if (user) fetchMyOrders();
   }, [user, fetchMyOrders]);
 
   useEffect(() => {
-    if (user) return;
-
-    // Check URL query param first
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryOrderNum = urlParams.get('order');
-
-    if (queryOrderNum) {
-      setInputValue(queryOrderNum.trim());
-      setOrderNumber(queryOrderNum.trim().toUpperCase());
-      return;
-    }
-
-    // Check session storage fallback
-    const raw = sessionStorage.getItem('feastfete_order');
-    if (raw) {
-      try {
-        const saved = JSON.parse(raw);
-        if (saved?.orderId) {
-          setInputValue(saved.orderId);
-          setOrderNumber(saved.orderId);
-        }
-      } catch { /* ignore */ }
-    }
-  }, [user]);
-
-  const fetchGuestOrder = useCallback(async (num: string) => {
-    if (!num.trim()) return;
-    setGuestLoading(true);
-    setGuestError(null);
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('order_number', num.trim().toUpperCase())
-        .maybeSingle();
-
-      if (fetchError) {
-        setGuestError('Unable to fetch order. Please try again.');
-        setGuestOrder(null);
-      } else if (!data) {
-        setGuestError('No order found with that order number. Please check and try again.');
-        setGuestOrder(null);
-      } else {
-        setGuestOrder(data as Order);
-        setLastUpdated(new Date());
-        setGuestError(null);
-      }
-    } catch {
-      setGuestError('Something went wrong. Please try again.');
-    } finally {
-      setGuestLoading(false);
-    }
-  }, [supabase]);
-
-  useEffect(() => {
-    if (!user && orderNumber) fetchGuestOrder(orderNumber);
-  }, [user, orderNumber, fetchGuestOrder]);
-
-  // Realtime subscription logic
-  useEffect(() => {
-    if (!activeOrder?.id) return;
+    if (!activeOrder?.id || !user) return;
 
     const channel = supabase
       .channel(`order_status_${activeOrder.id}`)
@@ -503,14 +458,10 @@ export default function OrderStatusContent() {
         (payload) => {
           const updated = payload.new as Partial<Order>;
 
-          if (user) {
-            setSelectedOrder((prev) => (prev ? { ...prev, ...updated } : prev));
-            setMyOrders((prev) =>
-              prev.map((o) => (o.id === activeOrder.id ? { ...o, ...updated } : o))
-            );
-          } else {
-            setGuestOrder((prev) => (prev ? { ...prev, ...updated } : prev));
-          }
+          setSelectedOrder((prev) => (prev ? { ...prev, ...updated } : prev));
+          setMyOrders((prev) =>
+            prev.map((o) => (o.id === activeOrder.id ? { ...o, ...updated } : o))
+          );
           setLastUpdated(new Date());
         }
       )
@@ -520,11 +471,6 @@ export default function OrderStatusContent() {
       supabase.removeChannel(channel);
     };
   }, [activeOrder?.id, user, supabase]);
-
-  const handleGuestSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setOrderNumber(inputValue.trim().toUpperCase());
-  };
 
   function openReviewModal(order: Order) {
     const items: ReviewableItem[] = (order.order_items || []).map((item) => ({
@@ -541,19 +487,23 @@ export default function OrderStatusContent() {
   function handleReviewComplete(orderId: string) {
     setReviewedOrders((prev) => new Set(prev).add(orderId));
     setShowReview(false);
+    setShowHistory(true);
   }
 
   const normStatus = normalizeStatus(activeOrder?.status);
   const currentStepIndex = activeOrder ? STATUS_ORDER.indexOf(normStatus) : -1;
+  
   const progressPercent =
     activeOrder && normStatus !== 'cancelled'
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round((Math.max(0, currentStepIndex) / (STATUS_ORDER.length - 1)) * 100)
+      ? normStatus === 'completed'
+        ? 100
+        : Math.max(
+            0,
+            Math.min(
+              100,
+              Math.round((Math.max(0, currentStepIndex) / (STATUS_ORDER.length - 1)) * 100)
+            )
           )
-        )
       : 0;
 
   const formattedEventDate = activeOrder?.event_date
@@ -564,6 +514,8 @@ export default function OrderStatusContent() {
         day: 'numeric',
       })
     : null;
+
+  const isCurrentOrderReviewed = activeOrder ? reviewedOrders.has(activeOrder.id) : false;
 
   return (
     <div className="min-h-screen bg-background">
@@ -599,7 +551,7 @@ export default function OrderStatusContent() {
           <p className="text-muted-foreground text-sm">
             {user
               ? 'All your orders are shown below with live status updates.'
-              : 'Enter your order number to see real-time status updates'}
+              : 'Please sign in to track your order and view status updates.'}
           </p>
         </div>
 
@@ -613,7 +565,13 @@ export default function OrderStatusContent() {
               >
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <h2 className="font-display text-base font-bold text-foreground">My Orders</h2>
-                  <span className="text-xs text-muted-foreground font-medium">{myOrders.length} total</span>
+                  <button
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+                  >
+                    <Icon name="ClockIcon" size={14} />
+                    {showHistory ? 'View Tracking' : 'View History'}
+                  </button>
                 </div>
                 {myOrdersLoading && (
                   <div className="p-4 space-y-3 animate-pulse">
@@ -637,12 +595,21 @@ export default function OrderStatusContent() {
                       const norm = normalizeStatus(o.status);
                       const badge = STATUS_BADGE[norm] || STATUS_BADGE.pending;
                       const isSelected = selectedOrder?.id === o.id;
+                      const isReviewed = reviewedOrders.has(o.id);
+
                       return (
                         <button
                           key={o.id}
-                          onClick={() => setSelectedOrder(o)}
+                          onClick={() => {
+                            setSelectedOrder(o);
+                            if (norm === 'completed' && isReviewed) {
+                              setShowHistory(true);
+                            } else {
+                              setShowHistory(false);
+                            }
+                          }}
                           className={`w-full text-left px-5 py-3.5 transition-all duration-200 hover:bg-muted/50 ${
-                            isSelected ? 'bg-primary/5 border-l-4 border-primary' : ''
+                            isSelected && !showHistory ? 'bg-primary/5 border-l-4 border-primary' : ''
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2 mb-1">
@@ -652,14 +619,20 @@ export default function OrderStatusContent() {
                               <span className="capitalize">{norm}</span>
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(o.created_at).toLocaleDateString('en-PH', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
-                            {' · '}₱{Number(o.total_amount).toLocaleString()}
-                          </p>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              {new Date(o.created_at).toLocaleDateString('en-PH', {
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                              {' · '}₱{Number(o.total_amount).toLocaleString()}
+                            </span>
+                            {isReviewed && (
+                              <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                Reviewed
+                              </span>
+                            )}
+                          </div>
                         </button>
                       );
                     })}
@@ -669,100 +642,56 @@ export default function OrderStatusContent() {
             </div>
 
             <div className="lg:col-span-8 xl:col-span-9 min-w-0">
-              {!selectedOrder && !myOrdersLoading && (
+              {showHistory ? (
+                <OrderHistoryView
+                  orders={myOrders}
+                  reviewedOrders={reviewedOrders}
+                  onSelectOrder={(order) => {
+                    setSelectedOrder(order);
+                    setShowHistory(false);
+                  }}
+                />
+              ) : !selectedOrder && !myOrdersLoading ? (
                 <div className="text-center py-16 bg-card border border-border rounded-2xl p-8">
                   <Icon name="CursorArrowRaysIcon" size={36} className="text-muted-foreground mx-auto mb-3 opacity-40" />
                   <p className="text-sm text-muted-foreground">Select an order from the list to view details.</p>
                 </div>
-              )}
-              {selectedOrder && (
-                <OrderDetail
-                  order={selectedOrder}
-                  lastUpdated={lastUpdated}
-                  progressPercent={progressPercent}
-                  formattedEventDate={formattedEventDate}
-                  onOpenReview={() => openReviewModal(selectedOrder)}
-                  hasReviewed={reviewedOrders.has(selectedOrder.id)}
-                />
+              ) : (
+                selectedOrder && (
+                  <OrderDetail
+                    order={selectedOrder}
+                    lastUpdated={lastUpdated}
+                    progressPercent={progressPercent}
+                    formattedEventDate={formattedEventDate}
+                    onOpenReview={() => openReviewModal(selectedOrder)}
+                    hasReviewed={isCurrentOrderReviewed}
+                    onHideOrder={() => setShowHistory(true)}
+                  />
+                )
               )}
             </div>
           </div>
         )}
 
-        {/* GUEST VIEW */}
+        {/* NOT LOGGED IN / GUEST LOCK VIEW */}
         {!user && !authLoading && (
-          <div className="max-w-4xl mx-auto">
-            <form onSubmit={handleGuestSearch} className="mb-8">
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <Icon name="HashtagIcon" size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="e.g. FF-MSG0FKJE-5042"
-                    className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={guestLoading || !inputValue.trim()}
-                  className="px-5 py-3 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl btn-3d disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                >
-                  {guestLoading ? <Icon name="ArrowPathIcon" size={16} className="animate-spin" /> : <Icon name="MagnifyingGlassIcon" size={16} />}
-                  Track
-                </button>
-              </div>
-            </form>
-
-            <div className="mb-6 bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center gap-3">
-              <Icon name="UserCircleIcon" size={20} className="text-primary flex-shrink-0" />
-              <p className="text-sm text-foreground">
-                <Link href="/sign-up-login-screen" className="font-semibold text-primary hover:underline">
-                  Sign in
-                </Link>{' '}
-                to automatically see all your orders without entering an order number.
-              </p>
+          <div className="max-w-md mx-auto text-center py-16 bg-card border border-border rounded-2xl p-8 shadow-sm">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+              <Icon name="LockClosedIcon" size={32} />
             </div>
-
-            {guestError && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6 flex items-start gap-3">
-                <Icon name="ExclamationCircleIcon" size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700">{guestError}</p>
-              </div>
-            )}
-
-            {guestLoading && !guestOrder && (
-              <div className="space-y-4 animate-pulse">
-                <div className="h-32 bg-muted rounded-2xl" />
-                <div className="h-48 bg-muted rounded-2xl" />
-              </div>
-            )}
-
-            {guestOrder && !guestLoading && (
-              <OrderDetail
-                order={guestOrder}
-                lastUpdated={lastUpdated}
-                progressPercent={progressPercent}
-                formattedEventDate={formattedEventDate}
-                onOpenReview={() => guestOrder && openReviewModal(guestOrder)}
-                hasReviewed={guestOrder ? reviewedOrders.has(guestOrder.id) : false}
-              />
-            )}
-
-            {!guestOrder && !guestLoading && !guestError && !orderNumber && (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                  <Icon name="MagnifyingGlassIcon" size={28} className="text-muted-foreground" />
-                </div>
-                <p className="text-muted-foreground text-sm">
-                  Enter your order number above to track your order status in real time.
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Your order number was shown on the confirmation page (e.g. FF-MSG0FKJE-5042)
-                </p>
-              </div>
-            )}
+            <h2 className="font-display text-2xl font-bold text-foreground mb-2">
+              Sign In to Track Orders
+            </h2>
+            <p className="text-muted-foreground text-sm mb-6">
+              You must be logged in to view your order status and real-time updates.
+            </p>
+            <Link
+              href="/sign-up-login-screen"
+              className="inline-flex items-center justify-center w-full px-5 py-3 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl btn-3d transition-all gap-2"
+            >
+              <Icon name="ArrowLeftOnRectangleIcon" size={18} />
+              Sign In to Continue
+            </Link>
           </div>
         )}
 
@@ -784,6 +713,7 @@ function OrderDetail({
   formattedEventDate,
   onOpenReview,
   hasReviewed,
+  onHideOrder,
 }: {
   order: Order;
   lastUpdated: Date | null;
@@ -791,6 +721,7 @@ function OrderDetail({
   formattedEventDate: string | null;
   onOpenReview: () => void;
   hasReviewed: boolean;
+  onHideOrder?: () => void;
 }) {
   const [visible, setVisible] = useState(false);
   const prevStatus = useRef(order.status);
@@ -811,6 +742,7 @@ function OrderDetail({
   }, [order.status]);
 
   const normStatus = normalizeStatus(order.status);
+  const badge = STATUS_BADGE[normStatus] || STATUS_BADGE.pending;
 
   return (
     <div
@@ -851,233 +783,262 @@ function OrderDetail({
               })}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            {normStatus === 'cancelled' ? (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-red-100 text-red-700 border border-red-200">
-                <Icon name="XCircleIcon" size={16} /> Cancelled
-              </span>
-            ) : normStatus === 'completed' ? (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-green-100 text-green-700 border border-green-200">
-                <Icon name="CheckCircleIcon" size={16} /> Completed
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-primary/10 text-primary border border-primary/20">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span className="capitalize">{normStatus}</span>
-              </span>
-            )}
+          <div className="flex flex-col items-end gap-2">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${badge.bg} ${badge.text}`}>
+              {badge.dot && <span className="w-2 h-2 rounded-full bg-current animate-pulse" />}
+              <span className="capitalize">{normStatus}</span>
+            </span>
             {lastUpdated && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <Icon name="ArrowPathIcon" size={11} className="animate-spin" style={{ animationDuration: '3s' }} />
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                 Live updates active
-              </p>
+              </span>
             )}
-          </div>
-        </div>
-
-        {normStatus === 'cancelled' && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
-            <p className="text-sm text-red-700 font-medium">
-              This order has been cancelled. Please contact us if you have questions.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {normStatus === 'completed' && (
-        <div className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Order completed!</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Confirm receipt and rate your experience with our staff and the taste of your food.
-              </p>
-            </div>
-            {hasReviewed ? (
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-semibold border border-emerald-200">
-                <Icon name="CheckCircleIcon" size={16} className="text-emerald-700" />
-                Feedback received
-              </div>
-            ) : (
+            {onHideOrder && hasReviewed && (
               <button
-                type="button"
-                onClick={onOpenReview}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/95 transition"
+                onClick={onHideOrder}
+                className="mt-1 px-3 py-1.5 bg-card border border-border hover:bg-muted text-foreground font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5"
               >
-                <Icon name="StarIcon" size={16} className="text-primary-foreground" />
-                Confirm & Rate Order
+                <Icon name="EyeSlashIcon" size={14} />
+                Hide & View Order History
               </button>
             )}
           </div>
         </div>
-      )}
 
-      {normStatus !== 'cancelled' && (
-        <div className="bg-card rounded-2xl border border-border p-6 sm:p-8" style={{ boxShadow: 'var(--shadow-3d)' }}>
-          <h2 className="font-display text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-            <Icon name="ClockIcon" size={20} className="text-primary" />
+        {/* Action / Rating section */}
+        {normStatus === 'completed' && !hasReviewed && (
+          <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-sm font-bold text-foreground">Order completed! Action Required</p>
+              <p className="text-xs text-muted-foreground">Please confirm receipt and rate your experience to finish and hide this active order tracking view.</p>
+            </div>
+            <button
+              onClick={onOpenReview}
+              className="px-4 py-2 gradient-brand text-primary-foreground font-semibold text-xs rounded-xl btn-3d transition-all flex items-center gap-1.5"
+            >
+              <Icon name="StarIcon" size={14} />
+              Confirm & Rate Order
+            </button>
+          </div>
+        )}
+
+        {/* Once confirmed & reviewed banner */}
+        {normStatus === 'completed' && hasReviewed && (
+          <div className="mt-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Icon name="CheckCircleIcon" size={20} className="text-emerald-600 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-emerald-900">Order Confirmed & Reviewed</p>
+                <p className="text-xs text-emerald-700">Thank you! Your feedback has been recorded.</p>
+              </div>
+            </div>
+            {onHideOrder && (
+              <button
+                onClick={onHideOrder}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1"
+              >
+                <Icon name="ClockIcon" size={14} />
+                Hide & View History
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ORDER TIMELINE */}
+        <div className="mt-8 border-t border-border pt-6">
+          <h3 className="font-display text-base font-bold text-foreground mb-6 flex items-center gap-2">
+            <Icon name="ClockIcon" size={18} className="text-primary" />
             Order Timeline
-          </h2>
+          </h3>
 
           <AnimatedProgressBar percent={progressPercent} status={order.status} />
+          <StageCard order={order} />
 
-          <div className="space-y-6 pt-2">
-            {TIMELINE_STEPS.map((step, idx) => {
+          <div className="space-y-4">
+            {TIMELINE_STEPS.map((step) => {
               const state = getStepState(step.status, order.status);
-              const isLast = idx === TIMELINE_STEPS.length - 1;
               return (
-                <div
-                  key={step.status}
-                  className="flex gap-4 relative"
-                  style={{
-                    opacity: visible ? 1 : 0,
-                    transform: visible ? 'translateX(0)' : 'translateX(-12px)',
-                    transition: `opacity 0.4s ease ${idx * 0.1}s, transform 0.4s ease ${idx * 0.1}s`,
-                  }}
-                >
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500 relative ${
-                        state === 'completed'
-                          ? 'gradient-brand text-white'
-                          : state === 'active'
-                          ? 'gradient-brand text-white ring-4 ring-primary/20'
-                          : 'bg-muted border-2 border-border text-muted-foreground'
-                      }`}
-                    >
-                      {state === 'active' && (
-                        <span className="absolute inset-0 rounded-full animate-ping opacity-30 gradient-brand" />
-                      )}
-                      <Icon name={step.icon as Parameters<typeof Icon>[0]['name']} size={18} />
-                    </div>
-                    {!isLast && (
-                      <div
-                        className={`w-0.5 flex-1 my-1 transition-colors duration-500 ${
-                          state === 'completed' ? 'bg-primary' : 'bg-border'
-                        }`}
-                        style={{ minHeight: '28px' }}
-                      />
-                    )}
+                <div key={step.status} className="flex items-start gap-3">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{
+                      background: state === 'upcoming' ? 'var(--muted)' : `${step.color}20`,
+                      border: `1.5px solid ${state === 'upcoming' ? 'var(--border)' : step.color}`,
+                    }}
+                  >
+                    <Icon
+                      name={step.icon as Parameters<typeof Icon>[0]['name']}
+                      size={14}
+                      style={{ color: state === 'upcoming' ? 'var(--muted-foreground)' : step.color }}
+                    />
                   </div>
-
-                  <div className="flex-1 pb-2">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p
-                        className={`text-sm sm:text-base font-semibold transition-colors duration-300 ${
-                          state === 'upcoming' ? 'text-muted-foreground' : 'text-foreground'
-                        }`}
-                      >
+                      <p className={`text-sm font-semibold ${state === 'upcoming' ? 'text-muted-foreground' : 'text-foreground'}`}>
                         {step.label}
                       </p>
-                      <span className="text-xs sm:text-sm text-muted-foreground">{step.estimatedTime}</span>
+                      <span className="text-xs text-muted-foreground">{step.estimatedTime}</span>
                     </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{step.desc}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-card rounded-2xl border border-border p-6 sm:p-8" style={{ boxShadow: 'var(--shadow-3d)' }}>
-          <h2 className="font-display text-base sm:text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-            <Icon name="TruckIcon" size={20} className="text-primary" />
-            Fulfillment Details
-          </h2>
-
-          <div className="space-y-4 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Method</p>
-              <p className="font-semibold text-foreground capitalize mt-0.5">{order.delivery_method}</p>
+        {/* Details Grid */}
+        <div className="mt-8 border-t border-border pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Icon name="UserIcon" size={14} />
+              Customer Information
+            </h4>
+            <div className="space-y-1.5 text-sm">
+              <p className="font-medium text-foreground">{order.customer_name}</p>
+              <p className="text-muted-foreground">{order.customer_email}</p>
+              <p className="text-muted-foreground">{order.customer_phone}</p>
             </div>
+          </div>
 
-            {formattedEventDate && (
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Event Date</p>
-                <p className="font-semibold text-foreground mt-0.5">{formattedEventDate}</p>
-              </div>
-            )}
-
-            {order.event_time && (
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Event Time</p>
-                <p className="font-semibold text-foreground mt-0.5">{order.event_time}</p>
-              </div>
-            )}
-
-            {order.delivery_method === 'delivery' && order.delivery_address && (
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Delivery Address</p>
-                <p className="font-semibold text-foreground mt-0.5">{order.delivery_address}</p>
-              </div>
-            )}
-
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Customer</p>
-              <p className="font-semibold text-foreground mt-0.5">{order.customer_name}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{order.customer_email} · {order.customer_phone}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Payment Method</p>
-              <p className="font-semibold text-foreground mt-0.5">
-                {PAYMENT_LABELS[order.payment_method] || order.payment_method}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Icon name="MapPinIcon" size={14} />
+              Fulfillment & Payment
+            </h4>
+            <div className="space-y-1.5 text-sm">
+              <p className="text-foreground capitalize">
+                <span className="font-semibold">Method:</span> {order.delivery_method}
+              </p>
+              {order.delivery_address && (
+                <p className="text-muted-foreground">
+                  <span className="font-semibold text-foreground">Address:</span> {order.delivery_address}
+                </p>
+              )}
+              {formattedEventDate && (
+                <p className="text-muted-foreground">
+                  <span className="font-semibold text-foreground">Event Date:</span> {formattedEventDate}
+                  {order.event_time ? ` at ${order.event_time}` : ''}
+                </p>
+              )}
+              <p className="text-muted-foreground">
+                <span className="font-semibold text-foreground">Payment:</span> {PAYMENT_LABELS[order.payment_method] || order.payment_method}
               </p>
             </div>
-
-            {order.notes && (
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Notes</p>
-                <p className="text-xs italic text-foreground bg-muted/50 p-2.5 rounded-lg border border-border/50 mt-1">
-                  {order.notes}
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
-        <div className="bg-card rounded-2xl border border-border p-6 sm:p-8" style={{ boxShadow: 'var(--shadow-3d)' }}>
-          <h2 className="font-display text-base sm:text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-            <Icon name="ShoppingBagIcon" size={20} className="text-primary" />
+        {/* Order Items */}
+        <div className="mt-8 border-t border-border pt-6">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-1.5">
+            <Icon name="ShoppingBagIcon" size={14} />
             Order Items
-          </h2>
-
-          <div className="divide-y divide-border mb-4">
+          </h4>
+          <div className="divide-y divide-border">
             {order.order_items?.map((item) => (
-              <div key={item.id} className="py-3 flex items-center justify-between text-sm">
+              <div key={item.id} className="py-3 flex items-center justify-between text-sm gap-4">
                 <div>
-                  <p className="font-semibold text-foreground">{item.menu_item_name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="font-medium text-foreground">{item.menu_item_name}</p>
+                  <p className="text-xs text-muted-foreground">
                     Qty: {item.quantity} × ₱{Number(item.unit_price).toLocaleString()}
                   </p>
                 </div>
-                <span className="font-semibold text-foreground">
-                  ₱{Number(item.subtotal).toLocaleString()}
-                </span>
+                <p className="font-semibold text-foreground">₱{Number(item.subtotal).toLocaleString()}</p>
               </div>
             ))}
           </div>
 
-          <div className="border-t border-border pt-4 space-y-2 text-xs sm:text-sm">
+          <div className="mt-4 pt-4 border-t border-border space-y-1 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
               <span>₱{Number(order.subtotal).toLocaleString()}</span>
             </div>
-            {order.delivery_method === 'delivery' && (
+            {Number(order.delivery_fee) > 0 && (
               <div className="flex justify-between text-muted-foreground">
                 <span>Delivery Fee</span>
                 <span>₱{Number(order.delivery_fee).toLocaleString()}</span>
               </div>
             )}
-            <div className="flex justify-between font-bold text-foreground text-sm sm:text-base pt-3 border-t border-border">
+            <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border mt-2">
               <span>Total Amount</span>
               <span className="text-primary">₱{Number(order.total_amount).toLocaleString()}</span>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function OrderHistoryView({
+  orders,
+  reviewedOrders,
+  onSelectOrder,
+}: {
+  orders: Order[];
+  reviewedOrders: Set<string>;
+  onSelectOrder: (order: Order) => void;
+}) {
+  return (
+    <div className="bg-card rounded-2xl border border-border p-6 sm:p-8" style={{ boxShadow: 'var(--shadow-3d)' }}>
+      <h2 className="font-display text-xl font-bold text-foreground mb-2 flex items-center gap-2">
+        <Icon name="ClockIcon" size={22} className="text-primary" />
+        Order History
+      </h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        All past completed and reviewed orders are stored here.
+      </p>
+
+      {orders.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground text-sm">No order history available.</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {orders.map((o) => {
+            const norm = normalizeStatus(o.status);
+            const badge = STATUS_BADGE[norm] || STATUS_BADGE.pending;
+            const isReviewed = reviewedOrders.has(o.id);
+
+            return (
+              <div key={o.id} className="py-4 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-bold text-primary">{o.order_number}</span>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text}`}>
+                      <span className="capitalize">{norm}</span>
+                    </span>
+                    {isReviewed && (
+                      <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <Icon name="CheckCircleIcon" size={12} />
+                        Reviewed & Confirmed
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {new Date(o.created_at).toLocaleDateString('en-PH', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                    {' · '}
+                    {o.order_items?.length || 0} items
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <span className="font-bold text-sm text-foreground">₱{Number(o.total_amount).toLocaleString()}</span>
+                  <button
+                    onClick={() => onSelectOrder(o)}
+                    className="px-3 py-1.5 bg-muted hover:bg-muted/80 text-foreground font-semibold text-xs rounded-xl transition-colors flex items-center gap-1"
+                  >
+                    View Details →
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

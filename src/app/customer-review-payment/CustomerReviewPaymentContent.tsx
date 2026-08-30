@@ -49,6 +49,9 @@ export default function CustomerReviewPaymentContent() {
   const { user } = useAuth();
   const router = useRouter();
 
+  // Get current date in YYYY-MM-DD format for date picker restriction
+  const today = new Date().toISOString().split('T')[0];
+
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash_on_delivery');
   const [form, setForm] = useState<AddressForm>({
@@ -68,6 +71,7 @@ export default function CustomerReviewPaymentContent() {
   const [placeError, setPlaceError] = useState('');
   const [guestProfile, setGuestProfile] = useState<{ id: string; contactType: string; contactValue: string } | null>(null);
   const [savedAddress, setSavedAddress] = useState('');
+  const [showQRModal, setShowQRModal] = useState(false);
 
   const deliveryFee = deliveryMethod === 'delivery' ? 150 : 0;
   const total = totalAmount + deliveryFee;
@@ -245,15 +249,31 @@ export default function CustomerReviewPaymentContent() {
     if (!form.email.trim()) errs.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Enter a valid email';
     if (deliveryMethod === 'delivery' && !form.street.trim()) errs.street = 'Street address is required';
-    if (!form.eventDate) errs.eventDate = 'Event date is required';
+    
+    // Updated date validation
+    if (!form.eventDate) {
+      errs.eventDate = 'Event date is required';
+    } else if (form.eventDate < today) {
+      errs.eventDate = 'Cannot select a past date';
+    }
+
     if (!form.eventTime) errs.eventTime = 'Event time is required';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
 
-  async function handlePlaceOrder(e: React.FormEvent) {
+  function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
+
+    if (paymentMethod === 'gcash') {
+      setShowQRModal(true);
+    } else {
+      executeOrder();
+    }
+  }
+
+  async function executeOrder() {
     setPlacing(true);
     setPlaceError('');
 
@@ -292,6 +312,7 @@ export default function CustomerReviewPaymentContent() {
       if (orderError) {
         setPlaceError('Failed to place order: ' + orderError.message);
         setPlacing(false);
+        setShowQRModal(false);
         return;
       }
 
@@ -310,6 +331,7 @@ export default function CustomerReviewPaymentContent() {
       console.error('Order error:', err);
       setPlaceError('Something went wrong. Please try again.');
       setPlacing(false);
+      setShowQRModal(false);
       return;
     }
 
@@ -333,6 +355,7 @@ export default function CustomerReviewPaymentContent() {
     };
     sessionStorage.setItem('feastfete_order', JSON.stringify(orderPayload));
     clearCart();
+    setShowQRModal(false);
     router.push('/order-confirmation');
   }
 
@@ -377,7 +400,7 @@ export default function CustomerReviewPaymentContent() {
           <p className="text-muted-foreground">Confirm your items, enter delivery details, and place your order.</p>
         </div>
 
-        <form onSubmit={handlePlaceOrder}>
+        <form onSubmit={handleFormSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
 
             {/* ── LEFT COLUMN ── */}
@@ -596,6 +619,7 @@ export default function CustomerReviewPaymentContent() {
                       <input
                         name="eventDate"
                         type="date"
+                        min={today}
                         value={form.eventDate}
                         onChange={handleChange}
                         className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.eventDate ? 'border-error' : 'border-border'}`}
@@ -684,9 +708,9 @@ export default function CustomerReviewPaymentContent() {
                   <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
                     <p className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1.5">
                       <Icon name="InformationCircleIcon" size={14} className="text-primary" />
-                      GCash Number
+                      GCash Payment Info
                     </p>
-                    <p className="text-xs text-muted-foreground">Send to: <span className="font-mono text-foreground font-semibold">0917-XXX-XXXX</span> · Feast & Fête</p>
+                    <p className="text-xs text-muted-foreground">A QR code will appear after clicking "Place Order" to scan and pay via GCash.</p>
                   </div>
                 )}
               </section>
@@ -779,6 +803,61 @@ export default function CustomerReviewPaymentContent() {
           </div>
         </form>
       </div>
+
+      {/* GCash Payment QR Code Modal */}
+      {showQRModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold text-foreground mb-1">Scan to Pay via GCash</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Please scan the QR code using your GCash app to pay <span className="font-bold text-primary">₱{total.toLocaleString()}</span>
+            </p>
+
+            <div className="bg-[#005ce6] p-4 rounded-xl mb-4 flex flex-col items-center justify-center">
+              <AppImage
+                src="/assets/images/image15.jpg"
+                alt="GCash QR Code"
+                width={240}
+                height={320}
+                className="w-full max-w-[220px] rounded-lg bg-white p-1 object-contain"
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground mb-6">
+              After completing the transfer in GCash, click <strong>"I Have Paid"</strong> to proceed.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowQRModal(false)}
+                disabled={placing}
+                className="w-1/2 py-3 rounded-xl border border-border text-foreground text-sm font-semibold hover:bg-muted transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeOrder}
+                disabled={placing}
+                className="w-1/2 py-3 rounded-xl gradient-brand text-primary-foreground text-sm font-bold btn-3d transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {placing ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  'I Have Paid'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

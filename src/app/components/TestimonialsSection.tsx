@@ -11,202 +11,201 @@ interface Review {
   created_at: string;
 }
 
-// Fallback static testimonials shown when no Supabase reviews exist yet
-const FALLBACK_TESTIMONIALS = [
-  { id: 'test-001', name: 'Maria Santos', role: 'Birthday party host', quote: 'The Lechon Kawali tray was the star of my daughter\'s birthday! Crispy skin, juicy meat — guests kept going back for more. Ordering online was so much easier than calling.', rating: 5, location: 'Mandaluyong City' },
-  { id: 'test-002', name: 'Roberto Lim', role: 'Christening organizer', quote: 'Feast & Fête delivered everything on time and the Kare-Kare was absolutely authentic. The online ordering system made coordination effortless — no more missed messages!', rating: 5, location: 'Pasig City' },
-  { id: 'test-003', name: 'Lorena Mendoza', role: 'Fiesta committee head', quote: 'We ordered the Fiesta Package A for our barangay fiesta and it was a huge hit. The Leche Flan was the best I\'ve ever tasted. Will definitely order again for Christmas!', rating: 5, location: 'Quezon City' },
-];
-
 interface DisplayTestimonial {
   id: string;
   name: string;
   role: string;
   quote: string;
   rating: number;
-  location: string;
+  avatar?: string;
 }
+
+const FALLBACK_TESTIMONIALS: DisplayTestimonial[] = [
+  {
+    id: 'test-001',
+    name: 'Sarah Chen',
+    role: 'PRODUCT DESIGNER',
+    quote: 'The attention to detail in these blocks is insane. The animations are smooth and the code is so clean. Highly recommended for any Pro project.',
+    rating: 5,
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'test-002',
+    name: 'James Wilson',
+    role: 'FULLSTACK DEVELOPER',
+    quote: "I've tried many UI libraries, but Lightwind is on another level. The 3D components and glassmorphism effects are a game changer for my clients.",
+    rating: 5,
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'test-003',
+    name: 'Elena Rodriguez',
+    role: 'MARKETING DIRECTOR',
+    quote: 'Our landing page conversion rates increased by 40% after switching to Lightwind components. The visual impact is immediate and professional.',
+    rating: 5,
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'test-004',
+    name: 'Alex Rivera',
+    role: 'CEO AT TECHFLOW',
+    quote: 'Lightwind UI has completely transformed our development workflow. The components are not just beautiful, they are incredibly well-engineered.',
+    rating: 5,
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+  },
+];
 
 export default function TestimonialsSection() {
   const [testimonials, setTestimonials] = useState<DisplayTestimonial[]>(FALLBACK_TESTIMONIALS);
-  const [totalReviews, setTotalReviews] = useState<number | null>(null);
-  const [avgRating, setAvgRating] = useState<number | null>(null);
 
-  const fetchReviewsAndStats = useCallback(async () => {
+  const fetchReviews = useCallback(async () => {
     const supabase = createClient();
-
-    // Fetch live ratings from item_reviews
     const { data: reviewsData } = await supabase
       .from('item_reviews')
       .select('id, reviewer_name, rating, review_text, created_at')
       .not('review_text', 'is', null)
       .gte('rating', 4)
-      .order('created_at', { ascending: false })
-      .limit(3);
+      .order('created_at', { ascending: false });
 
     if (reviewsData && reviewsData.length > 0) {
       const realTestimonials: DisplayTestimonial[] = (reviewsData as Review[]).map((r) => ({
         id: r.id,
         name: r.reviewer_name || 'Verified Customer',
-        role: 'Verified Customer',
+        role: 'VERIFIED CUSTOMER',
         quote: r.review_text || '',
         rating: Number(r.rating) || 5,
-        location: '',
       }));
 
-      // Merge real reviews with fallbacks so all 3 card slots stay filled
-      const combined = [
-        ...realTestimonials,
-        ...FALLBACK_TESTIMONIALS.slice(realTestimonials.length),
-      ].slice(0, 3);
-
-      setTestimonials(combined);
-    } else {
-      setTestimonials(FALLBACK_TESTIMONIALS);
-    }
-
-    // Fetch aggregate statistics
-    const { data: statsData } = await supabase
-      .from('item_reviews')
-      .select('rating');
-
-    if (statsData && statsData.length > 0) {
-      const total = statsData.length;
-      const sum = statsData.reduce((acc, r) => acc + Number(r.rating || 5), 0);
-      const avg = sum / total;
-      setTotalReviews(total);
-      setAvgRating(Math.round(avg * 10) / 10);
+      setTestimonials([...realTestimonials, ...FALLBACK_TESTIMONIALS]);
     }
   }, []);
 
   useEffect(() => {
-    fetchReviewsAndStats();
+    fetchReviews();
+  }, [fetchReviews]);
 
-    // Subscribe to realtime database updates
-    const supabase = createClient();
-    const channel = supabase
-      .channel('item_reviews_realtime_changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'item_reviews' },
-        () => {
-          fetchReviewsAndStats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchReviewsAndStats]);
-
-  const featured = testimonials?.[0];
-  const rest = testimonials?.slice(1);
+  const marqueeItems = [...testimonials, ...testimonials];
 
   return (
-    <section className="testi-v2-root py-24 relative overflow-hidden">
-      {/* Decorative large quote mark */}
-      <div className="testi-v2-quote-bg absolute top-8 left-8 font-display font-black text-[20rem] leading-none pointer-events-none select-none">
-        &ldquo;
-      </div>
-      <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 xl:px-10 2xl:px-16 relative z-10">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <p className="testi-v2-eyebrow text-xs font-bold tracking-[0.3em] uppercase mb-3">Social Proof</p>
-          <h2 className="font-display text-4xl lg:text-5xl font-black text-black leading-tight">
-            What Our <span className="testi-v2-accent">Customers</span> Say
+    <section className="py-20 relative overflow-hidden bg-background text-foreground transition-colors duration-300">
+      <style jsx>{`
+        @keyframes marquee {
+          0% {
+            transform: translateX(0%);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+        .animate-marquee {
+          display: flex;
+          width: max-content;
+          animation: marquee 55s linear infinite;
+        }
+        .animate-marquee:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Eyebrow Label */}
+        <div className="flex justify-center mb-3">
+          <span className="text-[12px] font-bold tracking-[0.25em] text-[#D4AF37] uppercase">
+            SOCIAL PROOF
+          </span>
+        </div>
+
+        {/* Title Header */}
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif text-foreground tracking-tight">
+            What Our Customers Say
           </h2>
         </div>
 
-        {/* Asymmetric layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Featured large testimonial */}
-          <div className="lg:col-span-6 testi-v2-featured rounded-3xl p-8 lg:p-10 space-y-6">
-            {/* Stars */}
-            <div className="flex gap-1">
-              {Array.from({ length: featured?.rating || 5 })?.map((_, idx) => (
-                <span key={idx} className="text-secondary text-xl">★</span>
-              ))}
+        {/* Maroon Stats Banner */}
+        <div className="max-w-4xl mx-auto mb-16 bg-[#6B1D2F] rounded-3xl p-6 sm:p-8 shadow-xl border border-[#521624]">
+          <div className="grid grid-cols-3 divide-x divide-white/20 text-center">
+            {/* Stat 1 */}
+            <div className="px-2 sm:px-4">
+              <p className="text-2xl sm:text-4xl font-serif font-bold text-[#D4AF37] mb-1">
+                500+
+              </p>
+              <p className="text-[11px] sm:text-xs text-stone-200 uppercase tracking-wider font-medium">
+                Happy Families
+              </p>
             </div>
 
-            {/* Quote */}
-            <blockquote className="font-display text-xl lg:text-2xl font-bold text-black leading-snug">
-              &ldquo;{featured?.quote}&rdquo;
-            </blockquote>
+            {/* Stat 2 */}
+            <div className="px-2 sm:px-4">
+              <p className="text-2xl sm:text-4xl font-serif font-bold text-[#D4AF37] mb-1">
+                5
+              </p>
+              <p className="text-[11px] sm:text-xs text-stone-200 uppercase tracking-wider font-medium">
+                Average Rating
+              </p>
+            </div>
 
-            {/* Author */}
-            <div className="flex items-center gap-4 pt-4 border-t testi-v2-divider">
-              <div className="testi-v2-avatar w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-black text-primary-foreground">
-                  {featured?.name?.split(' ')?.map(n => n?.[0])?.join('')}
-                </span>
-              </div>
-              <div>
-                <p className="font-bold text-black text-sm">{featured?.name}</p>
-                <p className="text-xs text-gray-700">
-                  {featured?.role}{featured?.location ? ` · ${featured.location}` : ''}
-                </p>
-              </div>
+            {/* Stat 3 */}
+            <div className="px-2 sm:px-4">
+              <p className="text-2xl sm:text-4xl font-serif font-bold text-[#D4AF37] mb-1">
+                45+
+              </p>
+              <p className="text-[11px] sm:text-xs text-stone-200 uppercase tracking-wider font-medium">
+                Reviews
+              </p>
             </div>
           </div>
+        </div>
 
-          {/* Right column — stacked smaller cards + stat */}
-          <div className="lg:col-span-6 space-y-4">
-            {rest?.map((t, i) => (
+        {/* Infinite Smooth Carousel Area */}
+        <div className="relative w-full overflow-hidden">
+          {/* Fade overlays sa mga gilid */}
+          <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+
+          {/* Moving Track */}
+          <div className="animate-marquee flex gap-5 py-4">
+            {marqueeItems.map((item, index) => (
               <div
-                key={t?.id}
-                className="testi-v2-card rounded-2xl p-6 space-y-3"
-                style={{ animationDelay: `${i * 100}ms` }}
+                key={`${item.id}-${index}`}
+                className="flex-none w-[300px] sm:w-[340px] bg-card border border-border rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <p className="text-sm text-black leading-relaxed italic flex-1 line-clamp-3">
-                    &ldquo;{t?.quote}&rdquo;
-                  </p>
-                  <div className="flex gap-0.5 flex-shrink-0">
-                    {Array.from({ length: t?.rating || 5 })?.map((_, idx) => (
-                      <span key={idx} className="text-secondary text-xs">★</span>
+                <div>
+                  {/* Stars */}
+                  <div className="flex gap-1 text-[#059669] text-sm mb-4">
+                    {Array.from({ length: item.rating }).map((_, i) => (
+                      <span key={i}>★</span>
                     ))}
                   </div>
+
+                  {/* Quote */}
+                  <p className="text-xs sm:text-sm text-foreground leading-relaxed font-medium">
+                    &ldquo;{item.quote}&rdquo;
+                  </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="testi-v2-small-avatar w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-black text-primary-foreground">
-                      {t?.name?.split(' ')?.map(n => n?.[0])?.join('')}
-                    </span>
-                  </div>
+
+                {/* Author Info & Avatar */}
+                <div className="flex items-center gap-3 mt-8 pt-4 border-t border-border">
+                  {item.avatar ? (
+                    <img
+                      src={item.avatar}
+                      alt={item.name}
+                      className="w-10 h-10 rounded-full object-cover border border-border"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-[#059669] flex items-center justify-center text-white text-xs font-bold">
+                      {item.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div>
-                    <p className="text-xs font-bold text-black">{t?.name}</p>
-                    <p className="text-xs text-gray-700">
-                      {t?.role}{t?.location ? ` · ${t.location}` : ''}
+                    <h3 className="text-xs sm:text-sm font-bold text-foreground">{item.name}</h3>
+                    <p className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase mt-0.5">
+                      {item.role}
                     </p>
                   </div>
                 </div>
               </div>
             ))}
-
-            {/* Trust stat card */}
-            <div className="testi-v2-stat-card rounded-2xl p-6 flex items-center gap-6">
-              <div className="text-center flex-shrink-0">
-                <p className="font-display text-4xl font-black text-primary">500+</p>
-                <p className="text-xs text-muted-foreground font-medium mt-1">Happy Families</p>
-              </div>
-              <div className="w-px h-12 testi-v2-stat-divider flex-shrink-0" />
-              <div className="text-center flex-shrink-0">
-                <p className="font-display text-4xl font-black text-primary">
-                  {avgRating !== null ? avgRating : '4.9'}
-                </p>
-                <p className="text-xs text-muted-foreground font-medium mt-1">Average Rating</p>
-              </div>
-              <div className="w-px h-12 testi-v2-stat-divider flex-shrink-0" />
-              <div className="text-center flex-1">
-                <p className="font-display text-4xl font-black text-primary">
-                  {totalReviews !== null ? `${totalReviews}+` : '3+'}
-                </p>
-                <p className="text-xs text-muted-foreground font-medium mt-1">
-                  Reviews
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </div>

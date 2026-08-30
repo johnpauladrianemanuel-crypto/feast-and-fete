@@ -6,6 +6,7 @@ import { MenuItem } from '@/lib/supabase/services';
 import { useCart } from '@/lib/cartContext';
 import { toast } from 'sonner';
 import { MenuItemRatingSummary } from '@/lib/supabase/services';
+import { createClient } from '@/lib/supabase/client';
 
 interface Props {
   item: MenuItem;
@@ -100,12 +101,23 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
     return () => observer.disconnect();
   }, [index]);
 
-  function handleAdd(e?: React.MouseEvent) {
+  async function handleAdd(e?: React.MouseEvent) {
     if (e) e.stopPropagation();
 
     if (isInactive) {
       toast.error('Temporarily Unavailable', {
         description: deactivationReason || 'This product is currently not available for order.',
+      });
+      return;
+    }
+
+    // Check if user is authenticated with Supabase
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      toast.error('Login Required', {
+        description: 'Please log in first to add items to your cart.',
       });
       return;
     }

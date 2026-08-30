@@ -7,6 +7,7 @@ import { useCart } from '@/lib/cartContext';
 import Icon from '@/components/ui/AppIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 
 type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled';
 
@@ -318,15 +319,21 @@ export default function CustomerNavbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6">
-            <Link href="/menu-browse-screen" className="text-sm font-medium text-white/90 hover:text-white transition-colors duration-150">
-              Menu
+          <div className="hidden md:flex items-center gap-3">
+            <Link href="/menu-browse-screen">
+              <LiquidGlassButton variant="glass" size="sm">
+                Menu
+              </LiquidGlassButton>
             </Link>
-            <Link href="/cart-review" className="text-sm font-medium text-white/80 hover:text-white transition-colors duration-150">
-              My Cart
+            <Link href="/cart-review">
+              <LiquidGlassButton variant="glass" size="sm">
+                My Cart
+              </LiquidGlassButton>
             </Link>
-            <Link href="/order-status" className="text-sm font-medium text-white/80 hover:text-white transition-colors duration-150">
-              Track Order
+            <Link href="/order-status">
+              <LiquidGlassButton variant="glass" size="sm">
+                Track Order
+              </LiquidGlassButton>
             </Link>
           </div>
 

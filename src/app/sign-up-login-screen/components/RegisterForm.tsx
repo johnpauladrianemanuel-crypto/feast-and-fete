@@ -21,6 +21,38 @@ interface Props {
   onSuccess?: (userName: string) => void;
 }
 
+// Built-in Password Strength Indicator component (No external library required)
+function PasswordStrengthIndicator({ value }: { value: string }) {
+  if (!value) return null;
+
+  let score = 0;
+  if (value.length >= 8) score += 1;
+  if (/[A-Z]/.test(value)) score += 1;
+  if (/[0-9]/.test(value)) score += 1;
+  if (/[^A-Za-z0-9]/.test(value)) score += 1;
+
+  const levels = [
+    { label: 'Very Weak', color: 'bg-red-500', width: 'w-1/4' },
+    { label: 'Weak', color: 'bg-orange-500', width: 'w-2/4' },
+    { label: 'Medium', color: 'bg-yellow-500', width: 'w-3/4' },
+    { label: 'Strong', color: 'bg-emerald-500', width: 'w-full' },
+  ];
+
+  const currentLevel = levels[Math.max(0, score - 1)];
+
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+        <div className={`h-full ${currentLevel.color} ${currentLevel.width} transition-all duration-300 rounded-full`} />
+      </div>
+      <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+        <span>Strength: <strong className="text-foreground">{currentLevel.label}</strong></span>
+        <span>{value.length}/8+ chars</span>
+      </div>
+    </div>
+  );
+}
+
 export default function RegisterForm({ onSwitchToLogin }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -54,20 +86,17 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
       toast.success('Account created!', {
         description: 'Please check your email to confirm your account.',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       let message = 'Registration failed. Please try again.';
 
       if (typeof err === 'string') {
         message = err;
-      } else if (err?.message && typeof err.message === 'string') {
-        message = err.message;
-      } else if (err?.error_description && typeof err.error_description === 'string') {
-        message = err.error_description;
-      } else if (typeof err === 'object' && err !== null) {
-        try {
-          message = JSON.stringify(err) === '{}' ? message : String(err);
-        } catch {
-          message = 'Registration failed. Please try again.';
+      } else if (err && typeof err === 'object') {
+        const errorObj = err as { message?: string; error_description?: string };
+        if (errorObj.message && typeof errorObj.message === 'string') {
+          message = errorObj.message;
+        } else if (errorObj.error_description && typeof errorObj.error_description === 'string') {
+          message = errorObj.error_description;
         }
       }
 
@@ -77,6 +106,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
     }
   }
 
+  // Confirmation screen pagkatapos mag sign-up
   if (success) {
     return (
       <div className="text-center py-8 space-y-4 animate-slide-up">
@@ -110,7 +140,6 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
         <p className="text-sm text-muted-foreground mt-1">Join Feast & Fête and start pre-ordering today.</p>
       </div>
 
-      {/* Safe Root error display */}
       {errors.root?.message && (
         <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-error/8 border border-error/20">
           <Icon name="ExclamationCircleIcon" size={16} className="text-error mt-0.5 flex-shrink-0" />
@@ -246,6 +275,10 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
             <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
           </button>
         </div>
+
+        {/* Password Strength Indicator Visual */}
+        <PasswordStrengthIndicator value={passwordValue} />
+
         {errors.password?.message && (
           <p className="text-xs text-error flex items-center gap-1">
             <Icon name="ExclamationCircleIcon" size={12} className="text-error" />
@@ -314,7 +347,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
         )}
       </div>
 
-      {/* Submit */}
+      {/* Submit Button */}
       <button
         type="submit"
         disabled={isLoading}
