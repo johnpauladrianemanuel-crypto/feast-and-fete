@@ -29,8 +29,10 @@ export async function POST(req: Request) {
 
     const resend = new Resend(process.env.RESEND_API_KEY);
 
-    const data = await resend.emails.send({
-      from: 'Feast & Fête <onboarding@resend.dev>',
+    // PAALALA: Palitan ang "updates.yourdomain.com" o "feastandfete.com" kapag na-verify mo na ang domain mo sa Resend dashboard.
+    // Kapag 'onboarding@resend.dev', sa sarili mong Resend account email lang ito makakapag-send.
+    const { data, error } = await resend.emails.send({
+      from: 'Feast & Fête <onboarding@resend.dev>', // Palitan ng verified domain halimbawa: 'Feast & Fête <noreply@yourdomain.com>'
       to: [email],
       subject: 'Your Verification Code — Feast & Fête',
       html: `
@@ -42,6 +44,15 @@ export async function POST(req: Request) {
         </div>
       `,
     });
+
+    // Sinusuri kung nag-return ng error ang Resend (e.g. Domain restrictions)
+    if (error) {
+      console.error('[RESEND ERROR]:', error);
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (error: unknown) {

@@ -49,7 +49,6 @@ export default function CustomerReviewPaymentContent() {
   const { user } = useAuth();
   const router = useRouter();
 
-  // Get current date in YYYY-MM-DD format for date picker restriction
   const today = new Date().toISOString().split('T')[0];
 
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
@@ -77,7 +76,6 @@ export default function CustomerReviewPaymentContent() {
   const total = totalAmount + deliveryFee;
   const itemCount = state.items.reduce((s, i) => s + i.quantity, 0);
 
-  // Load profile data
   useEffect(() => {
     const gp = getGuestProfile();
     setGuestProfile(gp);
@@ -130,56 +128,24 @@ export default function CustomerReviewPaymentContent() {
 
   const REGION_CITY_MAP: Record<string, string[]> = {
     NCR: [
-      'Quezon City',
-      'Manila',
-      'Makati',
-      'Pasig',
-      'Taguig',
-      'Mandaluyong',
-      'Parañaque',
-      'Las Piñas',
-      'Muntinlupa',
-      'Marikina',
-      'Caloocan',
-      'Valenzuela',
-      'Malabon',
-      'Navotas',
-      'San Juan',
-      'Pasay'
+      'Quezon City', 'Manila', 'Makati', 'Pasig', 'Taguig', 'Mandaluyong',
+      'Parañaque', 'Las Piñas', 'Muntinlupa', 'Marikina', 'Caloocan',
+      'Valenzuela', 'Malabon', 'Navotas', 'San Juan', 'Pasay'
     ],
     CALABARZON: [
-      'San Mateo (Rizal)',
-      'Antipolo City',
-      'Taytay',
-      'Cainta',
-      'Rodriguez (Montalban)',
-      'Bacoor City',
-      'Imus City',
-      'Dasmariñas City',
-      'General Trias City',
-      'Calamba City',
-      'Santa Rosa City',
-      'Biñan City',
-      'Cabuyao City',
-      'San Pedro City',
-      'Lipa City',
-      'Batangas City'
+      'San Mateo (Rizal)', 'Antipolo City', 'Taytay', 'Cainta', 'Rodriguez (Montalban)',
+      'Bacoor City', 'Imus City', 'Dasmariñas City', 'General Trias City',
+      'Calamba City', 'Santa Rosa City', 'Biñan City', 'Cabuyao City',
+      'San Pedro City', 'Lipa City', 'Batangas City'
     ],
     CENTRAL_LUZON: [
-      'Angeles City',
-      'San Fernando City',
-      'Mabalacat City',
-      'Malolos City',
-      'Meycauayan City',
-      'San Jose del Monte City',
-      'Tarlac City',
-      'Olongapo City',
-      'Cabanatuan City'
+      'Angeles City', 'San Fernando City', 'Mabalacat City', 'Malolos City',
+      'Meycauayan City', 'San Jose del Monte City', 'Tarlac City',
+      'Olongapo City', 'Cabanatuan City'
     ],
   };
 
   const CITY_BARANGAY_MAP: Record<string, string[]> = {
-    // NCR Cities
     'Quezon City': ['Barangay San Jose', 'Barangay Holy Spirit', 'Barangay Tatalon', 'Batasan Hills', 'Commonwealth', 'Cubao', 'Diliman', 'Kamuning', 'Loyola Heights', 'New Manila', 'Novaliches', 'Project 6', 'Teachers Village'],
     'Manila': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Binondo', 'Ermita', 'Intramuros', 'Malate', 'Paco', 'Pandacan', 'Port Area', 'Quiapo', 'Sampaloc', 'San Miguel', 'San Nicolas', 'Santa Cruz', 'Santa Ana', 'Tondo'],
     'Makati': ['Poblacion', 'San Antonio', 'Bel-Air', 'Dasmariñas', 'Forbes Park', 'Guadalupe Nuevo', 'Guadalupe Viejo', 'Magallanes', 'Pio del Pilar', 'San Lorenzo', 'Urdaneta'],
@@ -196,24 +162,7 @@ export default function CustomerReviewPaymentContent() {
     'Navotas': ['Bagumbayan North', 'Bagumbayan South', 'Bangkulasi', 'Daanghari', 'Navotas East', 'Navotas West', 'San Jose', 'San Roque', 'Tangos North', 'Tangos South'],
     'San Juan': ['Addition Hills', 'Balong-Bato', 'Greenhills', 'Kabayanan', 'Little Baguio', 'Maytunas', 'Onse', 'Pasadena', 'Poblacion', 'Progreso', 'San Perfecta', 'Tibagan'],
     'Pasay': ['Baclaran', 'Don Carlos Village', 'Malibay', 'Maricaban', 'Poblacion', 'San Jose', 'San Rafael', 'San Roque', 'Villamor Airbase'],
-
-    // CALABARZON Cities / Municipalities
-    'San Mateo (Rizal)': [
-      'Ampid I',
-      'Ampid II',
-      'Banaba',
-      'Dulumbayan',
-      'Guitnang Bayan I',
-      'Guitnang Bayan II',
-      'Gulod Malaya',
-      'Malanday',
-      'Maly',
-      'Pintong Bukawe',
-      'Santa Ana',
-      'Santo Niño',
-      'Silangan',
-      'Kambal'
-    ],
+    'San Mateo (Rizal)': ['Ampid I', 'Ampid II', 'Banaba', 'Dulumbayan', 'Guitnang Bayan I', 'Guitnang Bayan II', 'Gulod Malaya', 'Malanday', 'Maly', 'Pintong Bukawe', 'Santa Ana', 'Santo Niño', 'Silangan', 'Kambal'],
     'Antipolo City': ['Bagong Nayon', 'Beverly Hills', 'Calawis', 'Cupang', 'Dalig', 'Inarawan', 'Mambugan', 'Mayamot', 'Muntingdilaw', 'San Cruz', 'San Isidro', 'San Jose', 'San Roque'],
     'Taytay': ['Dolores (Poblacion)', 'Muzon', 'San Juan', 'San Isidro', 'Santa Ana'],
     'Cainta': ['San Andres', 'San Juan', 'San Roque', 'Santa Rosa', 'Santo Domingo'],
@@ -229,8 +178,6 @@ export default function CustomerReviewPaymentContent() {
     'San Pedro City': ['Chrysanthemum', 'Cuyab', 'Landayan', 'Langgam', 'Magsaysay', 'Pacita 1', 'Pacita 2', 'Poblacion', 'San Antonio', 'San Vicente', 'United Bayanihan'],
     'Lipa City': ['Balintawak', 'Inosloban', 'Mataas na Lupa', 'Pangao', 'Poblacion', 'Sabang', 'San Carlos', 'Tambobong', 'Tibig'],
     'Batangas City': ['Alangilan', 'Balagtas', 'Bolbok', 'Calicanto', 'Cuta', 'Gulod Labac', 'Kumintang Ibaba', 'Kumintang Ilaya', 'Poblacion', 'Soro-soro Karsada'],
-
-    // CENTRAL LUZON Cities
     'Angeles City': ['Balibago', 'Cutcut', 'Malabanias', 'Margardt', 'Pami', 'Pulung Maragul', 'Salapungan', 'Santo Rosario', 'Sapu Bato'],
     'San Fernando City': ['Calulut', 'Dolores', 'Lacing', 'Magliman', 'Maimpis', 'Palawe', 'San Agustin', 'San Jose', 'Sindalan', 'Telabastagan'],
     'Mabalacat City': ['Dau', 'Lakandula', 'Mabiga', 'Macapagal Village', 'Poblacion', 'San Francisco', 'Santa Ines', 'Tabun'],
@@ -250,7 +197,6 @@ export default function CustomerReviewPaymentContent() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Enter a valid email';
     if (deliveryMethod === 'delivery' && !form.street.trim()) errs.street = 'Street address is required';
     
-    // Updated date validation
     if (!form.eventDate) {
       errs.eventDate = 'Event date is required';
     } else if (form.eventDate < today) {
@@ -317,6 +263,7 @@ export default function CustomerReviewPaymentContent() {
       }
 
       if (orderData) {
+        // Save order items
         const itemsToInsert = state.items.map(item => ({
           order_id: orderData.id,
           menu_item_id: item.menuItem.id,
@@ -326,6 +273,14 @@ export default function CustomerReviewPaymentContent() {
           subtotal: item.menuItem.price * item.quantity,
         }));
         await supabase.from('order_items').insert(itemsToInsert);
+
+        // DIREKTA AT SECURE NA PAGBAWAS NG STOCK VIA RPC FUNCTION
+        for (const item of state.items) {
+          await supabase.rpc('deduct_item_stock', {
+            item_id: item.menuItem.id,
+            qty_to_deduct: item.quantity,
+          });
+        }
       }
     } catch (err) {
       console.error('Order error:', err);
@@ -359,7 +314,6 @@ export default function CustomerReviewPaymentContent() {
     router.push('/order-confirmation');
   }
 
-  // Empty cart state
   if (state.items.length === 0 && !placing) {
     return (
       <div className="min-h-screen bg-background">
@@ -385,7 +339,6 @@ export default function CustomerReviewPaymentContent() {
       <CartDrawer />
 
       <div className="max-w-6xl mx-auto px-4 py-10 lg:px-8">
-        {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8 flex-wrap">
           <Link href="/menu-browse-screen" className="hover:text-primary transition-colors">Menu</Link>
           <Icon name="ChevronRightIcon" size={14} />
@@ -394,7 +347,6 @@ export default function CustomerReviewPaymentContent() {
           <span className="text-foreground font-medium">Review & Payment</span>
         </nav>
 
-        {/* Page Header */}
         <div className="mb-8">
           <h1 className="font-display text-3xl font-bold text-foreground mb-1">Review & Payment</h1>
           <p className="text-muted-foreground">Confirm your items, enter delivery details, and place your order.</p>
@@ -402,15 +354,10 @@ export default function CustomerReviewPaymentContent() {
 
         <form onSubmit={handleFormSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-
-            {/* ── LEFT COLUMN ── */}
             <div className="lg:col-span-3 space-y-6">
 
               {/* Order Items */}
-              <section
-                className="bg-card rounded-2xl border border-border p-6"
-                style={{ boxShadow: 'var(--shadow-3d)' }}
-              >
+              <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">1</span>
@@ -455,10 +402,7 @@ export default function CustomerReviewPaymentContent() {
               </section>
 
               {/* Delivery Method */}
-              <section
-                className="bg-card rounded-2xl border border-border p-6"
-                style={{ boxShadow: 'var(--shadow-3d)' }}
-              >
+              <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
                 <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2 mb-5">
                   <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">2</span>
                   Delivery Method
@@ -496,7 +440,6 @@ export default function CustomerReviewPaymentContent() {
                   ))}
                 </div>
 
-                {/* Address Fields */}
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -544,10 +487,7 @@ export default function CustomerReviewPaymentContent() {
                           <select
                             name="region"
                             value={form.region}
-                            onChange={e => {
-                              // reset city and barangay when region changes
-                              setForm(prev => ({ ...prev, region: e.target.value, city: '', barangay: '' }));
-                            }}
+                            onChange={e => setForm(prev => ({ ...prev, region: e.target.value, city: '', barangay: '' }))}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                           >
                             {REGION_OPTIONS.map(r => (
@@ -654,10 +594,7 @@ export default function CustomerReviewPaymentContent() {
               </section>
 
               {/* Payment Method */}
-              <section
-                className="bg-card rounded-2xl border border-border p-6"
-                style={{ boxShadow: 'var(--shadow-3d)' }}
-              >
+              <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
                 <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2 mb-5">
                   <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">3</span>
                   Payment Method
@@ -716,15 +653,11 @@ export default function CustomerReviewPaymentContent() {
               </section>
             </div>
 
-            {/* ── RIGHT COLUMN — Order Summary ── */}
+            {/* Order Summary */}
             <div className="lg:col-span-2">
-              <div
-                className="bg-card rounded-2xl border border-border p-6 sticky top-24"
-                style={{ boxShadow: 'var(--shadow-3d)' }}
-              >
+              <div className="bg-card rounded-2xl border border-border p-6 sticky top-24" style={{ boxShadow: 'var(--shadow-3d)' }}>
                 <h2 className="font-display text-base font-bold text-foreground mb-5">Order Summary</h2>
 
-                {/* Items mini-list */}
                 <div className="space-y-2 mb-5 max-h-48 overflow-y-auto pr-1">
                   {state.items.map(item => (
                     <div key={item.id} className="flex justify-between items-center text-sm">
@@ -739,7 +672,6 @@ export default function CustomerReviewPaymentContent() {
                   ))}
                 </div>
 
-                {/* Totals */}
                 <div className="border-t border-border pt-4 space-y-2.5 mb-5">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})</span>
@@ -757,7 +689,6 @@ export default function CustomerReviewPaymentContent() {
                   </div>
                 </div>
 
-                {/* Selected payment badge */}
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted mb-5">
                   <span className="text-lg">{PAYMENT_OPTIONS.find(p => p.value === paymentMethod)?.icon}</span>
                   <div className="min-w-0">

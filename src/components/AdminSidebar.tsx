@@ -29,15 +29,22 @@ export default function AdminSidebar() {
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
   const pathname = usePathname();
 
+  const applyTheme = (dark: boolean) => {
+    const root = document.documentElement;
+    if (dark) {
+      root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+    }
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem('theme');
-    const isDark = saved !== 'light';
+    const isDark = saved ? saved === 'dark' : true;
     setIsDarkMode(isDark);
-    if (isDark) {
-      document.documentElement?.classList?.add('dark');
-    } else {
-      document.documentElement?.classList?.remove('dark');
-    }
+    applyTheme(isDark);
   }, []);
 
   // Fetch pending/active orders count with auto-refresh
@@ -73,13 +80,8 @@ export default function AdminSidebar() {
   const toggleTheme = () => {
     const next = !isDarkMode;
     setIsDarkMode(next);
-    if (next) {
-      document.documentElement?.classList?.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement?.classList?.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
+    applyTheme(next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
   };
 
   return (
@@ -173,21 +175,21 @@ export default function AdminSidebar() {
           onClick={toggleTheme}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors w-full group"
           style={{ color: 'var(--admin-muted)' }}
-          title={collapsed ? (isDarkMode ? 'Light Mode' : 'Dark Mode') : undefined}
+          title={collapsed ? (isDarkMode ? 'Dark Mode' : 'Light Mode') : undefined}
           aria-label="Toggle theme"
         >
           <Icon
-            name={isDarkMode ? 'SunIcon' : 'MoonIcon'}
+            name={isDarkMode ? 'MoonIcon' : 'SunIcon'}
             size={18}
             className="text-admin-muted group-hover:text-secondary transition-colors flex-shrink-0"
           />
           {!collapsed && (
             <div className="flex items-center justify-between flex-1">
               <span className="text-sm font-medium" style={{ color: 'var(--admin-muted)' }}>
-                {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                {isDarkMode ? 'Dark Mode' : 'Light Mode'}
               </span>
-              <span className={`w-8 h-4 rounded-full transition-colors duration-200 flex items-center px-0.5 ${isDarkMode ? 'bg-secondary/40' : 'bg-secondary'}`}>
-                <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${isDarkMode ? 'translate-x-0' : 'translate-x-4'}`} />
+              <span className={`w-8 h-4 rounded-full transition-colors duration-200 flex items-center px-0.5 ${isDarkMode ? 'bg-amber-500' : 'bg-gray-600'}`}>
+                <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${isDarkMode ? 'translate-x-4' : 'translate-x-0'}`} />
               </span>
             </div>
           )}

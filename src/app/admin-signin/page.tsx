@@ -4,9 +4,12 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
+const ADMIN_EMAIL = 'admin1@feastandfete.com';
+const ADMIN_PASSWORD = 'johnpaulmanuel23';
+
 export default function AdminSignInPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [inputVal, setInputVal] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,25 +20,39 @@ export default function AdminSignInPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
+      // Normalize input: allow either 'ADMIN1' or 'admin1@feastandfete.com'
+      const cleanInput = inputVal.trim().toLowerCase();
+      const targetEmail = cleanInput.includes('@') ? cleanInput : `${cleanInput}@feastandfete.com`;
 
-      // 1. Sign in gamit ang Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error || !data.user) {
+      // 1. Local Guard Check
+      if (targetEmail !== ADMIN_EMAIL.toLowerCase() || password !== ADMIN_PASSWORD) {
         setErrorMsg('Invalid admin credentials.');
         setLoading(false);
         return;
       }
 
-      // 2. Set Admin local storage flags para sa dashboard guard
-      localStorage.setItem('userRole', 'admin');
-      localStorage.setItem('adminProfile', JSON.stringify({ email: data.user.email, id: data.user.id }));
+      const supabase = createClient();
 
-      // 3. Direct papunta sa Admin Dashboard
+      // 2. Sign in with Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: ADMIN_EMAIL,
+        password: password,
+      });
+
+      if (error || !data.user) {
+        setErrorMsg('Authentication failed on the server.');
+        setLoading(false);
+        return;
+      }
+
+      // 3. Set local storage flags
+      localStorage.setItem('userRole', 'admin');
+      localStorage.setItem(
+        'adminProfile',
+        JSON.stringify({ email: data.user.email, id: data.user.id })
+      );
+
+      // 4. Redirect to Dashboard
       router.replace('/admin-dashboard');
     } catch (err: any) {
       setErrorMsg('An unexpected error occurred. Please try again.');
@@ -60,14 +77,14 @@ export default function AdminSignInPage() {
         <form onSubmit={handleAdminLogin} className="space-y-5">
           <div>
             <label className="block text-xs text-amber-200/80 mb-2 font-medium">
-              Admin Email
+              Admin Username or Email
             </label>
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@feastandfete.com"
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              placeholder="ADMIN1 or admin1@feastandfete.com"
               className="w-full px-4 py-3 bg-[#1b110e] border border-amber-900/50 rounded-xl text-white placeholder-white/20 text-sm focus:outline-none focus:border-amber-500 transition"
             />
           </div>

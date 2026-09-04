@@ -1,9 +1,22 @@
 'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
-import { fetchInventoryItems, updateInventoryItem, InventoryItem, StockStatus } from '@/lib/supabase/services';
+import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
+
+type StockStatus = 'OK' | 'Low Stock' | 'Out of Stock';
+
+interface MenuItemInventory {
+  id: string;
+  name: string;
+  unit: string;
+  currentStock: number;
+  reorderLevel: number;
+  status: StockStatus;
+  lastUpdated: string;
+}
 
 const STATUS_STYLES: Record<StockStatus, { bg: string; text: string; dot: string }> = {
   OK: { bg: 'rgba(34,197,94,0.12)', text: '#4ADE80', dot: '#4ADE80' },
@@ -12,12 +25,11 @@ const STATUS_STYLES: Record<StockStatus, { bg: string; text: string; dot: string
 };
 
 export default function AdminInventoryPage() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [items, setItems] = useState<MenuItemInventory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editStock, setEditStock] = useState('');
-  const [editReorder, setEditReorder] = useState('');
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState<StockStatus | 'All'>('All');
 
@@ -25,8 +37,35 @@ export default function AdminInventoryPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchInventoryItems();
-      setItems(data);
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('id, name, stock, updated_at');
+
+      if (error) throw error;
+
+      const mapped: MenuItemInventory[] = (data || []).map((item: any) => {
+        const stock = item.stock ?? 0;
+        let status: StockStatus = 'OK';
+        
+        if (stock === 0) {
+          status = 'Out of Stock';
+        } else if (stock <= 7) {
+          status = 'Low Stock';
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          unit: 'pcs/tray',
+          currentStock: stock,
+          reorderLevel: 7,
+          status,
+          lastUpdated: item.updated_at ? item.updated_at.split('T')[0] : new Date().toISOString().split('T')[0],
+        };
+      });
+
+      setItems(mapped);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory');
     } finally {
@@ -38,25 +77,33 @@ export default function AdminInventoryPage() {
     loadItems();
   }, [loadItems]);
 
-  const startEdit = (item: InventoryItem) => {
+  const startEdit = (item: MenuItemInventory) => {
     setEditId(item.id);
     setEditStock(String(item.currentStock));
-    setEditReorder(String(item.reorderLevel));
   };
 
   const saveEdit = async (id: string) => {
     setSaving(true);
     const newStock = Number(editStock);
-    const newReorder = Number(editReorder);
     try {
-      await updateInventoryItem(id, newStock, newReorder);
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ 
+          stock: newStock,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
       let status: StockStatus = 'OK';
       if (newStock === 0) status = 'Out of Stock';
-      else if (newStock <= newReorder) status = 'Low Stock';
+      else if (newStock <= 7) status = 'Low Stock';
+
       setItems(prev => prev.map(i => i.id === id ? {
         ...i,
         currentStock: newStock,
-        reorderLevel: newReorder,
         status,
         lastUpdated: new Date().toISOString().split('T')[0],
       } : i));
@@ -85,8 +132,8 @@ export default function AdminInventoryPage() {
         <div className="px-6 lg:px-8 py-6 max-w-screen-2xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>Inventory</h1>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>Track and manage ingredient stock levels</p>
+              <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>Inventory & Stock Management</h1>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>Real-time stock tracking for menu items (Low stock threshold: ≤ 7)</p>
             </div>
             <button
               onClick={loadItems}
@@ -109,16 +156,28 @@ export default function AdminInventoryPage() {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: 'Total Items', value: counts.All, color: '#F5EDE0' },
-              { label: 'In Stock', value: counts.OK, color: '#4ADE80' },
-              { label: 'Low Stock', value: counts['Low Stock'], color: '#EAB308' },
-              { label: 'Out of Stock', value: counts['Out of Stock'], color: '#F87171' },
-            ].map(card => (
-              <div key={card.label} className="rounded-2xl p-4" style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}>
-                <p className="text-xs font-medium" style={{ color: 'var(--admin-muted)' }}>{card.label}</p>
-                <p className="text-3xl font-bold mt-1" style={{ color: card.color }}>{card.value}</p>
-              </div>
-            ))}
+              { label: 'Total Items', value: counts.All, status: 'All' as const, color: '#F5EDE0' },
+              { label: 'In Stock', value: counts.OK, status: 'OK' as const, color: '#4ADE80' },
+              { label: 'Low Stock', value: counts['Low Stock'], status: 'Low Stock' as const, color: '#EAB308' },
+              { label: 'Out of Stock', value: counts['Out of Stock'], status: 'Out of Stock' as const, color: '#F87171' },
+            ].map(card => {
+              const isActive = filterStatus === card.status;
+              return (
+                <div
+                  key={card.label}
+                  onClick={() => setFilterStatus(card.status)}
+                  className="rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
+                  style={{
+                    background: 'var(--admin-surface)',
+                    border: `1px solid ${isActive ? '#D4A017' : 'var(--admin-border)'}`,
+                    boxShadow: isActive ? '0 0 0 1px #D4A017' : 'none',
+                  }}
+                >
+                  <p className="text-xs font-medium" style={{ color: 'var(--admin-muted)' }}>{card.label}</p>
+                  <p className="text-3xl font-bold mt-1" style={{ color: card.color }}>{card.value}</p>
+                </div>
+              );
+            })}
           </div>
 
           {/* Filter */}
@@ -149,7 +208,7 @@ export default function AdminInventoryPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--admin-border)' }}>
-                    {['Ingredient', 'Unit', 'Current Stock', 'Reorder Level', 'Status', 'Last Updated', 'Actions'].map(h => (
+                    {['Menu Item', 'Unit', 'Current Stock', 'Alert Threshold', 'Status', 'Last Updated', 'Actions'].map(h => (
                       <th key={h} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--admin-muted)' }}>{h}</th>
                     ))}
                   </tr>
@@ -174,23 +233,13 @@ export default function AdminInventoryPage() {
                             style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
                           />
                         ) : (
-                          <span className="font-semibold" style={{ color: item.currentStock === 0 ? '#F87171' : item.currentStock <= item.reorderLevel ? '#EAB308' : '#F5EDE0' }}>
-                            {item.currentStock} {item.unit}
+                          <span className="font-semibold" style={{ color: item.currentStock === 0 ? '#F87171' : item.currentStock <= 7 ? '#EAB308' : '#F5EDE0' }}>
+                            {item.currentStock}
                           </span>
                         )}
                       </td>
                       <td className="px-5 py-3.5">
-                        {editId === item.id ? (
-                          <input
-                            type="number"
-                            value={editReorder}
-                            onChange={e => setEditReorder(e.target.value)}
-                            className="w-20 px-2 py-1 rounded-lg text-sm outline-none"
-                            style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
-                          />
-                        ) : (
-                          <span style={{ color: 'var(--admin-muted)' }}>{item.reorderLevel} {item.unit}</span>
-                        )}
+                        <span style={{ color: 'var(--admin-muted)' }}>≤ 7 stocks</span>
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: STATUS_STYLES[item.status].bg, color: STATUS_STYLES[item.status].text }}>

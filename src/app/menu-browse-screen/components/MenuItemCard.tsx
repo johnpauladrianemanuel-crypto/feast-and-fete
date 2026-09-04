@@ -69,19 +69,44 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
   const cardRef = useRef<HTMLDivElement>(null);
   const catColor = CATEGORY_COLORS[item.categorySlug] ?? { bg: 'rgba(100,100,100,0.1)', text: '#555' };
 
-  // Checks both camelCase (isActive) and snake_case (is_active) from Supabase
+  // Checks active state
   const rawIsActive = item.isActive ?? (item as { is_active?: boolean }).is_active;
-  const isInactive = rawIsActive === false;
+  
+  // Auto-deactivate logic check (if stock is 2 or less)
+  const isAutoDeactivated = item.stock <= 2;
+  const isInactive = rawIsActive === false || isAutoDeactivated;
 
-  // Extract deactivation reason from item (supporting both camelCase and snake_case)
+  // Extract deactivation reason from item
   const deactivationReason =
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivationReason ??
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivation_reason ??
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailable_reason ??
-    (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailableReason;
+    (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailableReason ??
+    (isAutoDeactivated ? 'Automatically deactivated due to low stock (2 or fewer remaining).' : undefined);
 
-  const isLowStock = item.stock > 0 && item.stock <= 5;
+  const isLowStock = item.stock > 2 && item.stock <= 5;
   const isOutOfStock = item.stock === 0;
+
+  // Auto Deactivate Trigger to Database if stock <= 2 and still active
+  useEffect(() => {
+    if (item.stock <= 2 && rawIsActive !== false) {
+      const autoDeactivate = async () => {
+        try {
+          const supabase = createClient();
+          await supabase
+            .from('menu_items')
+            .update({
+              is_active: false,
+              deactivation_reason: 'Automatic deactivation: Stock reached 2 or fewer remaining items.'
+            })
+            .eq('id', item.id);
+        } catch (err) {
+          console.error('Failed to auto deactivate item:', err);
+        }
+      };
+      autoDeactivate();
+    }
+  }, [item.stock, item.id, rawIsActive]);
 
   // Intersection Observer for scroll-triggered entrance
   useEffect(() => {
@@ -111,7 +136,6 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
       return;
     }
 
-    // Check if user is authenticated with Supabase
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -187,7 +211,6 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           }}
           onLoad={() => setImageLoaded(true)}
         />
-        {/* Shimmer while image loads */}
         {!imageLoaded && (
           <div
             className="absolute inset-0"
@@ -199,7 +222,6 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           />
         )}
 
-        {/* Dark overlay gradient for deactivated item */}
         {isInactive && (
           <div
             className="absolute inset-0"
@@ -207,7 +229,6 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           />
         )}
 
-        {/* Hover gradient overlay */}
         {!isInactive && (
           <div
             className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none"
@@ -245,21 +266,12 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           </div>
         )}
 
-        {/* Temporarily Unavailable badge overlay */}
+        {/* Unavailable badge */}
         {isInactive && (
           <div className="absolute top-3 right-3">
             <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-red-950/90 text-red-200 border border-red-800/50 shadow-md backdrop-blur-sm flex items-center gap-1">
               <Icon name="ExclamationTriangleIcon" size={12} className="text-red-400" />
               Unavailable
-            </span>
-          </div>
-        )}
-
-        {/* Out of stock overlay */}
-        {isOutOfStock && !isInactive && (
-          <div className="absolute inset-0 bg-foreground/50 flex items-center justify-center backdrop-blur-sm">
-            <span className="px-3 py-1.5 bg-error text-white text-xs font-bold rounded-full">
-              Out of Stock
             </span>
           </div>
         )}
@@ -276,7 +288,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           </p>
         </div>
 
-        {/* Deactivation reason banner when inactive */}
+        {/* Deactivation banner */}
         {isInactive && (
           <div className="p-3 rounded-xl border border-red-900/40 bg-stone-950/90 backdrop-blur-sm space-y-1">
             <div className="flex items-center gap-1.5 text-red-400 font-semibold text-xs">
@@ -300,14 +312,20 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           <StarDisplay rating={ratingSummary.averageRating} count={ratingSummary.reviewCount} />
         )}
 
-        {/* Serving size */}
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Icon name="UsersIcon" size={12} className="text-muted-foreground flex-shrink-0" />
-          <span>{item.servingSize}</span>
+        {/* Serving size & Available Stock Count */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <Icon name="UsersIcon" size={12} className="text-muted-foreground flex-shrink-0" />
+            <span>{item.servingSize}</span>
+          </div>
+          {/* Stock Display for Users */}
+          <div className="font-semibold text-amber-500/90 bg-amber-500/10 px-2 py-0.5 rounded-md">
+            Stock: {item.stock} left
+          </div>
         </div>
 
         {/* Low stock warning */}
-        {isLowStock && !isOutOfStock && !isInactive && (
+        {isLowStock && !isInactive && (
           <div
             className="flex items-center gap-1.5 text-xs font-medium"
             style={{ color: 'var(--warning)', animation: 'lowStockPulse 1.8s ease-in-out infinite' }}

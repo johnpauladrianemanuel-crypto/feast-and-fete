@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
@@ -18,6 +19,7 @@ export default function AdminExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [filterCat, setFilterCat] = useState('All');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ date: '', category: 'Ingredients', description: '', amount: '' });
@@ -28,7 +30,7 @@ export default function AdminExpensesPage() {
     setError(null);
     try {
       const data = await fetchExpenses();
-      setExpenses(data);
+      setExpenses(data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load expenses');
     } finally {
@@ -41,16 +43,17 @@ export default function AdminExpensesPage() {
   }, [loadExpenses]);
 
   const filtered = expenses.filter(e => filterCat === 'All' || e.category === filterCat);
-  const total = filtered.reduce((sum, e) => sum + e.amount, 0);
+  const total = filtered.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const categoryTotals = CATEGORIES.map(cat => ({
     cat,
-    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0),
+    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount || 0), 0),
   }));
 
   const handleAdd = async () => {
     if (!form.date || !form.description || !form.amount) return;
     setSubmitting(true);
+    setModalError(null);
     try {
       const newExp = await addExpense({
         date: form.date,
@@ -62,7 +65,7 @@ export default function AdminExpensesPage() {
       setForm({ date: '', category: 'Ingredients', description: '', amount: '' });
       setShowForm(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to add expense');
+      setModalError(err instanceof Error ? err.message : 'Failed to add expense');
     } finally {
       setSubmitting(false);
     }
@@ -73,7 +76,7 @@ export default function AdminExpensesPage() {
       await deleteExpense(id);
       setExpenses(prev => prev.filter(e => e.id !== id));
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete expense');
+      setError(err instanceof Error ? err.message : 'Failed to delete expense');
     }
   };
 
@@ -89,8 +92,11 @@ export default function AdminExpensesPage() {
               <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>Track operational costs and spending</p>
             </div>
             <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+              onClick={() => {
+                setModalError(null);
+                setShowForm(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors cursor-pointer"
               style={{ background: '#D4A017', color: '#1A0F0A' }}
             >
               <Icon name="PlusIcon" size={16} />
@@ -105,27 +111,35 @@ export default function AdminExpensesPage() {
             </div>
           )}
 
-          {/* Category breakdown */}
+          {/* Category Breakdown Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {categoryTotals.map(({ cat, total: catTotal }) => (
-              <div key={cat} className="rounded-2xl p-4" style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}>
+              <button
+                key={cat}
+                onClick={() => setFilterCat(cat)}
+                className="rounded-2xl p-4 text-left transition-all cursor-pointer"
+                style={{
+                  background: filterCat === cat ? `${CATEGORY_COLORS[cat]}15` : 'var(--admin-surface)',
+                  border: `1px solid ${filterCat === cat ? CATEGORY_COLORS[cat] : 'var(--admin-border)'}`,
+                }}
+              >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLORS[cat] }} />
                   <p className="text-xs font-medium" style={{ color: 'var(--admin-muted)' }}>{cat}</p>
                 </div>
                 <p className="text-lg font-bold" style={{ color: CATEGORY_COLORS[cat] }}>₱{catTotal.toLocaleString()}</p>
-              </div>
+              </button>
             ))}
           </div>
 
-          {/* Filter + total */}
+          {/* Filter + Total */}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex gap-2 flex-wrap">
               {['All', ...CATEGORIES].map(cat => (
                 <button
                   key={cat}
                   onClick={() => setFilterCat(cat)}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                  className="px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer"
                   style={{ background: filterCat === cat ? '#D4A017' : 'var(--admin-surface)', color: filterCat === cat ? '#1A0F0A' : 'var(--admin-muted)', border: '1px solid var(--admin-border)' }}
                 >
                   {cat}
@@ -157,14 +171,14 @@ export default function AdminExpensesPage() {
                     <tr key={exp.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--admin-border)' : 'none' }}>
                       <td className="px-5 py-3.5 text-xs font-mono" style={{ color: 'var(--admin-muted)' }}>{exp.date}</td>
                       <td className="px-5 py-3.5">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: `${CATEGORY_COLORS[exp.category]}20`, color: CATEGORY_COLORS[exp.category] }}>
+                        <span className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: `${CATEGORY_COLORS[exp.category] || '#94A3B8'}20`, color: CATEGORY_COLORS[exp.category] || '#94A3B8' }}>
                           {exp.category}
                         </span>
                       </td>
                       <td className="px-5 py-3.5" style={{ color: '#F5EDE0' }}>{exp.description}</td>
-                      <td className="px-5 py-3.5 font-semibold" style={{ color: '#D4A017' }}>₱{exp.amount.toLocaleString()}</td>
+                      <td className="px-5 py-3.5 font-semibold" style={{ color: '#D4A017' }}>₱{Number(exp.amount).toLocaleString()}</td>
                       <td className="px-5 py-3.5">
-                        <button onClick={() => handleDelete(exp.id)} className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10" style={{ color: 'var(--admin-muted)' }}>
+                        <button onClick={() => handleDelete(exp.id)} className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10 cursor-pointer" style={{ color: 'var(--admin-muted)' }}>
                           <Icon name="TrashIcon" size={14} />
                         </button>
                       </td>
@@ -186,8 +200,16 @@ export default function AdminExpensesPage() {
           <div className="w-full max-w-md rounded-2xl p-6 space-y-4" style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}>
             <div className="flex items-center justify-between">
               <h3 className="font-display font-bold text-lg" style={{ color: '#F5EDE0' }}>Add Expense</h3>
-              <button onClick={() => setShowForm(false)} style={{ color: 'var(--admin-muted)' }}><Icon name="XMarkIcon" size={20} /></button>
+              <button onClick={() => setShowForm(false)} style={{ color: 'var(--admin-muted)' }} className="cursor-pointer"><Icon name="XMarkIcon" size={20} /></button>
             </div>
+
+            {modalError && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#F87171' }}>
+                <Icon name="ExclamationCircleIcon" size={14} />
+                {modalError}
+              </div>
+            )}
+
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>Date</label>
@@ -197,8 +219,8 @@ export default function AdminExpensesPage() {
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>Category</label>
                 <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none cursor-pointer" style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}>
+                  {CATEGORIES.map(c => <option key={c} value={c} style={{ background: '#1A0F0A' }}>{c}</option>)}
                 </select>
               </div>
               <div>
@@ -215,8 +237,8 @@ export default function AdminExpensesPage() {
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-xl text-sm font-medium" style={{ background: 'var(--admin-bg)', color: 'var(--admin-muted)', border: '1px solid var(--admin-border)' }}>Cancel</button>
-              <button onClick={handleAdd} disabled={submitting} className="flex-1 py-2 rounded-xl text-sm font-bold disabled:opacity-60" style={{ background: '#D4A017', color: '#1A0F0A' }}>
+              <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-xl text-sm font-medium cursor-pointer" style={{ background: 'var(--admin-bg)', color: 'var(--admin-muted)', border: '1px solid var(--admin-border)' }}>Cancel</button>
+              <button onClick={handleAdd} disabled={submitting} className="flex-1 py-2 rounded-xl text-sm font-bold disabled:opacity-60 cursor-pointer" style={{ background: '#D4A017', color: '#1A0F0A' }}>
                 {submitting ? 'Adding…' : 'Add Expense'}
               </button>
             </div>

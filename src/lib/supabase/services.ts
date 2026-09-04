@@ -669,3 +669,45 @@ export async function submitItemReview(review: {
   if (error) throw new Error(error.message);
   return rowToItemReview(data as Record<string, unknown>);
 }
+
+// ─── Stock Deduction ──────────────────────────────────────────────────────────
+
+/**
+ * Deducts stock & updates sold count for a single item
+ */
+export async function deductItemStock(menuItemId: string, quantityBought: number): Promise<void> {
+  const supabase = createClient();
+
+  const { data: item, error: fetchError } = await supabase
+    .from('menu_items')
+    .select('stock, sold_count')
+    .eq('id', menuItemId)
+    .single();
+
+  if (fetchError || !item) return;
+
+  const currentStock = Number(item.stock || 0);
+  const currentSoldCount = Number(item.sold_count || 0);
+
+  const newStock = Math.max(0, currentStock - quantityBought);
+  const newSoldCount = currentSoldCount + quantityBought;
+
+  await supabase
+    .from('menu_items')
+    .update({
+      stock: newStock,
+      sold_count: newSoldCount,
+    })
+    .eq('id', menuItemId);
+}
+
+/**
+ * Call this function inside your checkout/place order handler
+ */
+export async function deductCartStock(cartItems: { id: string; quantity: number }[]): Promise<void> {
+  for (const item of cartItems) {
+    if (item.id && item.quantity > 0) {
+      await deductItemStock(item.id, item.quantity);
+    }
+  }
+}

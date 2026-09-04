@@ -92,8 +92,8 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
   }, [onClose]);
 
   const catColor = CATEGORY_COLORS[item.categorySlug] ?? { bg: 'rgba(100,100,100,0.1)', text: '#555' };
-  const isOutOfStock = item.stock === 0;
-  const isLowStock = item.stock > 0 && item.stock <= 5;
+  const isOutOfStock = item.stock <= 2;
+  const isLowStock = item.stock > 2 && item.stock <= 5;
 
   function handleAdd() {
     const customizationsToSave = Object.keys(selectedCustomizations).length > 0 ? selectedCustomizations : undefined;
@@ -146,7 +146,6 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
           
           {/* Header Image Area with Smooth Seamless Fade */}
           <div className="relative w-full h-[290px] bg-white flex-shrink-0">
-            {/* Base Image */}
             <AppImage
               src={item.image}
               alt={item.imageAlt || item.name}
@@ -155,7 +154,6 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               className="w-full h-full object-cover"
             />
 
-            {/* Soft, Seamless Gradient Overlay to White (No Grey Artifact Line) */}
             <div 
               style={{
                 position: 'absolute',
@@ -226,7 +224,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                     boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
                   }}
                 >
-                  Out of Stock
+                  Unavailable
                 </span>
               )}
             </div>
@@ -249,7 +247,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               <Icon name="XMarkIcon" size={18} />
             </button>
 
-            {/* Dish Title & Price sitting over the smooth fade */}
+            {/* Dish Title & Price */}
             <div 
               style={{
                 position: 'absolute',
@@ -275,15 +273,19 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
             </div>
           </div>
 
-          {/* Details Section Below Image - Seamlessly Continuation */}
+          {/* Details Section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px', paddingTop: '16px', background: '#ffffff', marginTop: '-2px' }}>
             {ratingSummary && ratingSummary.reviewCount > 0 && (
               <StarDisplay rating={ratingSummary.averageRating} count={ratingSummary.reviewCount} />
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--muted-foreground)' }}>
-              <Icon name="UsersIcon" size={16} />
-              <span>{item.servingSize}</span>
+<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '14px', color: 'var(--muted-foreground)' }}>              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Icon name="UsersIcon" size={16} />
+                <span>{item.servingSize}</span>
+              </div>
+              <div style={{ fontWeight: 600, color: '#d97706' }}>
+                Available Stock: {item.stock}
+              </div>
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)' }} />
@@ -353,7 +355,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                 </button>
                 <span style={{ width: '40px', textAlign: 'center', fontSize: '14px', fontWeight: 700, color: 'var(--foreground)' }}>{quantity}</span>
                 <button
-                  onClick={() => setQuantity(q => q + 1)}
+                  onClick={() => setQuantity(q => Math.min(item.stock, q + 1))}
                   style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--foreground)' }}
                   aria-label="Increase quantity"
                 >
@@ -380,7 +382,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                 aria-label={`Add ${item.name} to cart`}
               >
                 <Icon name={addedPulse ? 'CheckIcon' : 'ShoppingCartIcon'} size={16} />
-                {addedPulse ? 'Added to Cart!' : `Add ${quantity > 1 ? `${quantity}×` : ''} to Cart — ₱${(item.price * quantity).toLocaleString()}`}
+                {isOutOfStock ? 'Unavailable (Low Stock)' : addedPulse ? 'Added to Cart!' : `Add ${quantity > 1 ? `${quantity}×` : ''} to Cart — ₱${(item.price * quantity).toLocaleString()}`}
               </button>
             </div>
           </div>
