@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import AuthCard from '@/app/sign-up-login-screen/components/AuthCard';
 import { ADMIN_PASSWORD } from '@/app/sign-up-login-screen/components/adminPassword';
 import WelcomeSplash from '@/components/WelcomeSplash';
-import { isQuietHoursActive } from '@/lib/quietHours';
+import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
 
 export default function SignUpLoginClient() {
   const router = useRouter();
+  const supabase = createClient();
   const [welcomeUser, setWelcomeUser] = useState<string | null>(null);
   const [isClosed, setIsClosed] = useState(false);
 
@@ -20,11 +21,51 @@ export default function SignUpLoginClient() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const checkStatus = () => {
-      setIsClosed(isQuietHoursActive());
+    const checkStoreStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('store_settings')
+          .select('value')
+          .eq('key', 'quiet_hours')
+          .single();
+
+        if (error || !data) {
+          setIsClosed(false);
+          return;
+        }
+
+        const quietHours = data.value;
+        if (!quietHours || !quietHours.enabled) {
+          setIsClosed(false);
+          return;
+        }
+
+        const now = new Date();
+        const currentDay = now.getDay(); // 0 = Sun, 1 = Mon, ... 6 = Sat
+
+        if (quietHours.days && !quietHours.days.includes(currentDay)) {
+          setIsClosed(false);
+          return;
+        }
+
+        const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        const { from, to } = quietHours;
+
+        let active = false;
+        if (from > to) {
+          active = currentTimeStr >= from || currentTimeStr <= to;
+        } else {
+          active = currentTimeStr >= from && currentTimeStr <= to;
+        }
+
+        setIsClosed(active);
+      } catch {
+        setIsClosed(false);
+      }
     };
-    checkStatus();
-    const timer = setInterval(checkStatus, 10000);
+
+    checkStoreStatus();
+    const timer = setInterval(checkStoreStatus, 10000);
     return () => clearInterval(timer);
   }, []);
 
