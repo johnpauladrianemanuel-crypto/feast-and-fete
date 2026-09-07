@@ -72,8 +72,8 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
   // Checks active state
   const rawIsActive = item.isActive ?? (item as { is_active?: boolean }).is_active;
   
-  // Auto-deactivate logic check (if stock is 2 or less)
-  const isAutoDeactivated = item.stock <= 2;
+  // Auto-deactivate logic check: Deactivate ONLY when stock is 0
+  const isAutoDeactivated = item.stock === 0;
   const isInactive = rawIsActive === false || isAutoDeactivated;
 
   // Extract deactivation reason from item
@@ -82,14 +82,15 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivation_reason ??
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailable_reason ??
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailableReason ??
-    (isAutoDeactivated ? 'Automatically deactivated due to low stock (2 or fewer remaining).' : undefined);
+    (isAutoDeactivated ? 'Automatically deactivated due to zero stock remaining.' : undefined);
 
-  const isLowStock = item.stock > 2 && item.stock <= 5;
+  // Low stock warning: Active pa rin pero warning kapag below 5 (1 to 4 stocks)
+  const isLowStock = item.stock > 0 && item.stock < 5;
   const isOutOfStock = item.stock === 0;
 
-  // Auto Deactivate Trigger to Database if stock <= 2 and still active
+  // Auto Deactivate Trigger to Database if stock is 0 and still active
   useEffect(() => {
-    if (item.stock <= 2 && rawIsActive !== false) {
+    if (item.stock === 0 && rawIsActive !== false) {
       const autoDeactivate = async () => {
         try {
           const supabase = createClient();
@@ -97,7 +98,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
             .from('menu_items')
             .update({
               is_active: false,
-              deactivation_reason: 'Automatic deactivation: Stock reached 2 or fewer remaining items.'
+              deactivation_reason: 'Automatic deactivation: Stock reached 0.'
             })
             .eq('id', item.id);
         } catch (err) {
@@ -324,7 +325,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           </div>
         </div>
 
-        {/* Low stock warning */}
+        {/* Low stock warning (Triggers when below 5, i.e., 1 to 4 stocks) */}
         {isLowStock && !isInactive && (
           <div
             className="flex items-center gap-1.5 text-xs font-medium"

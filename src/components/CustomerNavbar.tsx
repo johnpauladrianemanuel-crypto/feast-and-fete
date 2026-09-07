@@ -132,6 +132,10 @@ export default function CustomerNavbar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // State for the mobile food tray list and search
+  const [mobileFoodTraysOpen, setMobileFoodTraysOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
@@ -292,6 +296,14 @@ export default function CustomerNavbar() {
     }
   };
 
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/menu-browse-screen?search=${encodeURIComponent(searchQuery.trim())}`);
+      setMobileOpen(false);
+    }
+  };
+
   const avatarUrl = dbAvatarUrl || user?.avatar_url || user?.photoURL || user?.user_metadata?.avatar_url || user?.user_metadata?.photoURL;
   const rawName = dbFullName || user?.user_metadata?.full_name || user?.name;
 
@@ -307,11 +319,11 @@ export default function CustomerNavbar() {
     <nav className="sticky top-0 z-50 bg-black/30 backdrop-blur-md border-b border-white/10 transition-all duration-200" ref={dropdownRef}>
       <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 xl:px-10">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & Gold Brand Text */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <AppLogo size={36} />
+          {/* Logo & White-to-Gold Faded Brand Text */}
+          <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
+            <AppLogo size={48} />
             <span 
-              className="font-display text-xl font-bold bg-gradient-to-r from-[#FFF0B3] via-[#FFD700] to-[#E6A100] bg-clip-text text-transparent hidden sm:block" 
+              className="font-display text-2xl font-bold bg-gradient-to-r from-white via-[#FFF0B3] to-[#FFD700] bg-clip-text text-transparent hidden sm:block" 
               style={{ letterSpacing: '-0.01em' }}
             >
               Feast & Fête
@@ -321,10 +333,11 @@ export default function CustomerNavbar() {
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-3">
             <Link href="/menu-browse-screen">
-              <LiquidGlassButton variant="glass" size="sm">
+              <LiquidGlassButton variant="glass" size="sm" type="button">
                 Menu
               </LiquidGlassButton>
             </Link>
+
             <Link href="/cart-review">
               <LiquidGlassButton variant="glass" size="sm">
                 My Cart
@@ -555,11 +568,57 @@ export default function CustomerNavbar() {
 
         {/* Mobile Nav */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-white/10 py-3 animate-fade-in bg-black/80 backdrop-blur-lg rounded-b-2xl px-2">
-            <Link href="/menu-browse-screen" className="flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-white hover:bg-white/10 transition-colors" onClick={() => setMobileOpen(false)}>
-              <Icon name="BookOpenIcon" size={18} className="text-white" />
-              Menu
-            </Link>
+          <div className="md:hidden border-t border-white/10 py-3 animate-fade-in bg-black/90 backdrop-blur-lg rounded-b-2xl px-3 text-white max-h-[80vh] overflow-y-auto">
+            {/* Mobile Search Bar matching requested style */}
+            <form onSubmit={handleSearchSubmit} className="mb-4 relative">
+              <input
+                type="text"
+                placeholder="Search Food Trays..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/10 border border-white/20 rounded-xl py-2 pl-3 pr-10 text-sm text-white placeholder-white/60 focus:outline-none focus:border-primary"
+              />
+              <button type="submit" className="absolute right-3 top-2.5 text-white/70 hover:text-white">
+                <Icon name="MagnifyingGlassIcon" size={18} />
+              </button>
+            </form>
+
+            <div className="px-2 py-1 text-xs font-bold text-white/50 uppercase">Menu</div>
+
+            {/* Food Trays Collapsible Dropdown */}
+            <div>
+              <button
+                onClick={() => setMobileFoodTraysOpen(!mobileFoodTraysOpen)}
+                className="w-full flex items-center justify-between px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+              >
+                <span>Food Trays</span>
+                <Icon name={mobileFoodTraysOpen ? 'ChevronUpIcon' : 'ChevronDownIcon'} size={16} />
+              </button>
+
+              {mobileFoodTraysOpen && (
+                <div className="pl-4 space-y-1 my-1 border-l border-white/10 ml-2">
+                  <Link href="/menu-browse-screen?category=Beef" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Beef</Link>
+                  <Link href="/menu-browse-screen?category=Chicken" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Chicken</Link>
+                  <Link href="/menu-browse-screen?category=Pork" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Pork</Link>
+                  <Link href="/menu-browse-screen?category=Fish" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Fish</Link>
+                  <Link href="/menu-browse-screen?category=Seafood" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Seafood</Link>
+                  <Link href="/menu-browse-screen?category=Vegetable" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Vegetable</Link>
+                  <Link href="/menu-browse-screen?category=Pasta" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Pasta</Link>
+                  <Link href="/menu-browse-screen?category=Noodles" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Noodles</Link>
+                </div>
+              )}
+            </div>
+
+            <Link href="/menu-browse-screen?category=Packed+Meals" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Packed Meals</Link>
+            <Link href="/menu-browse-screen?category=Packages" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Packages</Link>
+            <Link href="/menu-browse-screen?category=Catering" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Catering</Link>
+            <Link href="/menu-browse-screen?category=FAQ" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">FAQ</Link>
+            <Link href="/menu-browse-screen?category=About" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">About</Link>
+            <Link href="/menu-browse-screen?category=Contact" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Contact</Link>
+            <Link href="/menu-browse-screen?category=Blogs" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Blogs</Link>
+
+            <hr className="my-2 border-white/10" />
+
             <Link href="/customer-orders" className="flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-white hover:bg-white/10 transition-colors" onClick={() => setMobileOpen(false)}>
               <Icon name="ClipboardDocumentListIcon" size={18} className="text-white" />
               My Orders
@@ -593,7 +652,7 @@ export default function CustomerNavbar() {
                 <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${isDarkMode ? 'translate-x-4' : 'translate-x-0'}`} />
               </span>
             </button>
-            {user && (
+            {user ? (
               <button
                 onClick={handleSignOut}
                 className="w-full flex items-center gap-2 px-2 py-2.5 rounded-lg text-sm font-medium text-error hover:bg-white/10 transition-colors mt-2 border-t border-white/10 pt-3"
@@ -601,6 +660,14 @@ export default function CustomerNavbar() {
                 <Icon name="ArrowRightOnRectangleIcon" size={18} className="text-error" />
                 Logout
               </button>
+            ) : (
+              <Link
+                href="/sign-up-login-screen"
+                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                onClick={() => setMobileOpen(false)}
+              >
+                Login
+              </Link>
             )}
           </div>
         )}

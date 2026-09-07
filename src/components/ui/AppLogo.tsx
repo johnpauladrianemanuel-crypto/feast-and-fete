@@ -13,9 +13,9 @@ interface AppLogoProps {
 }
 
 const AppLogo = memo(function AppLogo({
-  src = '/assets/images/app_logo.png',
+  src = '/assets/images/Logo123.png',
   iconName = 'SparklesIcon',
-  size = 64,
+  size = 100, // Pinalaki ko mula 64 patungong 72 para mas lumaki nang kaunti
   className = '',
   onClick,
 }: AppLogoProps) {

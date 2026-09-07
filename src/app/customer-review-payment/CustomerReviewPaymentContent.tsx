@@ -10,7 +10,7 @@ import { useCart } from '@/lib/cartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 
-type PaymentMethod = 'cash_on_delivery' | 'card' | 'bank_transfer' | 'gcash';
+type PaymentMethod = 'cash_on_delivery' | 'gcash';
 type DeliveryMethod = 'delivery' | 'pickup';
 
 interface AddressForm {
@@ -29,8 +29,6 @@ interface AddressForm {
 const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; icon: string; desc: string }[] = [
   { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: '💵', desc: 'Pay when your order arrives' },
   { value: 'gcash', label: 'GCash', icon: '📱', desc: 'Pay via GCash mobile wallet' },
-  { value: 'card', label: 'Credit / Debit Card', icon: '💳', desc: 'Visa, Mastercard, or any major card' },
-  { value: 'bank_transfer', label: 'Bank Transfer', icon: '🏦', desc: 'BDO / BPI / UnionBank' },
 ];
 
 function getGuestProfile(): { id: string; contactType: string; contactValue: string } | null {
@@ -71,6 +69,11 @@ export default function CustomerReviewPaymentContent() {
   const [guestProfile, setGuestProfile] = useState<{ id: string; contactType: string; contactValue: string } | null>(null);
   const [savedAddress, setSavedAddress] = useState('');
   const [showQRModal, setShowQRModal] = useState(false);
+  
+  // States para sa Terms & Conditions
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsError, setTermsError] = useState('');
 
   const deliveryFee = deliveryMethod === 'delivery' ? 150 : 0;
   const total = totalAmount + deliveryFee;
@@ -205,6 +208,14 @@ export default function CustomerReviewPaymentContent() {
 
     if (!form.eventTime) errs.eventTime = 'Event time is required';
     setErrors(errs);
+    
+    if (!agreedToTerms) {
+      setTermsError('You must read and agree to the Terms and Conditions inside the pop-up to proceed.');
+      return false;
+    } else {
+      setTermsError('');
+    }
+
     return Object.keys(errs).length === 0;
   }
 
@@ -263,7 +274,6 @@ export default function CustomerReviewPaymentContent() {
       }
 
       if (orderData) {
-        // Save order items
         const itemsToInsert = state.items.map(item => ({
           order_id: orderData.id,
           menu_item_id: item.menuItem.id,
@@ -274,7 +284,6 @@ export default function CustomerReviewPaymentContent() {
         }));
         await supabase.from('order_items').insert(itemsToInsert);
 
-        // DIREKTA AT SECURE NA PAGBAWAS NG STOCK VIA RPC FUNCTION
         for (const item of state.items) {
           await supabase.rpc('deduct_item_stock', {
             item_id: item.menuItem.id,
@@ -627,20 +636,6 @@ export default function CustomerReviewPaymentContent() {
                   ))}
                 </div>
 
-                {paymentMethod === 'bank_transfer' && (
-                  <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
-                    <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-                      <Icon name="InformationCircleIcon" size={14} className="text-primary" />
-                      Bank Transfer Details
-                    </p>
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <p>BDO: <span className="font-mono text-foreground">0012-3456-7890</span></p>
-                      <p>BPI: <span className="font-mono text-foreground">1234-5678-90</span></p>
-                      <p>Account Name: <span className="text-foreground font-medium">Feast & Fête Catering</span></p>
-                    </div>
-                  </div>
-                )}
-
                 {paymentMethod === 'gcash' && (
                   <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
                     <p className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1.5">
@@ -695,6 +690,23 @@ export default function CustomerReviewPaymentContent() {
                     <p className="text-xs text-muted-foreground">Payment via</p>
                     <p className="text-sm font-semibold text-foreground truncate">{PAYMENT_OPTIONS.find(p => p.value === paymentMethod)?.label}</p>
                   </div>
+                </div>
+
+                {/* TERMS AND CONDITIONS LINK / STATUS */}
+                <div className="mb-4 pt-2">
+                  <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${agreedToTerms ? 'bg-primary/5 border-primary/30 text-primary font-medium' : 'bg-muted/40 border-border text-muted-foreground'}`}>
+                    <span>
+                      {agreedToTerms ? '✓ Terms and Conditions agreed.' : 'Please read and agree to our Terms.'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsModal(true)}
+                      className="px-3 py-1.5 rounded-lg gradient-brand text-primary-foreground font-semibold text-xs btn-3d transition-all"
+                    >
+                      {agreedToTerms ? 'View Terms' : 'Read Terms & Conditions'}
+                    </button>
+                  </div>
+                  {termsError && <p className="text-xs text-error mt-1">{termsError}</p>}
                 </div>
 
                 {placeError && (
@@ -784,6 +796,74 @@ export default function CustomerReviewPaymentContent() {
                 ) : (
                   'I Have Paid'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TERMS AND CONDITIONS MODAL (Ginawang .jpg ang image path para mabasa na) */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-foreground">Terms and Conditions</h3>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Icon name="XMarkIcon" size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-muted/5 p-2 mb-4">
+              <AppImage
+                src="/assets/images/image2.jpg"
+                alt="Terms and Conditions"
+                width={500}
+                height={700}
+                className="w-full h-auto rounded-lg object-contain"
+              />
+            </div>
+
+            <div className="mb-5 p-3 rounded-xl bg-muted/30 border border-border">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => {
+                    setAgreedToTerms(e.target.checked);
+                    if (e.target.checked) setTermsError('');
+                  }}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                />
+                <span className="text-xs text-foreground font-medium leading-relaxed">
+                  I have read, understood, and agreed to the Terms and Conditions and Privacy Policy of Feast & Fête.
+                </span>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-border text-foreground text-sm font-semibold hover:bg-muted transition-all"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!agreedToTerms) {
+                    setAgreedToTerms(true);
+                  }
+                  setTermsError('');
+                  setShowTermsModal(false);
+                }}
+                className="px-6 py-2.5 rounded-xl gradient-brand text-primary-foreground text-sm font-bold btn-3d transition-all"
+              >
+                Confirm & Proceed
               </button>
             </div>
           </div>

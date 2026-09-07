@@ -50,64 +50,75 @@ export default function CartReviewContent() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             {/* Items List */}
             <div className="lg:col-span-2 space-y-4">
-              {state?.items?.map((item) => (
-                <div
-                  key={item?.id}
-                  className="flex gap-4 p-4 bg-card rounded-2xl border border-border"
-                  style={{ boxShadow: 'var(--shadow-3d)' }}
-                >
-                  <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
-                    <AppImage
-                      src={item?.menuItem?.image}
-                      alt={item?.menuItem?.imageAlt}
-                      width={96}
-                      height={96}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-display text-base font-semibold text-foreground">{item?.menuItem?.name}</h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">{item?.menuItem?.servingSize}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{item?.menuItem?.category}</p>
-                      </div>
-                      <button
-                        onClick={() => removeItem(item?.id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
-                        aria-label={`Remove ${item?.menuItem?.name}`}
-                      >
-                        <Icon name="TrashIcon" size={15} className="text-error" />
-                      </button>
+              {state?.items?.map((item) => {
+                const maxStock = (item?.menuItem as any)?.stock ?? (item?.menuItem as any)?.stocks ?? (item?.menuItem as any)?.stock_left ?? 999;
+                const isAtMax = item?.quantity >= maxStock;
+
+                return (
+                  <div
+                    key={item?.id}
+                    className="flex gap-4 p-4 bg-card rounded-2xl border border-border"
+                    style={{ boxShadow: 'var(--shadow-3d)' }}
+                  >
+                    <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
+                      <AppImage
+                        src={item?.menuItem?.image}
+                        alt={item?.menuItem?.imageAlt}
+                        width={96}
+                        height={96}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-display text-base font-semibold text-foreground">{item?.menuItem?.name}</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">{item?.menuItem?.servingSize}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{item?.menuItem?.category}</p>
+                          {isAtMax && (
+                            <p className="text-xs text-amber-600 font-medium mt-1">Maximum available stock reached ({maxStock})</p>
+                          )}
+                        </div>
                         <button
-                          onClick={() => updateQuantity(item?.id, item?.quantity - 1)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-card transition-colors text-foreground"
-                          aria-label="Decrease quantity"
+                          onClick={() => removeItem(item?.id)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
+                          aria-label={`Remove ${item?.menuItem?.name}`}
                         >
-                          <Icon name="MinusIcon" size={13} />
-                        </button>
-                        <span className="w-6 text-center text-sm font-semibold text-foreground tabular-nums">{item?.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item?.id, item?.quantity + 1)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-card transition-colors text-foreground"
-                          aria-label="Increase quantity"
-                        >
-                          <Icon name="PlusIcon" size={13} />
+                          <Icon name="TrashIcon" size={15} className="text-error" />
                         </button>
                       </div>
-                      <p className="font-bold text-primary text-base tabular-nums">
-                        ₱{(item?.menuItem?.price * item?.quantity)?.toLocaleString()}
-                      </p>
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+                          <button
+                            onClick={() => updateQuantity(item?.id, item?.quantity - 1)}
+                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-card transition-colors text-foreground"
+                            aria-label="Decrease quantity"
+                          >
+                            <Icon name="MinusIcon" size={13} />
+                          </button>
+                          <span className="w-6 text-center text-sm font-semibold text-foreground tabular-nums">{item?.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item?.id, item?.quantity + 1)}
+                            disabled={isAtMax}
+                            className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors text-foreground ${
+                              isAtMax ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : 'hover:bg-card'
+                            }`}
+                            aria-label="Increase quantity"
+                          >
+                            <Icon name="PlusIcon" size={13} />
+                          </button>
+                        </div>
+                        <p className="font-bold text-primary text-base tabular-nums">
+                          ₱{(item?.menuItem?.price * item?.quantity)?.toLocaleString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <Link
                 href="/menu-browse-screen"
@@ -119,9 +130,9 @@ export default function CartReviewContent() {
             </div>
 
             {/* Order Summary */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 lg:sticky lg:top-24">
               <div
-                className="bg-card rounded-2xl border border-border p-6 sticky top-24"
+                className="bg-card rounded-2xl border border-border p-6"
                 style={{ boxShadow: 'var(--shadow-3d)' }}
               >
                 <h2 className="font-display text-lg font-bold text-foreground mb-5">Order Summary</h2>

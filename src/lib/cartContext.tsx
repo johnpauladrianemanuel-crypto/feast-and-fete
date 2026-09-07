@@ -53,12 +53,23 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const { item, customizations } = action.payload;
       const cartId = buildCartId(item.id, customizations);
       const existing = state.items.find(ci => ci.id === cartId);
+      
+      // Kunin ang stock limit (support sa iba't ibang naming convention tulad ng stock, stocks, stock_left, atbp.)
+      const maxStock = (item as any).stock ?? (item as any).stocks ?? (item as any).stock_left ?? 999;
+      const currentQty = existing ? existing.quantity : 0;
+
+      // Kung ang kasalukuyang dami sa cart ay umabot na o hihigit sa stock, huwag nang magdagdag
+      if (currentQty >= maxStock) {
+        return state;
+      }
+
+      const newQuantity = Math.min(currentQty + 1, maxStock);
 
       if (existing) {
         return {
           ...state,
           items: state.items.map(ci =>
-            ci.id === cartId ? { ...ci, quantity: ci.quantity + 1 } : ci
+            ci.id === cartId ? { ...ci, quantity: newQuantity } : ci
           ),
         };
       }
@@ -66,9 +77,8 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const newItem: CartItem = {
         id: cartId,
         menuItem: item,
-        quantity: 1,
+        quantity: newQuantity,
         customizations,
-        // Safe property extraction with type casting to prevent TS errors
         name: item.name,
         price: item.price,
         image: (item as any).image_url || (item as any).image || '',
@@ -83,18 +93,23 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     case 'REMOVE_ITEM':
       return { ...state, items: state.items.filter(item => item.id !== action.payload) };
 
-    case 'UPDATE_QUANTITY':
+    case 'UPDATE_QUANTITY': {
       if (action.payload.quantity <= 0) {
         return { ...state, items: state.items.filter(item => item.id !== action.payload.id) };
       }
+
       return {
         ...state,
-        items: state.items.map(item =>
-          item.id === action.payload.id
-            ? { ...item, quantity: action.payload.quantity }
-            : item
-        ),
+        items: state.items.map(item => {
+          if (item.id === action.payload.id) {
+            const maxStock = (item.menuItem as any).stock ?? (item.menuItem as any).stocks ?? (item.menuItem as any).stock_left ?? 999;
+            const safeQuantity = Math.min(action.payload.quantity, maxStock);
+            return { ...item, quantity: safeQuantity };
+          }
+          return item;
+        }),
       };
+    }
 
     case 'CLEAR_CART':
       return { ...state, items: [] };
@@ -119,7 +134,6 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 // --- Context Definition ---
 
 interface CartContextValue {
-  // New State & Methods
   state: CartState;
   addItem: (item: MenuItem, customizations?: Record<string, string>) => boolean;
   removeItem: (id: string) => void;
@@ -131,7 +145,6 @@ interface CartContextValue {
   totalItems: number;
   totalAmount: number;
 
-  // Legacy Backwards Compatibility Aliases
   cart: CartItem[];
   addToCart: (item: MenuItem, customizations?: Record<string, string>) => boolean;
   removeFromCart: (id: string) => void;
@@ -147,7 +160,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const auth = useAuth?.() || { user: null };
   const user = auth.user;
 
-  // Load saved cart on initial mount
   useEffect(() => {
     try {
       const savedCart = localStorage.getItem('feast_fete_cart');
@@ -162,7 +174,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Sync cart to localStorage when items update
   useEffect(() => {
     try {
       localStorage.setItem('feast_fete_cart', JSON.stringify(state.items));
@@ -214,7 +225,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         totalItems,
         totalAmount,
 
-        // Backwards compatibility mappings
         cart: state.items,
         addToCart: addItem,
         removeFromCart: removeItem,

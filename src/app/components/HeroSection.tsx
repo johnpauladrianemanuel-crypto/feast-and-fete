@@ -74,7 +74,7 @@ export default function HeroSection() {
 
           {/* Headline */}
           <div className="space-y-1">
-            <p className="hero-v2-overline text-sm font-bold tracking-[0.3em] uppercase">Feast & Fête</p>
+            <p className="text-base lg:text-lg font-bold tracking-[0.3em] uppercase text-[#FFD700] drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Feast & Fête</p>
             <h1 className="hero-v2-headline font-display leading-[0.95] tracking-tight">
               <span className="block text-white">Filipino</span>
               <span className="block hero-v2-gold-word">Food Trays</span>

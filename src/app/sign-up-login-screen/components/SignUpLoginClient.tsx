@@ -1,20 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthCard from '@/app/sign-up-login-screen/components/AuthCard';
 import { ADMIN_PASSWORD } from '@/app/sign-up-login-screen/components/adminPassword';
 import WelcomeSplash from '@/components/WelcomeSplash';
+import { isQuietHoursActive } from '@/lib/quietHours';
+import Icon from '@/components/ui/AppIcon';
 
 export default function SignUpLoginClient() {
   const router = useRouter();
   const [welcomeUser, setWelcomeUser] = useState<string | null>(null);
+  const [isClosed, setIsClosed] = useState(false);
 
   // Admin Modal State
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const checkStatus = () => {
+      setIsClosed(isQuietHoursActive());
+    };
+    checkStatus();
+    const timer = setInterval(checkStatus, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Direct Password Validation Handler
   const handleAdminSubmit = async (e: React.FormEvent) => {
@@ -32,6 +44,27 @@ export default function SignUpLoginClient() {
 
     setLoading(false);
   };
+
+  if (isClosed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="max-w-md w-full p-8 rounded-3xl border border-border/50 bg-surface text-center space-y-6 shadow-2xl">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
+            <Icon name="MoonIcon" size={32} />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-display font-bold text-secondary">We Are Currently Closed</h1>
+            <p className="text-sm text-muted-foreground">
+              Paumanhin, sarado ang aming sistema para sa pre-ordering at login dahil kasalukuyan kaming nasa Quiet Hours. Mangyaring bumalik pagkatapos ng oras ng pahinga.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-secondary/5 border border-secondary/20 text-xs text-secondary font-medium">
+            Quiet Hours Active — Logins are temporarily paused.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (welcomeUser) {
     return (
