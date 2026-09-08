@@ -152,47 +152,49 @@ export default function SignUpLoginClient() {
           </div>
         </div>
 
-        {/* Middle: Hero image grid and copy */}
-        <div className="relative z-10 space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              {
-                src: "https://img.rocket.new/generatedImages/rocket_gen_img_15b5bd873-1765211057457.png",
-                alt: 'Lechon Kawali crispy pork belly Filipino food tray',
-                h: 'h-36',
-                delay: '0.3s'
-              },
-              {
-                src: "https://img.rocket.new/generatedImages/rocket_gen_img_14a51a9d3-1772868034765.png",
-                alt: 'Chicken Inasal Bacolod grilled chicken tray',
-                h: 'h-36',
-                delay: '0.45s'
-              },
-              {
-                src: "https://img.rocket.new/generatedImages/rocket_gen_img_1c8439ecd-1771179335894.png",
-                alt: 'Leche Flan Filipino steamed custard dessert',
-                h: 'h-36',
-                delay: '0.6s'
-              },
-              {
-                src: "https://images.unsplash.com/photo-1630393617712-489929103aae?auto=format&fit=crop&w=800&q=80",
-                alt: 'Festive Filipino food spread for a celebration',
-                h: 'h-36',
-                delay: '0.75s'
-              }
-            ].map((img, i) => (
-              <div
-                key={`auth-img-${i}`}
-                className={`rounded-xl overflow-hidden ${img.h} auth-img-pop`}
-                style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.3)', animationDelay: img.delay }}
-              >
-                <img
-                  src={img.src}
-                  alt={img.alt}
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
-                />
-              </div>
-            ))}
+        {/* Middle: Larger stair-step layout with generous sizing and individual spacing */}
+        <div className="relative z-10 space-y-4">
+          <div className="relative w-full h-88 flex items-center justify-center">
+            <div className="relative w-[520px] h-72">
+              {[
+                {
+                  src: "https://img.rocket.new/generatedImages/rocket_gen_img_15b5bd873-1765211057457.png",
+                  alt: 'Lechon Kawali crispy pork belly Filipino food tray',
+                  customStyle: 'top-0 left-0 -rotate-2 z-10 hover:z-50',
+                  delay: '0.3s'
+                },
+                {
+                  src: "https://img.rocket.new/generatedImages/rocket_gen_img_14a51a9d3-1772868034765.png",
+                  alt: 'Chicken Inasal Bacolod grilled chicken tray',
+                  customStyle: 'top-10 left-[120px] rotate-1 z-20 hover:z-50',
+                  delay: '0.45s'
+                },
+                {
+                  src: "https://img.rocket.new/generatedImages/rocket_gen_img_1c8439ecd-1771179335894.png",
+                  alt: 'Leche Flan Filipino steamed custard dessert',
+                  customStyle: 'top-20 left-[240px] -rotate-1 z-30 hover:z-50',
+                  delay: '0.6s'
+                },
+                {
+                  src: "https://images.unsplash.com/photo-1630393617712-489929103aae?auto=format&fit=crop&w=800&q=80",
+                  alt: 'Festive Filipino food spread for a celebration',
+                  customStyle: 'top-[120px] left-[360px] rotate-2 z-40 hover:z-50',
+                  delay: '0.75s'
+                }
+              ].map((img, i) => (
+                <div
+                  key={`large-stair-step-img-${i}`}
+                  className={`absolute w-[170px] h-[115px] rounded-2xl overflow-hidden border-2 border-white/70 shadow-2xl transition-transform duration-300 hover:scale-110 auth-img-pop ${img.customStyle}`}
+                  style={{ animationDelay: img.delay, background: '#3D0A14' }}
+                >
+                  <img
+                    src={img.src}
+                    alt={img.alt}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="auth-fade-up" style={{ animationDelay: '0.85s' }}>
@@ -200,7 +202,7 @@ export default function SignUpLoginClient() {
               Your Celebration,<br />
               <span className="text-secondary">Perfectly Catered</span>
             </h2>
-            <p className="text-white/60 text-sm mt-3 leading-relaxed">
+            <p className="text-white/60 text-sm mt-2 leading-relaxed">
               Pre-order authentic Filipino food trays for pickup or delivery. No more missed calls — order online, track your feast in real time.
             </p>
           </div>
