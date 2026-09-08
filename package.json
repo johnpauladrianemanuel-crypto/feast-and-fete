@@ -65,7 +65,7 @@
     "react-dom": "19.0.3",
     "react-hook-form": "^7.81.0",
     "recharts": "^2.15.2",
-    "resend": "^6.20.0",
+    "resend": "^6.26.0",
     "sonner": "^1.7.4"
   },
   "devDependencies": {

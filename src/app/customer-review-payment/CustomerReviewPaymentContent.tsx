@@ -157,7 +157,7 @@ export default function CustomerReviewPaymentContent() {
     'Mandaluyong': ['Addition Hills', 'Barangka Drive', 'Highway Hills', 'Hulo', 'Malamig', 'Plainview', 'Pleasant Hills', 'Poblacion', 'San Jose', 'Wack-Wack Greenhills'],
     'Parañaque': ['B F Homes', 'Don Bosco', 'Baclaran', 'Don Galo', 'La Huerta', 'Moonwalk', 'San Dionisio', 'San Isidro', 'Santo Niño', 'Sun Valley', 'Tambo'],
     'Las Piñas': ['Alabang-Zapote', 'BF International', 'Daniel Fajardo', 'Pamplona Uno', 'Pamplona Tres', 'Pilar', 'Pulang Lupa Uno', 'Talon Uno', 'Talon Dos'],
-    'Muntinlupa': ['Alabang', 'Bayanan', 'B declaration', 'Cupang', 'Poblacion', 'Putatan', 'Sucat', 'Tunasan'],
+    'Muntinlupa': ['Alabang', 'Bayanan', 'Cupang', 'Poblacion', 'Putatan', 'Sucat', 'Tunasan'],
     'Marikina': ['Barangka', 'Concepcion Uno', 'Concepcion Dos', 'Industrial Valley', 'Fortune', 'Malanday', 'Marikina Heights', 'Nangka', 'Parang', 'San Roque', 'Santa Elena'],
     'Caloocan': ['Barangay 1 to 188 (North/South Caloocan)', 'Bagong Silang', 'Camarin', 'Deparo', 'Grace Park', 'Monumento', 'Tala'],
     'Valenzuela': ['Arkong Bato', 'Gen. T. de Leon', 'Karuhatan', 'Lawang Bato', 'Malinta', 'Mapulang Lupa', 'Marulas', 'Paso de Blas', 'Poblacion', 'Punturin'],
@@ -290,6 +290,27 @@ export default function CustomerReviewPaymentContent() {
             qty_to_deduct: item.quantity,
           });
         }
+
+        // --- FIXED API URL PATH TO MATCH /api/admin/send-order-email ---
+        try {
+          const itemsSummary = state.items
+            .map(i => `${i.quantity}x ${i.menuItem.name}`)
+            .join(', ');
+
+          await fetch('/api/admin/send-order-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: orderId,
+              customerName: form.fullName,
+              total: total.toLocaleString(),
+              items: itemsSummary,
+            }),
+          });
+        } catch (emailErr) {
+          console.error('Failed to send notification email:', emailErr);
+        }
+        // -------------------------------------------------------------
       }
     } catch (err) {
       console.error('Order error:', err);
@@ -802,7 +823,7 @@ export default function CustomerReviewPaymentContent() {
         </div>
       )}
 
-      {/* TERMS AND CONDITIONS MODAL (Ginawang .jpg ang image path para mabasa na) */}
+      {/* TERMS AND CONDITIONS MODAL */}
       {showTermsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
