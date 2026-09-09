@@ -703,9 +703,10 @@
   }
 
   .hero-v2-overline {
-    color: #7B1C2E;
+    color: #FFD700;
     letter-spacing: 0.3em;
     font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
   }
 
   .hero-v2-headline {
@@ -1331,9 +1332,4 @@
 @keyframes shimmer {
   0%   { background-position: -200% center; }
   100% { background-position: 200% center; }
-}
-
-.hero-v2-overline {
-  color: #FFD700; /* Siguraduhing solid gold o puti */
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); /* Dagdagan ng shadow para lumitaw sa background */
 }

@@ -39,6 +39,75 @@ const STATUS_STYLES: Record<string, string> = {
   Cancelled: 'bg-red-100 text-red-700 border border-red-200',
 };
 
+const REGION_OPTIONS = [
+  { value: 'NCR', label: 'National Capital Region (NCR)' },
+  { value: 'CALABARZON', label: 'Calabarzon (Region IV-A)' },
+  { value: 'CENTRAL_LUZON', label: 'Central Luzon (Region III)' },
+];
+
+const REGION_CITY_MAP: Record<string, string[]> = {
+  NCR: [
+    'Quezon City', 'Manila', 'Makati', 'Pasig', 'Taguig', 'Mandaluyong',
+    'Parañaque', 'Las Piñas', 'Muntinlupa', 'Marikina', 'Caloocan',
+    'Valenzuela', 'Malabon', 'Navotas', 'San Juan', 'Pasay'
+  ],
+  CALABARZON: [
+    'San Mateo (Rizal)', 'Antipolo City', 'Taytay', 'Cainta', 'Rodriguez (Montalban)',
+    'Bacoor City', 'Imus City', 'Dasmariñas City', 'General Trias City',
+    'Calamba City', 'Santa Rosa City', 'Biñan City', 'Cabuyao City',
+    'San Pedro City', 'Lipa City', 'Batangas City'
+  ],
+  CENTRAL_LUZON: [
+    'Angeles City', 'San Fernando City', 'Mabalacat City', 'Malolos City',
+    'Meycauayan City', 'San Jose del Monte City', 'Tarlac City',
+    'Olongapo City', 'Cabanatuan City'
+  ],
+};
+
+const CITY_BARANGAY_MAP: Record<string, string[]> = {
+  'Quezon City': ['Barangay San Jose', 'Barangay Holy Spirit', 'Barangay Tatalon', 'Batasan Hills', 'Commonwealth', 'Cubao', 'Diliman', 'Kamuning', 'Loyola Heights', 'New Manila', 'Novaliches', 'Project 6', 'Teachers Village'],
+  'Manila': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Binondo', 'Ermita', 'Intramuros', 'Malate', 'Paco', 'Pandacan', 'Port Area', 'Quiapo', 'Sampaloc', 'San Miguel', 'San Nicolas', 'Santa Cruz', 'Santa Ana', 'Tondo'],
+  'Makati': ['Poblacion', 'San Antonio', 'Bel-Air', 'Dasmariñas', 'Forbes Park', 'Guadalupe Nuevo', 'Guadalupe Viejo', 'Magallanes', 'Pio del Pilar', 'San Lorenzo', 'Urdaneta'],
+  'Pasig': ['Bagong Ilog', 'Pinagbuhatan', 'Caniogan', 'Kapitolyo', 'Manggahan', 'Maybunga', 'Oranbo', 'Rosario', 'San Antonio', 'San Joaquin', 'Ugong'],
+  'Taguig': ['Central Bicutan', 'Ususan', 'Bambang', 'Fort Bonifacio (BGC)', 'Lower Bicutan', 'Napindan', 'Pinagsama', 'Signal Village', 'Tuktukan', 'Upper Bicutan'],
+  'Mandaluyong': ['Addition Hills', 'Barangka Drive', 'Highway Hills', 'Hulo', 'Malamig', 'Plainview', 'Pleasant Hills', 'Poblacion', 'San Jose', 'Wack-Wack Greenhills'],
+  'Parañaque': ['B F Homes', 'Don Bosco', 'Baclaran', 'Don Galo', 'La Huerta', 'Moonwalk', 'San Dionisio', 'San Isidro', 'Santo Niño', 'Sun Valley', 'Tambo'],
+  'Las Piñas': ['Alabang-Zapote', 'BF International', 'Daniel Fajardo', 'Pamplona Uno', 'Pamplona Tres', 'Pilar', 'Pulang Lupa Uno', 'Talon Uno', 'Talon Dos'],
+  'Muntinlupa': ['Alabang', 'Bayanan', 'Cupang', 'Poblacion', 'Putatan', 'Sucat', 'Tunasan'],
+  'Marikina': ['Barangka', 'Concepcion Uno', 'Concepcion Dos', 'Industrial Valley', 'Fortune', 'Malanday', 'Marikina Heights', 'Nangka', 'Parang', 'San Roque', 'Santa Elena'],
+  'Caloocan': ['Barangay 1 to 188 (North/South Caloocan)', 'Bagong Silang', 'Camarin', 'Deparo', 'Grace Park', 'Monumento', 'Tala'],
+  'Valenzuela': ['Arkong Bato', 'Gen. T. de Leon', 'Karuhatan', 'Lawang Bato', 'Malinta', 'Mapulang Lupa', 'Marulas', 'Paso de Blas', 'Poblacion', 'Punturin'],
+  'Malabon': ['Acacia', 'Catmon', 'Concepcion', 'Dampalit', 'Longos', 'Niugan', 'Potrero', 'San Agustin', 'Tañong', 'Tugatog'],
+  'Navotas': ['Bagumbayan North', 'Bagumbayan South', 'Bangkulasi', 'Daanghari', 'Navotas East', 'Navotas West', 'San Jose', 'San Roque', 'Tangos North', 'Tangos South'],
+  'San Juan': ['Addition Hills', 'Balong-Bato', 'Greenhills', 'Kabayanan', 'Little Baguio', 'Maytunas', 'Onse', 'Pasadena', 'Poblacion', 'Progreso', 'San Perfecta', 'Tibagan'],
+  'Pasay': ['Baclaran', 'Don Carlos Village', 'Malibay', 'Maricaban', 'Poblacion', 'San Jose', 'San Rafael', 'San Roque', 'Villamor Airbase'],
+  'San Mateo (Rizal)': ['Ampid I', 'Ampid II', 'Banaba', 'Dulumbayan', 'Guitnang Bayan I', 'Guitnang Bayan II', 'Gulod Malaya', 'Malanday', 'Maly', 'Pintong Bukawe', 'Santa Ana', 'Santo Niño', 'Silangan', 'Kambal'],
+  'Antipolo City': ['Bagong Nayon', 'Beverly Hills', 'Calawis', 'Cupang', 'Dalig', 'Inarawan', 'Mambugan', 'Mayamot', 'Muntingdilaw', 'San Cruz', 'San Isidro', 'San Jose', 'San Roque'],
+  'Taytay': ['Dolores (Poblacion)', 'Muzon', 'San Juan', 'San Isidro', 'Santa Ana'],
+  'Cainta': ['San Andres', 'San Juan', 'San Roque', 'Santa Rosa', 'Santo Domingo'],
+  'Rodriguez (Montalban)': ['Balite', 'Burgos', 'Geronimo', 'Macabud', 'Manggahan', 'Mascap', 'Rosario', 'San Jose', 'San Rafael'],
+  'Bacoor City': ['Bayanan', 'Habay I', 'Habay II', 'Mambog I', 'Mambog II', 'Molino I', 'Molino II', 'Molino III', 'Molino IV', 'Niog I', 'Niog II', 'Panapaan', 'Salawag', 'Talaba'],
+  'Imus City': ['Anabu I-A', 'Anabu II-A', 'Bucandala', 'Carsadang Bago', 'Malagasang I-A', 'Malagasang II-A', 'Medicion', 'Poblacion', 'Tanzang Luma'],
+  'Dasmariñas City': ['Burol', 'Dasmariñas Bagong Bayan', 'Langkaan I', 'Langkaan II', 'Paliparan I', 'Paliparan II', 'Paliparan III', 'Sabang', 'Salawag', 'Salitran I', 'Salitran II', 'Sampaloc I'],
+  'General Trias City': ['Arnaldo', 'Bacao', 'Manggahan', 'Navarro', 'Pasong Kawayan', 'San Francisco', 'Tejero'],
+  'Calamba City': ['Barandal', 'Bucal', 'Canlubang', 'Halang', 'Lawa', 'Makiling', 'Parian', 'Poblacion', 'Real', 'Saimsim', 'Turbina'],
+  'Santa Rosa City': ['Balibago', 'Dila', 'Dita', 'Don Jose', 'Ibaba', 'Macabling', 'Malitlit', 'Market Area', 'Sinalhan', 'Tagapo'],
+  'Biñan City': ['Caniogan', 'De La Paz', 'Ganado', 'Langkiwa', 'Loma', 'Malaban', 'Platero', 'Poblacion', 'San Antonio', 'San Francisco', 'Santo Tomas'],
+  'Cabuyao City': ['Banaybanay', 'Banlic', 'Bigaa', 'Casile', 'Diezmo', 'Gulod', 'Mamatid', 'Poblacion', 'Pulo', 'Sala'],
+  'San Pedro City': ['Chrysanthemum', 'Cuyab', 'Landayan', 'Langgam', 'Magsaysay', 'Pacita 1', 'Pacita 2', 'Poblacion', 'San Antonio', 'San Vicente', 'United Bayanihan'],
+  'Lipa City': ['Balintawak', 'Inosloban', 'Mataas na Lupa', 'Pangao', 'Poblacion', 'Sabang', 'San Carlos', 'Tambobong', 'Tibig'],
+  'Batangas City': ['Alangilan', 'Balagtas', 'Bolbok', 'Calicanto', 'Cuta', 'Gulod Labac', 'Kumintang Ibaba', 'Kumintang Ilaya', 'Poblacion', 'Soro-soro Karsada'],
+  'Angeles City': ['Balibago', 'Cutcut', 'Malabanias', 'Margardt', 'Pami', 'Pulung Maragul', 'Salapungan', 'Santo Rosario', 'Sapu Bato'],
+  'San Fernando City': ['Calulut', 'Dolores', 'Lacing', 'Magliman', 'Maimpis', 'Palawe', 'San Agustin', 'San Jose', 'Sindalan', 'Telabastagan'],
+  'Mabalacat City': ['Dau', 'Lakandula', 'Mabiga', 'Macapagal Village', 'Poblacion', 'San Francisco', 'Santa Ines', 'Tabun'],
+  'Malolos City': ['Bulihan', 'Cofradia', 'Guinhawa', 'Ligas', 'Longos', 'Lugam', 'Mojon', 'Panasahan', 'San Gabriel', 'San Vicente'],
+  'Meycauayan City': ['Banga', 'Bayugo', 'Calvario', 'Iba', 'Lawa', 'Libtong', 'Perez', 'Poblacion', 'Saluysoy', 'Zamora'],
+  'San Jose del Monte City': ['Fierce', 'Gumaoc', 'Muzon', 'Poblacion', 'Graceville', 'Kaypian', 'San Manuel', 'Santo Cristo', 'Tungkong Mangga'],
+  'Tarlac City': ['Binauganan', 'Central', 'Matatalaib', 'Poblacion', 'San Nicolas', 'San Rafael', 'San Vicente', 'Sepung Calzada', 'Suizo', 'Tibag'],
+  'Olongapo City': ['Barretto', 'East Bajac-Bajac', 'East Tapinac', 'Gordon Heights', 'Kalaklan', 'New Cabalan', 'Old Cabalan', 'Santa Rita', 'West Bajac-Bajac', 'West Tapinac'],
+  'Cabanatuan City': ['Bitas', 'Cabanatuan', 'Mabini Extension', 'Sangitan', 'San Josef', 'Supermarket', 'Aduas Norte', 'Aduas Sur', 'Barangay 1-10'],
+};
+
 function CustomerProfileContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -47,7 +116,21 @@ function CustomerProfileContent() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [form, setForm] = useState({ full_name: '', phone: '', address: '', preferences: '' });
+  const [form, setForm] = useState({ 
+    full_name: '', 
+    phone: '', 
+    region: 'NCR',
+    city: '',
+    barangay: '',
+    street: '',
+    preferences: '' 
+  });
+  
+  // Multiple addresses state
+  const [savedAddresses, setSavedAddresses] = useState<string[]>([]);
+  const [showAddAddressModal, setShowAddAddressModal] = useState(false);
+  const [newAddressForm, setNewAddressForm] = useState({ region: 'NCR', city: '', barangay: '', street: '' });
+
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -74,12 +157,30 @@ function CustomerProfileContent() {
       if (data) {
         setProfile(data);
         setAvatarUrl(data.avatar_url || null);
+        
+        // Parse address if it follows comma-separated format
+        const addrParts = (data.address || '').split(',').map((s: string) => s.trim());
+        const street = addrParts[0] || '';
+        const barangay = addrParts[1] || '';
+        const city = addrParts[2] || '';
+        const region = addrParts[3] || 'NCR';
+
         setForm({
           full_name: data.full_name || '',
           phone: data.phone || '',
-          address: data.address || '',
+          region: region,
+          city: city,
+          barangay: barangay,
+          street: street,
           preferences: data.preferences || '',
         });
+
+        // Load multiple addresses if stored as JSON array or fallback to single address
+        if (data.additional_addresses && Array.isArray(data.additional_addresses)) {
+          setSavedAddresses(data.additional_addresses);
+        } else if (data.address) {
+          setSavedAddresses([data.address]);
+        }
       }
       setProfileLoading(false);
     };
@@ -99,7 +200,6 @@ function CustomerProfileContent() {
       if (data) {
         setRecentOrders(data as OrderSummary[]);
       }
-      // Fetch stats
       const { data: allOrders } = await supabase
         .from('orders')
         .select('status, total_amount')
@@ -117,7 +217,7 @@ function CustomerProfileContent() {
     fetchOrders();
   }, [user]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -148,11 +248,10 @@ function CustomerProfileContent() {
       if (uploadErr) throw uploadErr;
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
       const publicUrl = urlData.publicUrl + `?t=${Date.now()}`;
-      const { error: updateErr } = await supabase
+      await supabase
         .from('user_profiles')
         .update({ avatar_url: urlData.publicUrl })
         .eq('id', user.id);
-      if (updateErr) throw updateErr;
       setAvatarUrl(publicUrl);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Upload failed. Please try again.';
@@ -167,13 +266,38 @@ function CustomerProfileContent() {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
+    const fullAddress = `${form.street}, ${form.barangay}, ${form.city}, ${form.region}`;
+    
     await supabase
       .from('user_profiles')
-      .update({ full_name: form.full_name, phone: form.phone, address: form.address, preferences: form.preferences })
+      .update({ 
+        full_name: form.full_name, 
+        phone: form.phone, 
+        address: fullAddress, 
+        preferences: form.preferences,
+        additional_addresses: savedAddresses 
+      })
       .eq('id', user.id);
+      
     setSaving(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleAddAddressSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const newAddr = `${newAddressForm.street}, ${newAddressForm.barangay}, ${newAddressForm.city}, ${newAddressForm.region}`;
+    const updatedAddresses = [...savedAddresses, newAddr];
+    setSavedAddresses(updatedAddresses);
+
+    await supabase
+      .from('user_profiles')
+      .update({ additional_addresses: updatedAddresses })
+      .eq('id', user.id);
+
+    setShowAddAddressModal(false);
+    setNewAddressForm({ region: 'NCR', city: '', barangay: '', street: '' });
   };
 
   if (loading || profileLoading) {
@@ -206,7 +330,6 @@ function CustomerProfileContent() {
       <CustomerNavbar />
       <CartDrawer />
       <div className="max-w-3xl mx-auto px-4 py-10">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
             <Icon name="ArrowLeftIcon" size={20} />
@@ -217,278 +340,179 @@ function CustomerProfileContent() {
           </div>
         </div>
 
-        {/* Avatar + Verified Contact */}
-        <div className="bg-card border border-border rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-center sm:items-start gap-6" style={{ boxShadow: 'var(--shadow-card)' }}>
-          {/* Avatar */}
+        {/* Avatar Card */}
+        <div className="bg-card border border-border rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-center sm:items-start gap-6">
           <div className="relative group flex-shrink-0">
             <div
               className="w-24 h-24 rounded-full overflow-hidden cursor-pointer ring-4 ring-border hover:ring-primary/50 transition-all shadow-lg"
               onClick={handleAvatarClick}
-              title="Change profile picture"
             >
               {avatarUrl ? (
-                <Image
-                  src={avatarUrl}
-                  alt="Profile picture"
-                  width={96}
-                  height={96}
-                  className="w-full h-full object-cover"
-                  unoptimized
-                />
+                <Image src={avatarUrl} alt="Profile picture" width={96} height={96} className="w-full h-full object-cover" unoptimized />
               ) : (
-                <div className="w-full h-full gradient-brand flex items-center justify-center text-white text-2xl font-bold">
-                  {initials}
-                </div>
+                <div className="w-full h-full gradient-brand flex items-center justify-center text-white text-2xl font-bold">{initials}</div>
               )}
-              <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                {uploading ? (
-                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Icon name="CameraIcon" size={22} className="text-white" />
-                )}
-              </div>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={uploading}
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
           </div>
 
-          {/* Contact Info */}
           <div className="flex-1 text-center sm:text-left">
             <h2 className="text-xl font-bold text-foreground mb-1">{form.full_name || 'Your Name'}</h2>
+            <p className="text-sm text-muted-foreground mb-2">{user?.email}</p>
+          </div>
+        </div>
+
+        {/* Profile Form */}
+        <div className="bg-card border border-border rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Icon name="PencilSquareIcon" size={18} className="text-primary" />
+              Edit Profile & Main Address
+            </h3>
             <button
               type="button"
-              onClick={handleAvatarClick}
-              disabled={uploading}
-              className="text-xs text-primary hover:underline disabled:opacity-50 transition-colors mb-3 block"
+              onClick={() => setShowAddAddressModal(true)}
+              className="px-3 py-1.5 rounded-xl gradient-brand text-primary-foreground text-xs font-bold flex items-center gap-1 btn-3d"
             >
-              {uploading ? 'Uploading…' : 'Change photo'}
+              <Icon name="PlusIcon" size={14} />
+              + Add Address
             </button>
-            {uploadError && (
-              <p className="text-xs text-red-500 mb-2">{uploadError}</p>
-            )}
-
-            {/* Verified Email */}
-            <div className="flex items-center gap-2 justify-center sm:justify-start mb-2">
-              <Icon name="EnvelopeIcon" size={15} className="text-muted-foreground" />
-              <span className="text-sm text-foreground">{user?.email}</span>
-              {isEmailVerified ? (
-                <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
-                  <Icon name="CheckBadgeIcon" size={12} className="text-green-600" />
-                  Verified
-                </span>
-              ) : (
-                <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Unverified</span>
-              )}
-            </div>
-
-            {/* Phone if set */}
-            {form.phone && (
-              <div className="flex items-center gap-2 justify-center sm:justify-start">
-                <Icon name="PhoneIcon" size={15} className="text-muted-foreground" />
-                <span className="text-sm text-foreground">{form.phone}</span>
-              </div>
-            )}
-
-            {profile?.role === 'admin' && (
-              <span className="mt-2 inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full">Admin</span>
-            )}
-          </div>
-        </div>
-
-        {/* Order History Summary */}
-        <div className="bg-card border border-border rounded-2xl p-6 mb-6" style={{ boxShadow: 'var(--shadow-card)' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-              <Icon name="ClipboardDocumentListIcon" size={18} className="text-primary" />
-              Order History
-            </h3>
-            <Link href="/customer-orders" className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
-              View All
-              <Icon name="ArrowRightIcon" size={12} />
-            </Link>
           </div>
 
-          {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-3 mb-5">
-            <div className="bg-muted rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-foreground">{orderStats.total}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Total Orders</p>
-            </div>
-            <div className="bg-muted rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-green-600">{orderStats.completed}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Completed</p>
-            </div>
-            <div className="bg-muted rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-primary">₱{orderStats.totalSpent.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Total Spent</p>
-            </div>
-          </div>
-
-          {/* Recent Orders */}
-          {ordersLoading ? (
-            <div className="flex justify-center py-4">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : recentOrders.length === 0 ? (
-            <div className="text-center py-6">
-              <Icon name="ShoppingBagIcon" size={32} className="text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No orders yet. Start ordering!</p>
-              <Link href="/menu-browse-screen" className="mt-3 inline-block text-sm text-primary hover:underline font-medium">
-                Browse Menu →
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {recentOrders.map(order => (
-                <Link
-                  key={order.id}
-                  href={`/order-status?order=${order.order_number}`}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 gradient-brand rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Icon name="ReceiptPercentIcon" size={14} className="text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">#{order.order_number}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(order.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[order.status] || 'bg-muted text-muted-foreground'}`}>
-                      {order.status}
-                    </span>
-                    <span className="text-sm font-bold text-foreground">₱{order.total_amount?.toLocaleString()}</span>
-                    <Icon name="ChevronRightIcon" size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Editable Profile Form */}
-        <div className="bg-card border border-border rounded-2xl p-6 mb-6" style={{ boxShadow: 'var(--shadow-card)' }}>
-          <h3 className="text-base font-bold text-foreground mb-5 flex items-center gap-2">
-            <Icon name="PencilSquareIcon" size={18} className="text-primary" />
-            Edit Profile
-          </h3>
           <form onSubmit={handleSave} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
-              <input
-                type="text"
-                name="full_name"
-                value={form.full_name}
-                onChange={handleChange}
-                placeholder="Enter your full name"
-                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={user?.email || ''}
-                  disabled
-                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-muted text-muted-foreground cursor-not-allowed pr-24"
-                />
-                {isEmailVerified && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-medium text-green-600">
-                    <Icon name="CheckBadgeIcon" size={14} className="text-green-600" />
-                    Verified
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Email cannot be changed here.</p>
+              <input type="text" name="full_name" value={form.full_name} onChange={handleChange} className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground" />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
-              <input
-                type="tel"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                placeholder="Enter your phone number"
-                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
-              />
+              <input type="tel" name="phone" value={form.phone} onChange={handleChange} className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground" />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Delivery Address</label>
-              <textarea
-                name="address"
-                value={form.address}
-                onChange={handleChange}
-                rows={3}
-                placeholder="Enter your default delivery address"
-                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition resize-none"
-              />
+            {/* Structured Address */}
+            <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
+              <label className="block text-sm font-semibold text-foreground">Default Delivery Address</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Region</label>
+                  <select name="region" value={form.region} onChange={handleChange} className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
+                    {REGION_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">City</label>
+                  <select name="city" value={form.city} onChange={handleChange} className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
+                    <option value="">Select city</option>
+                    {(REGION_CITY_MAP[form.region] || []).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Barangay</label>
+                  <select name="barangay" value={form.barangay} onChange={handleChange} className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
+                    <option value="">Select barangay</option>
+                    {(CITY_BARANGAY_MAP[form.city] || []).map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Street Address / Unit No.</label>
+                <input type="text" name="street" value={form.street} onChange={handleChange} className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground" />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Dietary Preferences
-                <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>
-              </label>
-              <textarea
-                name="preferences"
-                value={form.preferences}
-                onChange={handleChange}
-                rows={2}
-                placeholder="e.g. No pork, vegetarian, allergic to shellfish…"
-                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition resize-none"
-              />
-              <p className="text-xs text-muted-foreground mt-1">We'll note your preferences when preparing your orders.</p>
-            </div>
+            {/* Saved Addresses List */}
+            {savedAddresses.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Saved Delivery Locations</label>
+                <div className="space-y-2">
+                  {savedAddresses.map((addr, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-border bg-muted/40 text-xs">
+                      <span className="text-foreground">{addr}</span>
+                      <button
+                        type="button"
+                        onClick={() => setForm(prev => {
+                          const parts = addr.split(',').map(s => s.trim());
+                          return { ...prev, street: parts[0] || '', barangay: parts[1] || '', city: parts[2] || '', region: parts[3] || 'NCR' };
+                        })}
+                        className="text-primary font-semibold hover:underline"
+                      >
+                        Set as Default
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            <div className="flex items-center gap-3 pt-1">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 py-2.5 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition disabled:opacity-60"
-              >
+            <div className="flex items-center gap-3 pt-2">
+              <button type="submit" disabled={saving} className="flex-1 py-2.5 gradient-brand text-white font-semibold rounded-xl transition">
                 {saving ? 'Saving…' : 'Save Changes'}
               </button>
-              {saveSuccess && (
-                <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
-                  <Icon name="CheckCircleIcon" size={18} />
-                  Saved!
-                </span>
-              )}
+              {saveSuccess && <span className="text-sm text-green-600 font-medium">Saved!</span>}
             </div>
           </form>
         </div>
-
-        {/* Quick links */}
-        <div className="grid grid-cols-2 gap-4">
-          <Link
-            href="/customer-orders"
-            className="flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 hover:bg-muted transition-colors"
-          >
-            <Icon name="ClipboardDocumentListIcon" size={20} className="text-primary" />
-            <span className="text-sm font-medium text-foreground">Order History</span>
-          </Link>
-          <Link
-            href="/customer-notifications"
-            className="flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 hover:bg-muted transition-colors"
-          >
-            <Icon name="BellIcon" size={20} className="text-primary" />
-            <span className="text-sm font-medium text-foreground">Notifications</span>
-          </Link>
-        </div>
       </div>
+
+      {/* Add Address Modal */}
+      {showAddAddressModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-foreground mb-4">Add New Delivery Address</h3>
+            <form onSubmit={handleAddAddressSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Region</label>
+                <select 
+                  value={newAddressForm.region} 
+                  onChange={e => setNewAddressForm(p => ({ ...p, region: e.target.value, city: '', barangay: '' }))}
+                  className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground"
+                >
+                  {REGION_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">City / Municipality</label>
+                <select 
+                  value={newAddressForm.city} 
+                  onChange={e => setNewAddressForm(p => ({ ...p, city: e.target.value, barangay: '' }))}
+                  className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground"
+                >
+                  <option value="">Select city</option>
+                  {(REGION_CITY_MAP[newAddressForm.region] || []).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Barangay</label>
+                <select 
+                  value={newAddressForm.barangay} 
+                  onChange={e => setNewAddressForm(p => ({ ...p, barangay: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground"
+                >
+                  <option value="">Select barangay</option>
+                  {(CITY_BARANGAY_MAP[newAddressForm.city] || []).map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Street Address</label>
+                <input 
+                  type="text" 
+                  value={newAddressForm.street} 
+                  onChange={e => setNewAddressForm(p => ({ ...p, street: e.target.value }))}
+                  placeholder="Street / Unit No." 
+                  className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground"
+                  required 
+                />
+              </div>
+
+              <div className="flex gap-2 pt-3">
+                <button type="button" onClick={() => setShowAddAddressModal(false)} className="w-1/2 py-2.5 rounded-xl border border-border text-sm">Cancel</button>
+                <button type="submit" className="w-1/2 py-2.5 rounded-xl gradient-brand text-primary-foreground text-sm font-bold">Save Address</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

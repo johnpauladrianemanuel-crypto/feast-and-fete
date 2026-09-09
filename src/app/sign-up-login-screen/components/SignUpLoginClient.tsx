@@ -128,32 +128,56 @@ export default function SignUpLoginClient() {
     <div className="min-h-screen flex flex-col lg:flex-row-reverse auth-page-root" style={{ background: 'var(--background)' }}>
       {/* Brand panel (Right side on desktop) */}
       <div
-        className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-12 relative overflow-hidden auth-brand-panel"
-        style={{ background: 'linear-gradient(160deg, #7B1C2E 0%, #5A1020 45%, #3D0A14 100%)' }}
+        className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-12 relative overflow-hidden auth-brand-panel bg-black"
       >
-        {/* Decorative circles */}
-        <div
-          className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10 auth-float-a"
-          style={{ background: 'radial-gradient(circle, #D4A017 0%, transparent 70%)', transform: 'translate(30%, -30%)' }}
-        />
-        <div
-          className="absolute bottom-1/3 left-0 w-48 h-48 rounded-full opacity-10 auth-float-b"
-          style={{ background: 'radial-gradient(circle, #D4A017 0%, transparent 70%)', transform: 'translate(-40%, 0)' }}
-        />
-
-        {/* Top: Logo */}
-        <div className="flex items-center gap-3 relative z-10 auth-fade-up" style={{ animationDelay: '0.2s' }}>
-          <div className="w-10 h-10 gradient-gold rounded-xl flex items-center justify-center" style={{ boxShadow: '0 4px 12px rgba(212,160,23,0.4)' }}>
-            <span className="text-lg">🍽️</span>
-          </div>
-          <div>
-            <p className="font-display text-xl font-bold text-white leading-none">Feast & Fête</p>
-            <p className="text-xs text-white/50 mt-0.5">Filipino Food Tray Catering</p>
+        {/* Full-height sliding background covering top to bottom using the 4 food images directly */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 flex items-center whitespace-nowrap animate-slide-track h-full">
+            <div className="flex items-center space-x-0 h-full">
+              {[
+                "https://img.rocket.new/generatedImages/rocket_gen_img_15b5bd873-1765211057457.png",
+                "https://img.rocket.new/generatedImages/rocket_gen_img_14a51a9d3-1772868034765.png",
+                "https://img.rocket.new/generatedImages/rocket_gen_img_1c8439ecd-1771179335894.png",
+                "https://images.unsplash.com/photo-1630393617712-489929103aae?auto=format&fit=crop&w=800&q=80"
+              ].map((src, index) => (
+                <div key={`full-slide-1-${index}`} className="w-[450px] h-full min-h-screen flex-shrink-0 relative">
+                  <img src={src} alt="Catering food background" className="w-full h-full object-cover filter brightness-105 contrast-105" />
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center space-x-0 h-full" aria-hidden="true">
+              {[
+                "https://img.rocket.new/generatedImages/rocket_gen_img_15b5bd873-1765211057457.png",
+                "https://img.rocket.new/generatedImages/rocket_gen_img_14a51a9d3-1772868034765.png",
+                "https://img.rocket.new/generatedImages/rocket_gen_img_1c8439ecd-1771179335894.png",
+                "https://images.unsplash.com/photo-1630393617712-489929103aae?auto=format&fit=crop&w=800&q=80"
+              ].map((src, index) => (
+                <div key={`full-slide-2-${index}`} className="w-[450px] h-full min-h-screen flex-shrink-0 relative">
+                  <img src={src} alt="Catering food background" className="w-full h-full object-cover filter brightness-105 contrast-105" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
+        {/* Pinagaan at mas maliwanag na overlay para luminaw ang sliding pictures */}
+        <div className="absolute inset-0 bg-black/20 pointer-events-none z-0" />
+
+        {/* Decorative circles */}
+        <div
+          className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10 auth-float-a z-10"
+          style={{ background: 'radial-gradient(circle, #D4A017 0%, transparent 70%)', transform: 'translate(30%, -30%)' }}
+        />
+        <div
+          className="absolute bottom-1/3 left-0 w-48 h-48 rounded-full opacity-10 auth-float-b z-10"
+          style={{ background: 'radial-gradient(circle, #D4A017 0%, transparent 70%)', transform: 'translate(-40%, 0)' }}
+        />
+
+        {/* Top spacing placeholder to balance layout */}
+        <div className="relative z-20"></div>
+
         {/* Middle: Larger stair-step layout with generous sizing and individual spacing */}
-        <div className="relative z-10 space-y-4">
+        <div className="relative z-20 space-y-4">
           <div className="relative w-full h-88 flex items-center justify-center">
             <div className="relative w-[520px] h-72">
               {[
@@ -202,14 +226,14 @@ export default function SignUpLoginClient() {
               Your Celebration,<br />
               <span className="text-secondary">Perfectly Catered</span>
             </h2>
-            <p className="text-white/60 text-sm mt-2 leading-relaxed">
+            <p className="text-white/80 text-sm mt-2 leading-relaxed font-medium">
               Pre-order authentic Filipino food trays for pickup or delivery. No more missed calls — order online, track your feast in real time.
             </p>
           </div>
         </div>
 
-        {/* Bottom: Stats */}
-        <div className="flex items-center gap-6 relative z-10">
+        {/* Bottom: Stats with improved contrast */}
+        <div className="flex items-center gap-6 relative z-20">
           {[
             { value: '500+', label: 'Happy customers', delay: '1s' },
             { value: '22', label: 'Menu items', delay: '1.1s' },
@@ -221,14 +245,24 @@ export default function SignUpLoginClient() {
               style={{ animationDelay: stat.delay }}
             >
               <p className="font-display text-xl font-bold text-secondary">{stat.value}</p>
-              <p className="text-xs text-white/40">{stat.label}</p>
+              <p className="text-xs text-stone-100 font-medium">{stat.label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Auth Card Panel (Left side on desktop) */}
+      {/* Auth Card Panel (Left side on desktop) with precisely aligned logo container matching AuthCard width */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 auth-right-panel relative">
+        <div className="w-full max-w-md mb-8 flex items-center gap-4 auth-fade-up" style={{ animationDelay: '0.1s' }}>
+          <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/90 p-1.5 shadow-md flex items-center justify-center border border-amber-200/60 backdrop-blur-md flex-shrink-0">
+            <img src="/assets/images/Logo123.png" alt="Feast & Fête Logo" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <p className="font-display text-xl font-bold tracking-wide" style={{ color: '#7B1C2E' }}>Feast & Fête</p>
+            <p className="text-xs text-stone-500 tracking-wider font-medium uppercase">Filipino Food Tray Catering</p>
+          </div>
+        </div>
+
         <AuthCard onSuccess={(name) => setWelcomeUser(name)} />
 
         {/* Admin Access Modal */}
@@ -297,6 +331,21 @@ export default function SignUpLoginClient() {
           </div>
         )}
       </div>
+
+      {/* Tailwind keyframes injection for smooth continuous sliding track */}
+      <style jsx global>{`
+        @keyframes slideTrack {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+        .animate-slide-track {
+          animation: slideTrack 40s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }
