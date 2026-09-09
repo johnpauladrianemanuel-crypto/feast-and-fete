@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { MenuItem } from '@/lib/supabase/services';
 
@@ -159,6 +159,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [], isOpen: false });
   const auth = useAuth?.() || { user: null };
   const user = auth.user;
+  const previousUserId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     try {
@@ -181,6 +182,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
       console.error('Failed to save cart to localStorage:', e);
     }
   }, [state.items]);
+
+  useEffect(() => {
+    const currentUserId = user?.id ?? null;
+    const didLogOut = previousUserId.current != null && currentUserId === null;
+
+    if (didLogOut) {
+      dispatch({ type: 'CLEAR_CART' });
+      localStorage.removeItem('feast_fete_cart');
+    }
+
+    previousUserId.current = currentUserId;
+  }, [user]);
 
   const totalItems = state.items.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = state.items.reduce(
