@@ -1,4 +1,5 @@
 import { createClient } from './client';
+import { MENU_ITEMS } from '@/lib/mockData';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ export interface MenuItem {
   servingSize: string;
   image: string;
   imageAlt: string;
+  ingredients?: string;
   isActive: boolean;
   unavailableReason?: string;
   stock: number;
@@ -73,17 +75,30 @@ export interface AdminNotification {
 
 function rowToMenuItem(row: Record<string, unknown>): MenuItem {
   const rawActive = row.is_active ?? row.isActive;
+  const description = String(row.description ?? '');
+  const localDescription = MENU_ITEMS.find(item => item.id === row.id)?.description;
+  const localBaseDescription = localDescription?.split(/\s+Ingredients:\s*/i, 2)[0].trim();
+  const descriptionIngredients = description.match(/\s+Ingredients:\s*(.*)$/i)?.[1]?.trim() ?? '';
+  const localIngredients = localDescription?.match(/\s+Ingredients:\s*(.*)$/i)?.[1]?.trim() ?? '';
+  const cleanDescription = description.replace(/\s+Ingredients:\s*.*$/i, '').trim();
+  const resolvedDescription =
+    localDescription &&
+    localBaseDescription &&
+    cleanDescription === localBaseDescription
+      ? localBaseDescription
+      : cleanDescription;
   
   return {
     id: row.id as string,
     name: row.name as string,
     category: row.category as string,
     categorySlug: row.category_slug as string,
-    description: row.description as string,
+    description: resolvedDescription,
     price: Number(row.price),
     servingSize: (row.serving_size as string) || (row.servingSize as string) || '',
     image: row.image as string,
     imageAlt: row.image_alt as string,
+    ingredients: String(row.ingredients ?? '').trim() || descriptionIngredients || localIngredients,
     isActive: rawActive !== undefined && rawActive !== null ? Boolean(rawActive) : true,
     unavailableReason: (row.unavailable_reason as string) || (row.unavailableReason as string) || '',
     stock: Number(row.stock),
@@ -203,6 +218,7 @@ export async function updateMenuItem(
     serving_size: string;
     servingSize: string;
     description: string;
+    ingredients: string;
     is_active: boolean;
     isActive: boolean;
     unavailable_reason: string | null;
@@ -221,6 +237,7 @@ export async function updateMenuItem(
   if (updates.price !== undefined) payload.price = Number(updates.price);
   if (updates.stock !== undefined) payload.stock = Number(updates.stock);
   if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.ingredients !== undefined) payload.ingredients = updates.ingredients;
   if (updates.featured !== undefined) payload.featured = Boolean(updates.featured);
 
   if (updates.serving_size !== undefined) {
@@ -248,6 +265,13 @@ export async function updateMenuItem(
   if (Object.keys(payload).length === 0) return;
 
   const { error } = await supabase.from('menu_items').update(payload).eq('id', id);
+  if (error && updates.ingredients !== undefined) {
+    const legacyPayload = { ...payload };
+    delete legacyPayload.ingredients;
+    const { error: legacyError } = await supabase.from('menu_items').update(legacyPayload).eq('id', id);
+    if (legacyError) throw new Error(legacyError.message);
+    return;
+  }
   if (error) throw new Error(error.message);
 }
 

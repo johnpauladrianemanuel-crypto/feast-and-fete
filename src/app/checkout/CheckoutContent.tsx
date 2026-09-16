@@ -204,6 +204,11 @@ export default function CheckoutContent() {
 
     const deliveryAddress = sessionStorage.getItem('feastfete_pending_delivery_address') || '';
     const orderId = `FF-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+    const itemNotes = state.items
+      .filter(item => item.note?.trim())
+      .map(item => `${item.menuItem.name}: ${item.note?.trim()}`)
+      .join('\n');
+    const orderNotes = [form.notes.trim(), itemNotes].filter(Boolean).join('\n\n');
 
     try {
       const supabase = createClient();
@@ -222,7 +227,7 @@ export default function CheckoutContent() {
           event_date: form.eventDate,
           event_time: form.eventTime,
           payment_method: form.paymentMethod,
-          notes: form.notes,
+          notes: orderNotes,
           subtotal: totalAmount,
           delivery_fee: deliveryFee,
           total_amount: total,
@@ -246,8 +251,16 @@ export default function CheckoutContent() {
           quantity: item.quantity,
           unit_price: item.menuItem.price,
           subtotal: item.menuItem.price * item.quantity,
+          notes: item.note || null,
         }));
-        await supabase.from('order_items').insert(itemsToInsert);
+        const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
+        if (itemsError && itemsToInsert.some(item => item.notes)) {
+          const legacyItems = itemsToInsert.map(({ notes, ...item }) => item);
+          const { error: legacyItemsError } = await supabase.from('order_items').insert(legacyItems);
+          if (legacyItemsError) throw legacyItemsError;
+        } else if (itemsError) {
+          throw itemsError;
+        }
       }
     } catch (err) {
       console.error('Supabase order save error:', err);
@@ -267,7 +280,7 @@ export default function CheckoutContent() {
       eventDate: form.eventDate,
       eventTime: form.eventTime,
       paymentMethod: form.paymentMethod,
-      notes: form.notes,
+      notes: orderNotes,
       items: state.items,
       subtotal: totalAmount,
       deliveryFee,

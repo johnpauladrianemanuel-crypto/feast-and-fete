@@ -14,6 +14,7 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  notes: string | null;
 }
 
 export interface Order {
@@ -293,6 +294,9 @@ export default function OrderDetailModal({
                 <div key={item.id} className="p-3.5 flex items-center justify-between text-sm bg-card">
                   <div>
                     <p className="font-medium text-foreground">{item.menu_item_name}</p>
+                    {item.notes && (
+                      <p className="text-xs text-amber-700 mt-1 italic">Note: {item.notes}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Qty: {item.quantity} × ₱{Number(item.unit_price).toLocaleString()}
                     </p>

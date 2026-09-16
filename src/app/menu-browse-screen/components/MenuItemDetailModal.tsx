@@ -59,6 +59,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
   const [addedPulse, setAddedPulse] = useState(false);
   const [visible, setVisible] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [orderNote, setOrderNote] = useState('');
   const [selectedCustomizations, setSelectedCustomizations] = useState<Record<string, string>>(() => {
     const defaults: Record<string, string> = {};
     item.customizations?.forEach(c => { defaults[c.id] = c.defaultValue; });
@@ -67,6 +68,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
 
   useEffect(() => {
     setQuantity(1);
+    setOrderNote('');
     const newDefaults: Record<string, string> = {};
     item.customizations?.forEach(c => { newDefaults[c.id] = c.defaultValue; });
     setSelectedCustomizations(newDefaults);
@@ -97,7 +99,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
 
   function handleAdd() {
     const customizationsToSave = Object.keys(selectedCustomizations).length > 0 ? selectedCustomizations : undefined;
-    for (let i = 0; i < quantity; i++) addItem(item, customizationsToSave);
+    for (let i = 0; i < quantity; i++) addItem(item, customizationsToSave, orderNote);
     setAddedPulse(true);
     setTimeout(() => setAddedPulse(false), 800);
     toast.success(`${quantity}× ${item.name} added!`, {
@@ -299,6 +301,17 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               </p>
             </div>
 
+            {item.ingredients && (
+              <div>
+                <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>
+                  Ingredients
+                </h3>
+                <p style={{ fontSize: '14px', color: 'var(--muted-foreground)', lineHeight: 1.6, margin: 0 }}>
+                  {item.ingredients}
+                </p>
+              </div>
+            )}
+
             {/* Customizations */}
             {item.customizations && item.customizations.length > 0 && (
               <>
@@ -342,6 +355,21 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                 </div>
               </>
             )}
+
+            <div>
+              <label htmlFor="dish-order-note" style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>
+                Note for this dish
+              </label>
+              <textarea
+                id="dish-order-note"
+                value={orderNote}
+                onChange={e => setOrderNote(e.target.value)}
+                rows={2}
+                maxLength={240}
+                placeholder="e.g. Less spicy, sauce on the side"
+                style={{ width: '100%', resize: 'vertical', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', fontSize: '14px', color: 'var(--foreground)', background: '#ffffff', outline: 'none' }}
+              />
+            </div>
 
             {/* Quantity + Add to Cart */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingTop: '8px' }}>

@@ -11,6 +11,7 @@ export interface CartItem {
   menuItem: MenuItem;
   quantity: number;
   customizations?: Record<string, string>;
+  note?: string;
   // Backwards compatibility fields for legacy components
   name?: string;
   price?: number;
@@ -23,7 +24,7 @@ interface CartState {
 }
 
 type CartAction =
-  | { type: 'ADD_ITEM'; payload: { item: MenuItem; customizations?: Record<string, string> } }
+  | { type: 'ADD_ITEM'; payload: { item: MenuItem; customizations?: Record<string, string>; note?: string } }
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'UPDATE_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'CLEAR_CART' }
@@ -34,14 +35,14 @@ type CartAction =
 
 // --- Helper Functions ---
 
-function buildCartId(itemId: string, customizations?: Record<string, string>): string {
-  if (!customizations || Object.keys(customizations).length === 0) {
-    return `cart-${itemId}`;
-  }
-  const suffix = Object.entries(customizations)
+function buildCartId(itemId: string, customizations?: Record<string, string>, note?: string): string {
+  const customizationSuffix = Object.entries(customizations ?? {})
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}:${v}`)
+    .map(([key, value]) => `${key}:${value}`)
     .join('|');
+  const noteSuffix = note?.trim() ? `|note:${note.trim()}` : '';
+  const suffix = `${customizationSuffix}${noteSuffix}`;
+  if (!suffix) return `cart-${itemId}`;
   return `cart-${itemId}-${suffix}`;
 }
 
@@ -50,8 +51,8 @@ function buildCartId(itemId: string, customizations?: Record<string, string>): s
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_ITEM': {
-      const { item, customizations } = action.payload;
-      const cartId = buildCartId(item.id, customizations);
+      const { item, customizations, note } = action.payload;
+      const cartId = buildCartId(item.id, customizations, note);
       const existing = state.items.find(ci => ci.id === cartId);
       
       // Kunin ang stock limit (support sa iba't ibang naming convention tulad ng stock, stocks, stock_left, atbp.)
@@ -79,6 +80,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         menuItem: item,
         quantity: newQuantity,
         customizations,
+        note: note?.trim() || undefined,
         name: item.name,
         price: item.price,
         image: (item as any).image_url || (item as any).image || '',
@@ -135,7 +137,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
 interface CartContextValue {
   state: CartState;
-  addItem: (item: MenuItem, customizations?: Record<string, string>) => boolean;
+  addItem: (item: MenuItem, customizations?: Record<string, string>, note?: string) => boolean;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -146,7 +148,7 @@ interface CartContextValue {
   totalAmount: number;
 
   cart: CartItem[];
-  addToCart: (item: MenuItem, customizations?: Record<string, string>) => boolean;
+  addToCart: (item: MenuItem, customizations?: Record<string, string>, note?: string) => boolean;
   removeFromCart: (id: string) => void;
   totalPrice: number;
 }
@@ -201,7 +203,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     0
   );
 
-  const addItem = (item: MenuItem, customizations?: Record<string, string>): boolean => {
+  const addItem = (item: MenuItem, customizations?: Record<string, string>, note?: string): boolean => {
     let hasAccess = false;
     try {
       const guestProfileId = localStorage.getItem('guestProfileId');
@@ -212,7 +214,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     if (!hasAccess) return false;
 
-    dispatch({ type: 'ADD_ITEM', payload: { item, customizations } });
+    dispatch({ type: 'ADD_ITEM', payload: { item, customizations, note } });
     return true;
   };
 

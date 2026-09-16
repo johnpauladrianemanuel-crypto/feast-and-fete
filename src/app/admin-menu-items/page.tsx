@@ -40,6 +40,20 @@ const INITIAL_NEW_ITEM: NewMenuItemData = {
   featured: false,
 };
 
+function splitDescription(description: string) {
+  const [mainDescription, ingredients] = description.split(/\s+Ingredients:\s*/i, 2);
+  return {
+    description: mainDescription.trim(),
+    ingredients: ingredients?.trim() ?? '',
+  };
+}
+
+function joinDescription(description: string, ingredients: string) {
+  const cleanDescription = description.trim();
+  const cleanIngredients = ingredients.trim();
+  return cleanIngredients ? `${cleanDescription} Ingredients: ${cleanIngredients}` : cleanDescription;
+}
+
 export default function AdminMenuItemsPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +61,7 @@ export default function AdminMenuItemsPage() {
   const [filterCategory, setFilterCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
+  const [editIngredients, setEditIngredients] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Add Item Modal state
@@ -188,18 +203,30 @@ export default function AdminMenuItemsPage() {
     }
   };
 
+  const openEditItem = (item: MenuItem) => {
+    const parts = splitDescription(item.description);
+    setEditItem({ ...item, description: parts.description });
+    setEditIngredients(parts.ingredients);
+  };
+
   const saveEdit = async () => {
     if (!editItem) return;
+    const updatedItem = {
+      ...editItem,
+      description: joinDescription(editItem.description, editIngredients),
+      ingredients: editIngredients.trim(),
+    };
     setSaving(true);
     try {
-      await updateMenuItem(editItem.id, {
-        name: editItem.name,
-        price: editItem.price,
-        stock: editItem.stock,
-        serving_size: editItem.servingSize,
-        description: editItem.description,
+      await updateMenuItem(updatedItem.id, {
+        name: updatedItem.name,
+        price: updatedItem.price,
+        stock: updatedItem.stock,
+        serving_size: updatedItem.servingSize,
+        description: updatedItem.description,
+        ingredients: updatedItem.ingredients,
       });
-      setItems(prev => prev.map(i => (i.id === editItem.id ? editItem : i)));
+      setItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
       setEditItem(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Save failed');
@@ -416,11 +443,18 @@ export default function AdminMenuItemsPage() {
                       </div>
                       <div className="flex gap-2 pt-1">
                         <button
-                          onClick={() => setEditItem(item)}
+                          onClick={() => openEditItem(item)}
                           className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors"
                           style={{ background: 'rgba(212,160,23,0.12)', color: '#D4A017', border: '1px solid rgba(212,160,23,0.3)' }}
                         >
                           Edit
+                        </button>
+                        <button
+                          onClick={() => openEditItem(item)}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                          style={{ background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.3)' }}
+                        >
+                          Ingredients
                         </button>
                         <button
                           onClick={() => handleToggleClick(item)}
@@ -721,6 +755,22 @@ export default function AdminMenuItemsPage() {
                   className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
                   style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--admin-muted)' }}>
+                  Ingredients
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. pork belly, vinegar, soy sauce, garlic"
+                  value={editIngredients}
+                  onChange={e => setEditIngredients(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
+                  style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                />
+                <p className="mt-1 text-xs" style={{ color: 'var(--admin-muted)' }}>
+                  Separate ingredients with commas. Leave blank to remove the ingredient list.
+                </p>
               </div>
             </div>
             <div className="flex gap-3 pt-2">

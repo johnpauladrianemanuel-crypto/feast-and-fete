@@ -127,6 +127,7 @@ export default function MenuBrowseContent() {
     servingSize: item.servingSize,
     image: item.image,
     imageAlt: item.imageAlt,
+    ingredients: item.ingredients,
     isActive: item.isActive,
     unavailableReason: item.unavailableReason,
     stock: item.stock,

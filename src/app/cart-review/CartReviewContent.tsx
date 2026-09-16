@@ -74,6 +74,9 @@ export default function CartReviewContent() {
                         <h3 className="font-display text-base font-semibold text-foreground">{item?.menuItem?.name}</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">{item?.menuItem?.servingSize}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{item?.menuItem?.category}</p>
+                        {item?.note && (
+                          <p className="text-xs text-muted-foreground mt-1 italic">Note: {item.note}</p>
+                        )}
                       </div>
                       <button
                         onClick={() => removeItem(item?.menuItem?.id)}

@@ -121,6 +121,9 @@ export default function CartDrawer() {
                         })}
                       </div>
                     )}
+                    {item?.note && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">Note: {item.note}</p>
+                    )}
                     <p className="text-sm font-bold text-primary mt-1">₱{(item?.menuItem?.price * item?.quantity)?.toLocaleString()}</p>
                   </div>
                   <div className="flex flex-col items-end justify-between gap-2 flex-shrink-0">
