@@ -21,6 +21,8 @@ interface OrderData {
   subtotal: number;
   deliveryFee: number;
   total: number;
+  orderType?: 'normal' | 'priority';
+  priorityFee?: number;
   isGuest?: boolean;
   guestProfileId?: string | null;
 }
@@ -109,6 +111,11 @@ export default function OrderConfirmationContent() {
             <span className="font-mono text-base font-bold text-primary tracking-wider">{order.orderId}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-2">Save this order number for tracking</p>
+          {order.orderType === 'priority' && (
+            <div className="inline-flex items-center mt-3 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold">
+              PRIORITY ORDER
+            </div>
+          )}
         </div>
 
         {/* Guest Order Tracking Link */}

@@ -85,8 +85,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const metaDataPayload: Record<string, string> = {};
-    if ((metadata as any)?.fullName) metaDataPayload.full_name = (metadata as any).fullName;
-    if ((metadata as any)?.avatarUrl) metaDataPayload.avatar_url = (metadata as any).avatarUrl;
+    const metadataFields: Record<string, string | undefined> = {
+      full_name: (metadata as any)?.fullName,
+      avatar_url: (metadata as any)?.avatarUrl,
+      phone: (metadata as any)?.phone,
+      address: (metadata as any)?.address,
+    };
+    Object.entries(metadataFields).forEach(([key, value]) => {
+      if (value) metaDataPayload[key] = value;
+    });
 
     if (Object.keys(metaDataPayload).length > 0) {
       signUpOptions.options.data = metaDataPayload;

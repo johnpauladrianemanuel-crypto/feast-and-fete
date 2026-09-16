@@ -6,19 +6,18 @@ import { toast } from 'sonner';
 import { generateSalesReportPDF, ReportOrder } from '@/lib/generateSalesReportPDF';
 import { createClient } from '@/lib/supabase/client';
 
-type DateRangeOption = '15days' | '1month' | '2months' | '3months';
+type DateRangeOption = '15days' | '1month' | '2months' | 'all';
 
 interface RangeConfig {
   label: string;
   days?: number;
-  isFixedRange?: boolean;
 }
 
 const RANGE_CONFIGS: Record<DateRangeOption, RangeConfig> = {
-  '15days': { label: 'Aug 1 - Aug 15', isFixedRange: true },
+  '15days': { label: '1-15 Days', days: 15 },
   '1month': { label: '1 Month', days: 30 },
   '2months': { label: '2 Months', days: 60 },
-  '3months': { label: '3 Months', days: 90 },
+  all: { label: 'Export All' },
 };
 
 export default function QuickActions() {
@@ -47,19 +46,10 @@ export default function QuickActions() {
       const supabase = createClient();
       let query = supabase.from('orders').select('*');
 
-      if (rangeKey === '15days') {
-        // Fixed range: Aug 1 to Aug 15 of current year
-        const currentYear = new Date().getFullYear();
-        const startDate = new Date(currentYear, 7, 1, 0, 0, 0, 0); // Month index 7 = August
-        const endDate = new Date(currentYear, 7, 15, 23, 59, 59, 999);
-
-        query = query
-          .gte('created_at', startDate.toISOString())
-          .lte('created_at', endDate.toISOString());
-      } else {
-        // Rolling relative range
+      if (range.days) {
+        // Use a rolling period ending today.
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - (range.days || 30));
+        startDate.setDate(startDate.getDate() - range.days);
         startDate.setHours(0, 0, 0, 0);
 
         query = query.gte('created_at', startDate.toISOString());

@@ -12,6 +12,9 @@ import { createClient } from '@/lib/supabase/client';
 
 type PaymentMethod = 'cash_on_delivery' | 'gcash';
 type DeliveryMethod = 'delivery' | 'pickup';
+type OrderType = 'normal' | 'priority';
+
+const PRIORITY_FEE = 500;
 
 interface AddressForm {
   fullName: string;
@@ -50,6 +53,7 @@ export default function CustomerReviewPaymentContent() {
   const today = new Date().toISOString().split('T')[0];
 
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
+  const [orderType, setOrderType] = useState<OrderType>('normal');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash_on_delivery');
   const [form, setForm] = useState<AddressForm>({
     fullName: '',
@@ -74,9 +78,11 @@ export default function CustomerReviewPaymentContent() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsError, setTermsError] = useState('');
+  const profileFieldsLocked = Boolean(user && savedAddress);
 
   const deliveryFee = deliveryMethod === 'delivery' ? 150 : 0;
-  const total = totalAmount + deliveryFee;
+  const priorityFee = orderType === 'priority' ? PRIORITY_FEE : 0;
+  const total = totalAmount + deliveryFee + priorityFee;
   const itemCount = state.items.reduce((s, i) => s + i.quantity, 0);
 
   useEffect(() => {
@@ -101,13 +107,18 @@ export default function CustomerReviewPaymentContent() {
       .single()
       .then(({ data }) => {
         if (data) {
-          setSavedAddress(data.address || '');
+          const addressParts = (data.address || '').split(',').map((part: string) => part.trim());
+          const profileAddress = data.address || '';
+          setSavedAddress(profileAddress);
           setForm(prev => ({
             ...prev,
             fullName: data.full_name || prev.fullName,
             email: data.email || user.email || prev.email,
             phone: data.phone || prev.phone,
-            street: data.address || prev.street,
+            street: addressParts[0] || prev.street,
+            barangay: addressParts[1] || prev.barangay,
+            city: addressParts[2] || prev.city,
+            region: addressParts[3] || prev.region,
           }));
         } else {
           setForm(prev => ({ ...prev, email: user.email || prev.email }));
@@ -257,6 +268,8 @@ export default function CustomerReviewPaymentContent() {
           event_date: form.eventDate,
           event_time: form.eventTime,
           payment_method: paymentMethod,
+          is_priority: orderType === 'priority',
+          priority_fee: priorityFee,
           notes: form.notes,
           subtotal: totalAmount,
           delivery_fee: deliveryFee,
@@ -334,6 +347,8 @@ export default function CustomerReviewPaymentContent() {
       items: state.items,
       subtotal: totalAmount,
       deliveryFee,
+      orderType,
+      priorityFee,
       total,
       isGuest: !user && !!guestProfile,
       guestProfileId: guestProfile?.id ?? null,
@@ -479,7 +494,8 @@ export default function CustomerReviewPaymentContent() {
                         value={form.fullName}
                         onChange={handleChange}
                         placeholder="Juan dela Cruz"
-                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.fullName ? 'border-error' : 'border-border'}`}
+                        readOnly={profileFieldsLocked}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.fullName ? 'border-error' : 'border-border'}`}
                       />
                       {errors.fullName && <p className="text-xs text-error mt-1">{errors.fullName}</p>}
                     </div>
@@ -490,7 +506,8 @@ export default function CustomerReviewPaymentContent() {
                         value={form.phone}
                         onChange={handleChange}
                         placeholder="09XX XXX XXXX"
-                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.phone ? 'border-error' : 'border-border'}`}
+                        readOnly={profileFieldsLocked}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.phone ? 'border-error' : 'border-border'}`}
                       />
                       {errors.phone && <p className="text-xs text-error mt-1">{errors.phone}</p>}
                     </div>
@@ -504,7 +521,8 @@ export default function CustomerReviewPaymentContent() {
                       value={form.email}
                       onChange={handleChange}
                       placeholder="juan@example.com"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.email ? 'border-error' : 'border-border'}`}
+                      readOnly={profileFieldsLocked}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.email ? 'border-error' : 'border-border'}`}
                     />
                     {errors.email && <p className="text-xs text-error mt-1">{errors.email}</p>}
                   </div>
@@ -518,7 +536,8 @@ export default function CustomerReviewPaymentContent() {
                             name="region"
                             value={form.region}
                             onChange={e => setForm(prev => ({ ...prev, region: e.target.value, city: '', barangay: '' }))}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                            disabled={profileFieldsLocked}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-muted/50 disabled:cursor-not-allowed"
                           >
                             {REGION_OPTIONS.map(r => (
                               <option key={r.value} value={r.value}>{r.label}</option>
@@ -532,7 +551,8 @@ export default function CustomerReviewPaymentContent() {
                             name="city"
                             value={form.city}
                             onChange={e => setForm(prev => ({ ...prev, city: e.target.value, barangay: '' }))}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                            disabled={profileFieldsLocked}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-muted/50 disabled:cursor-not-allowed"
                           >
                             <option value="">Select city</option>
                             {(REGION_CITY_MAP[form.region || 'NCR'] || []).map(city => (
@@ -547,7 +567,8 @@ export default function CustomerReviewPaymentContent() {
                             name="barangay"
                             value={form.barangay}
                             onChange={e => setForm(prev => ({ ...prev, barangay: e.target.value }))}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                            disabled={profileFieldsLocked}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-muted/50 disabled:cursor-not-allowed"
                           >
                             <option value="">Select barangay</option>
                             {((CITY_BARANGAY_MAP as Record<string, string[]>)[form.city] || []).map(b => (
@@ -576,7 +597,8 @@ export default function CustomerReviewPaymentContent() {
                           value={form.street}
                           onChange={handleChange}
                           placeholder="123 Rizal St., House / Unit No."
-                          className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.street ? 'border-error' : 'border-border'}`}
+                          readOnly={profileFieldsLocked}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.street ? 'border-error' : 'border-border'}`}
                         />
                         {errors.street && <p className="text-xs text-error mt-1">{errors.street}</p>}
                       </div>
@@ -623,10 +645,41 @@ export default function CustomerReviewPaymentContent() {
                 </div>
               </section>
 
-              {/* Payment Method */}
+              {/* Order Priority */}
               <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
                 <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2 mb-5">
                   <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">3</span>
+                  Order Priority
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([
+                    { value: 'normal' as const, label: 'Normal Order', description: 'Standard preparation queue', fee: 0 },
+                    { value: 'priority' as const, label: 'Priority Order', description: `Move to the front of the queue +₱${PRIORITY_FEE}`, fee: PRIORITY_FEE },
+                  ]).map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setOrderType(option.value)}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        orderType === option.value ? 'border-primary bg-primary/5' : 'border-border bg-background hover:border-primary/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className={`text-sm font-semibold ${orderType === option.value ? 'text-primary' : 'text-foreground'}`}>
+                          {option.label}
+                        </span>
+                        {orderType === option.value && <Icon name="CheckCircleIcon" size={18} className="text-primary" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {/* Payment Method */}
+              <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
+                <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2 mb-5">
+                  <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">4</span>
                   Payment Method
                 </h2>
 
@@ -693,6 +746,12 @@ export default function CustomerReviewPaymentContent() {
                     <span className="text-muted-foreground">Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})</span>
                     <span className="text-foreground tabular-nums">₱{totalAmount.toLocaleString()}</span>
                   </div>
+                  {priorityFee > 0 && (
+                    <div className="flex justify-between text-sm text-amber-700">
+                      <span>Priority order fee</span>
+                      <span className="tabular-nums">₱{priorityFee.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Delivery fee</span>
                     <span className="text-foreground tabular-nums">
@@ -715,7 +774,7 @@ export default function CustomerReviewPaymentContent() {
 
                 {/* TERMS AND CONDITIONS LINK / STATUS */}
                 <div className="mb-4 pt-2">
-                  <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${agreedToTerms ? 'bg-primary/5 border-primary/30 text-primary font-medium' : 'bg-muted/40 border-border text-muted-foreground'}`}>
+                  <div className={`p-3 rounded-xl border text-xs flex flex-col items-center justify-center gap-2 text-center ${agreedToTerms ? 'bg-primary/5 border-primary/30 text-primary font-medium' : 'bg-muted/40 border-border text-muted-foreground'}`}>
                     <span>
                       {agreedToTerms ? '✓ Terms and Conditions agreed.' : 'Please read and agree to our Terms.'}
                     </span>

@@ -24,6 +24,7 @@ interface Order {
   delivery_method: string;
   total_amount: number;
   payment_method: string;
+  is_priority: boolean;
   status: OrderStatus;
   created_at: string;
   order_items: OrderItem[];
@@ -71,7 +72,12 @@ export default function RecentOrdersTable() {
         .select('*, order_items(*)')
         .order('created_at', { ascending: false })
         .limit(50);
-      setOrders((data as Order[]) || []);
+      const sortedOrders = ((data as Order[]) || []).sort((a, b) => {
+        const priorityDifference = Number(Boolean(b.is_priority)) - Number(Boolean(a.is_priority));
+        if (priorityDifference !== 0) return priorityDifference;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      setOrders(sortedOrders);
     } catch {
       // silently fail
     } finally {
@@ -189,7 +195,14 @@ export default function RecentOrdersTable() {
                   }}
                 >
                   <td className="px-4 py-3">
-                    <span className="text-xs font-bold font-mono" style={{ color: '#D4A017' }}>{order.order_number}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold font-mono" style={{ color: '#D4A017' }}>{order.order_number}</span>
+                      {order.is_priority && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(245,158,11,0.18)', color: '#FBBF24' }}>
+                          PRIORITY
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

@@ -149,12 +149,29 @@ function CustomerProfileContent() {
     if (!user) return;
     const fetchProfile = async () => {
       setProfileLoading(true);
-      const { data } = await supabase
+      let { data } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', user.id)
         .single();
       if (data) {
+        const metadata = user.user_metadata || {};
+        const metadataAddress = metadata.address || '';
+        const needsMetadataBackfill = Boolean(
+          (metadata.phone && !data.phone) || (metadataAddress && !data.address)
+        );
+        if (needsMetadataBackfill) {
+          const { data: updatedProfile } = await supabase
+            .from('user_profiles')
+            .update({
+              phone: data.phone || metadata.phone,
+              address: data.address || metadataAddress,
+            })
+            .eq('id', user.id)
+            .select('*')
+            .single();
+          if (updatedProfile) data = updatedProfile;
+        }
         setProfile(data);
         setAvatarUrl(data.avatar_url || null);
         
@@ -268,7 +285,7 @@ function CustomerProfileContent() {
     setSaving(true);
     const fullAddress = `${form.street}, ${form.barangay}, ${form.city}, ${form.region}`;
     
-    await supabase
+    const { error } = await supabase
       .from('user_profiles')
       .update({ 
         full_name: form.full_name, 
@@ -278,8 +295,12 @@ function CustomerProfileContent() {
         additional_addresses: savedAddresses 
       })
       .eq('id', user.id);
-      
+
     setSaving(false);
+    if (error) {
+      setUploadError(error.message);
+      return;
+    }
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };

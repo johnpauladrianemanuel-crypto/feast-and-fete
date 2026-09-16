@@ -69,7 +69,12 @@ export default function AdminOrdersPage() {
       if (fetchError) {
         setError('Failed to load orders. Please try again.');
       } else {
-        setOrders((data as Order[]) || []);
+        const sortedOrders = ((data as Order[]) || []).sort((a, b) => {
+          const priorityDifference = Number(Boolean(b.is_priority)) - Number(Boolean(a.is_priority));
+          if (priorityDifference !== 0) return priorityDifference;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        setOrders(sortedOrders);
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -381,7 +386,14 @@ export default function AdminOrdersPage() {
                       }}
                     >
                       <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: '#D4A017' }}>
-                        {order.order_number}
+                        <div className="flex items-center gap-2">
+                          {order.is_priority && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(245,158,11,0.18)', color: '#FBBF24' }}>
+                              PRIORITY
+                            </span>
+                          )}
+                          {order.order_number}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium" style={{ color: '#F5EDE0' }}>

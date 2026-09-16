@@ -30,6 +30,8 @@ export interface Order {
   subtotal: number;
   delivery_fee: number;
   total_amount: number;
+  is_priority: boolean;
+  priority_fee: number;
   status: OrderStatus;
   notes: string | null;
   created_at: string;
@@ -169,6 +171,11 @@ export default function OrderDetailModal({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-lg font-bold text-primary">#{order.order_number}</span>
+              {order.is_priority && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                  PRIORITY
+                </span>
+              )}
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text}`}>
                 {currentStatus}
               </span>
@@ -305,6 +312,12 @@ export default function OrderDetailModal({
                 <div className="flex justify-between text-muted-foreground">
                   <span>Delivery Fee</span>
                   <span>₱{Number(order.delivery_fee).toLocaleString()}</span>
+                </div>
+              )}
+              {Number(order.priority_fee) > 0 && (
+                <div className="flex justify-between text-amber-700">
+                  <span>Priority Order Fee</span>
+                  <span>₱{Number(order.priority_fee).toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border mt-2">
