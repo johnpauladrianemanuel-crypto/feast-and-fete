@@ -49,6 +49,7 @@ export default function AdminOrdersPage() {
   const [search, setSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [cancelRequest, setCancelRequest] = useState<{ orderId: string; reason: string }>({ orderId: '', reason: '' });
   
   // State para sa Modal Form ng Completed & Cancelled Orders
   const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -181,6 +182,24 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
+    if (newStatus === 'Cancelled') {
+      setCancelRequest({ orderId, reason: '' });
+      return;
+    }
+
+    updateStatus(orderId, newStatus);
+  };
+
+  const confirmCancellation = async () => {
+    const reason = cancelRequest.reason.trim();
+    if (!reason) return;
+
+    const orderId = cancelRequest.orderId;
+    setCancelRequest({ orderId: '', reason: '' });
+    await updateStatus(orderId, 'Cancelled', reason);
+  };
+
   // Active orders (Lahat maliban sa Completed at Cancelled)
   const activeOrders = orders.filter((o) => o.status !== 'Completed' && o.status !== 'Cancelled');
 
@@ -224,7 +243,7 @@ export default function AdminOrdersPage() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--admin-bg)' }}>
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto scrollbar-thin">
+      <main className="min-w-0 flex-1 overflow-y-auto scrollbar-thin">
         <AdminTopbar />
         <div className="px-6 lg:px-8 py-6 max-w-screen-2xl mx-auto space-y-6">
           {/* Page Header */}
@@ -357,18 +376,21 @@ export default function AdminOrdersPage() {
           {/* Table */}
           {!loading && (
             <div
-              className="rounded-2xl overflow-hidden"
+              className="overflow-x-auto rounded-2xl scrollbar-thin"
               style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}
             >
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[1120px] text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--admin-border)' }}>
                     {['Order #', 'Customer', 'Items', 'Total', 'Method', 'Payment', 'Status', 'Actions'].map(
                       (h) => (
                         <th
                           key={h}
-                          className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide"
-                          style={{ color: 'var(--admin-muted)' }}
+                          className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${h === 'Actions' ? 'sticky right-0 z-10' : ''}`}
+                          style={{
+                            color: 'var(--admin-muted)',
+                            ...(h === 'Actions' ? { background: 'var(--admin-surface)', boxShadow: '-8px 0 12px rgba(0,0,0,0.12)' } : {}),
+                          }}
                         >
                           {h}
                         </th>
@@ -395,7 +417,10 @@ export default function AdminOrdersPage() {
                           {order.order_number}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td
+                        className="sticky right-0 px-4 py-3"
+                        style={{ background: 'var(--admin-surface)', boxShadow: '-8px 0 12px rgba(0,0,0,0.12)' }}
+                      >
                         <p className="font-medium" style={{ color: 'var(--admin-text)' }}>
                           {order.customer_name}
                         </p>
@@ -459,7 +484,7 @@ export default function AdminOrdersPage() {
                           <select
                             value={order.status}
                             disabled={updatingId === order.id}
-                            onChange={(e) => updateStatus(order.id, e.target.value as OrderStatus)}
+                            onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
                             className="px-2 py-1.5 rounded-lg text-xs outline-none cursor-pointer"
                             style={{
                               border: '1px solid var(--admin-border)',
@@ -588,18 +613,21 @@ export default function AdminOrdersPage() {
 
               {/* Archive Table inside Modal */}
               <div
-                className="rounded-2xl overflow-hidden border"
+                className="overflow-x-auto rounded-2xl border scrollbar-thin"
                 style={{ background: 'var(--admin-surface)', borderColor: 'var(--admin-border)' }}
               >
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[1120px] text-sm">
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--admin-border)' }}>
                       {['Order #', 'Customer', 'Items', 'Total', 'Method', 'Payment', 'Status', 'Actions'].map(
                         (h) => (
                           <th
                             key={h}
-                            className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide"
-                            style={{ color: 'var(--admin-muted)' }}
+                            className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${h === 'Actions' ? 'sticky right-0 z-10' : ''}`}
+                            style={{
+                              color: 'var(--admin-muted)',
+                              ...(h === 'Actions' ? { background: 'var(--admin-surface)', boxShadow: '-8px 0 12px rgba(0,0,0,0.12)' } : {}),
+                            }}
                           >
                             {h}
                           </th>
@@ -619,7 +647,10 @@ export default function AdminOrdersPage() {
                         <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: '#D4A017' }}>
                           {order.order_number}
                         </td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="sticky right-0 px-4 py-3"
+                          style={{ background: 'var(--admin-surface)', boxShadow: '-8px 0 12px rgba(0,0,0,0.12)' }}
+                        >
                           <p className="font-medium" style={{ color: '#F5EDE0' }}>
                             {order.customer_name}
                           </p>
@@ -668,7 +699,7 @@ export default function AdminOrdersPage() {
                             <select
                               value={order.status}
                               disabled={updatingId === order.id}
-                              onChange={(e) => updateStatus(order.id, e.target.value as OrderStatus)}
+                              onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
                               className="px-2 py-1.5 rounded-lg text-xs outline-none cursor-pointer"
                               style={{
                                 border: '1px solid var(--admin-border)',
@@ -728,6 +759,53 @@ export default function AdminOrdersPage() {
           onStatusUpdate={updateStatus}
           updatingId={updatingId}
         />
+      )}
+
+      {cancelRequest.orderId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div
+            className="w-full max-w-md rounded-2xl border p-6 shadow-2xl"
+            style={{ background: 'var(--admin-bg)', borderColor: 'var(--admin-border)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-order-title"
+          >
+            <h2 id="cancel-order-title" className="text-lg font-bold" style={{ color: '#F5EDE0' }}>
+              Cancel order
+            </h2>
+            <p className="mt-1 text-sm" style={{ color: 'var(--admin-muted)' }}>
+              Please provide a reason. This will be saved with the order.
+            </p>
+            <textarea
+              autoFocus
+              value={cancelRequest.reason}
+              onChange={(event) => setCancelRequest((prev) => ({ ...prev, reason: event.target.value }))}
+              placeholder="Enter cancellation reason..."
+              rows={4}
+              className="mt-4 w-full resize-none rounded-xl p-3 text-sm outline-none"
+              style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelRequest({ orderId: '', reason: '' })}
+                className="rounded-xl px-4 py-2 text-sm font-medium"
+                style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+              >
+                Keep order
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancellation}
+                disabled={!cancelRequest.reason.trim() || updatingId === cancelRequest.orderId}
+                className="rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: '#B91C1C', color: '#FFF7ED' }}
+              >
+                Confirm cancellation
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

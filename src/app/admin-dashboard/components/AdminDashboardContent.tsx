@@ -12,6 +12,18 @@ import { fetchInventoryItems, InventoryItem } from '@/lib/supabase/services';
 export default function AdminDashboardContent() {
   const [dismissedBanner, setDismissedBanner] = useState(false);
   const [criticalItems, setCriticalItems] = useState<InventoryItem[]>([]);
+  const [greeting, setGreeting] = useState('Good morning');
+
+  const updateGreeting = useCallback(() => {
+    const hour = new Date().getHours();
+    setGreeting(hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening');
+  }, []);
+
+  useEffect(() => {
+    updateGreeting();
+    const greetingInterval = window.setInterval(updateGreeting, 60_000);
+    return () => window.clearInterval(greetingInterval);
+  }, [updateGreeting]);
 
   const loadInventory = useCallback(async () => {
     try {
@@ -39,7 +51,7 @@ export default function AdminDashboardContent() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>
-              Good morning, Admin 👋
+              {greeting}, Admin 👋
             </h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>
               Here is what needs your attention today.

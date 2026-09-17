@@ -36,6 +36,21 @@ function getNotificationIcon(type: AdminNotification['type']): string {
   }
 }
 
+const READ_NOTIFICATIONS_KEY = 'feastfete_admin_read_notifications';
+
+function getLocallyReadNotificationIds(): Set<string> {
+  try {
+    const stored = JSON.parse(localStorage.getItem(READ_NOTIFICATIONS_KEY) || '[]');
+    return new Set(Array.isArray(stored) ? stored : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveLocallyReadNotificationIds(ids: Set<string>) {
+  localStorage.setItem(READ_NOTIFICATIONS_KEY, JSON.stringify([...ids]));
+}
+
 export default function AdminTopbar() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
@@ -44,7 +59,11 @@ export default function AdminTopbar() {
   const loadNotifications = useCallback(async () => {
     try {
       const data = await fetchAdminNotifications();
-      setNotifications(data);
+      const locallyRead = getLocallyReadNotificationIds();
+      setNotifications(data.map((notification) => ({
+        ...notification,
+        read: notification.read || locallyRead.has(notification.id),
+      })));
     } catch {
       // silently fail
     }
@@ -87,6 +106,9 @@ export default function AdminTopbar() {
   const handleMarkRead = async (id: string) => {
     try {
       await markAdminNotificationRead(id);
+      const locallyRead = getLocallyReadNotificationIds();
+      locallyRead.add(id);
+      saveLocallyReadNotificationIds(locallyRead);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n))
       );
@@ -98,6 +120,9 @@ export default function AdminTopbar() {
   const handleMarkAllRead = async () => {
     try {
       await markAllAdminNotificationsRead();
+      const locallyRead = getLocallyReadNotificationIds();
+      notifications.forEach((notification) => locallyRead.add(notification.id));
+      saveLocallyReadNotificationIds(locallyRead);
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch {
       // silently fail

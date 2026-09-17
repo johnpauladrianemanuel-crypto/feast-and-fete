@@ -76,6 +76,21 @@ const STATUS_MESSAGES: Record<OrderStatus, { title: string; message: (orderNum: 
   },
 };
 
+const CUSTOMER_READ_NOTIFICATIONS_KEY = 'feastfete_customer_read_notifications';
+
+function getReadNotificationIds(userId: string): Set<string> {
+  try {
+    const stored = JSON.parse(localStorage.getItem(`${CUSTOMER_READ_NOTIFICATIONS_KEY}_${userId}`) || '[]');
+    return new Set(Array.isArray(stored) ? stored : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveReadNotificationIds(userId: string, ids: Set<string>) {
+  localStorage.setItem(`${CUSTOMER_READ_NOTIFICATIONS_KEY}_${userId}`, JSON.stringify([...ids]));
+}
+
 function buildNotificationsFromOrders(orders: Order[]): CustomerNotification[] {
   const notifications: CustomerNotification[] = [];
 
@@ -236,6 +251,7 @@ export default function CustomerNavbar() {
   const fetchOrdersAndNotifications = useCallback(async () => {
     if (!user) {
       setNotifications([]);
+      setReadIds(new Set());
       return;
     }
 
@@ -248,6 +264,7 @@ export default function CustomerNavbar() {
     if (!error && data) {
       const built = buildNotificationsFromOrders(data as Order[]);
       setNotifications(built);
+      setReadIds(getReadNotificationIds(user.id));
     }
   }, [user, supabase]);
 
@@ -275,11 +292,19 @@ export default function CustomerNavbar() {
   }, [user, supabase, fetchOrdersAndNotifications]);
 
   const markRead = (id: string) => {
-    setReadIds((prev) => new Set([...prev, id]));
+    if (!user) return;
+    setReadIds((prev) => {
+      const next = new Set([...prev, id]);
+      saveReadNotificationIds(user.id, next);
+      return next;
+    });
   };
 
   const markAllRead = () => {
-    setReadIds(new Set(notifications.map((n) => n.id)));
+    if (!user) return;
+    const next = new Set(notifications.map((n) => n.id));
+    setReadIds(next);
+    saveReadNotificationIds(user.id, next);
   };
 
   const isRead = (n: CustomerNotification) => n.read || readIds.has(n.id);

@@ -15,106 +15,98 @@ interface ReportOptions {
   generatedBy?: string;
 }
 
+async function loadLogo(): Promise<string | null> {
+  try {
+    const response = await fetch('/assets/images/Logo123.png');
+    if (!response.ok) return null;
+
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function generateSalesReportPDF(
   orders: ReportOrder[],
   options: ReportOptions = {}
-) {
-  const doc = new jsPDF();
+): Promise<void> {
+  return (async () => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+    const logo = await loadLogo();
   const dateRangeLabel = options.dateRangeLabel || 'Sales Report';
   const generatedBy = options.generatedBy || 'Admin Representative';
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
 
-  // --- Header Styling ---
-  doc.setFillColor(26, 15, 10); // Brand Dark Color
-  doc.rect(0, 0, 210, 38, 'F');
+    if (logo) {
+      doc.addImage(logo, 'PNG', pageWidth - margin - 23, 10, 23, 23);
+    }
 
-  // Title & Subtitle
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.setTextColor(212, 160, 23); // Gold Color
-  doc.text('Feast & Fête', 14, 18);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(82, 82, 82);
+    doc.text('PRINTABLE SALES REPORT', margin, 19);
+    doc.text(dateRangeLabel.toUpperCase(), margin, 28);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(230, 213, 184);
-  doc.text(`Official Sales Report — ${dateRangeLabel}`, 14, 26);
+    doc.setDrawColor(60, 60, 60);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 33, pageWidth - margin, 33);
 
-  // Metadata Box
-  doc.setFontSize(9);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Range: ${dateRangeLabel}`, 14, 46);
-  doc.text(
-    `Generated: ${new Date().toLocaleDateString('en-US', {
+    const generatedDate = new Date().toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-    })}`,
-    14,
-    52
-  );
-  doc.text(`Prepared By: ${generatedBy}`, 14, 58);
+    });
 
-  // --- Summary Card ---
-  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    autoTable(doc, {
+      startY: 38,
+      margin: { left: margin, right: margin },
+      head: [['REPORT RANGE', 'ASSOCIATE NAME', 'SIGNATURE', 'REPORT COMPLETION DATE']],
+      body: [[dateRangeLabel, generatedBy, '', generatedDate]],
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 8, textColor: [30, 30, 30], cellPadding: 2.5, lineColor: [0, 0, 0], lineWidth: 0.25 },
+      headStyles: { fillColor: [203, 212, 222], textColor: [20, 20, 20], fontStyle: 'bold', halign: 'center' },
+      columnStyles: { 0: { cellWidth: 39 }, 1: { cellWidth: 39 }, 2: { cellWidth: 39 }, 3: { cellWidth: 45 } },
+    });
 
-  doc.setFillColor(245, 240, 235);
-  doc.roundedRect(120, 42, 76, 22, 3, 3, 'F');
+    const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+    const dayHeaders = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    const weeklyRows = orders.map((order) => {
+      const dayCells = dayHeaders.map(() => '');
+      const date = order.created_at ? new Date(order.created_at) : null;
+      const dayIndex = date ? (date.getDay() + 6) % 7 : -1;
+      const amount = `PHP ${Number(order.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+      if (dayIndex >= 0) dayCells[dayIndex] = amount;
+      const customerAndItems = `${order.customer_name || 'Guest'} - ${order.items_summary || 'Food Items'}`;
+      return [customerAndItems, ...dayCells, amount];
+    });
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(120, 100, 90);
-  doc.text('TOTAL PERIOD REVENUE', 125, 49);
+    const filledRows = weeklyRows.length > 0 ? weeklyRows : [['', '', '', '', '', '', '', '', '']];
+    while (filledRows.length < 19) filledRows.push(['', '', '', '', '', '', '', '', '']);
 
-  doc.setFontSize(13);
-  doc.setTextColor(26, 15, 10);
-  doc.text(
-    `PHP ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-    125,
-    58
-  );
+    autoTable(doc, {
+      startY: (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable!.finalY + 10,
+      margin: { left: margin, right: margin },
+      head: [['CUSTOMER / ORDER ITEMS', ...dayHeaders, 'TOTAL']],
+      body: filledRows,
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 7, textColor: [25, 25, 25], cellPadding: 1.8, lineColor: [0, 0, 0], lineWidth: 0.25, minCellHeight: 6.5 },
+      headStyles: { fillColor: [203, 212, 222], textColor: [20, 20, 20], fontStyle: 'bold', halign: 'center', minCellHeight: 9 },
+      columnStyles: { 0: { cellWidth: 47 }, 1: { cellWidth: 15 }, 2: { cellWidth: 15 }, 3: { cellWidth: 15 }, 4: { cellWidth: 15 }, 5: { cellWidth: 15 }, 6: { cellWidth: 15 }, 7: { cellWidth: 15 }, 8: { cellWidth: 28 } },
+    });
 
-  // Prepare autoTable Rows
-  const tableRows = orders.map((o) => [
-    o.created_at
-      ? new Date(o.created_at).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })
-      : 'N/A',
-    `#${o.id}`,
-    o.customer_name || 'Guest',
-    o.items_summary || 'Food Items',
-    o.status || 'Completed',
-    `PHP ${Number(o.total_amount || 0).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-    })}`,
-  ]);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(70, 70, 70);
+    doc.text(`TOTAL PERIOD SALES: PHP ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, margin, 272);
 
-  // Render Table
-  autoTable(doc, {
-    startY: 68,
-    head: [['Date', 'Order ID', 'Customer', 'Items Summary', 'Status', 'Total']],
-    body: tableRows,
-    theme: 'grid',
-    headStyles: {
-      fillColor: [26, 15, 10],
-      textColor: [212, 160, 23],
-      fontSize: 9,
-      fontStyle: 'bold',
-    },
-    bodyStyles: {
-      fontSize: 8,
-      textColor: [50, 50, 50],
-    },
-    alternateRowStyles: {
-      fillColor: [250, 248, 245],
-    },
-    columnStyles: {
-      5: { halign: 'right', fontStyle: 'bold' },
-    },
-  });
-
-  // Save File
-  const safeLabel = dateRangeLabel.replace(/\s+/g, '_');
-  doc.save(`Sales_Report_${safeLabel}.pdf`);
+    const safeLabel = dateRangeLabel.replace(/\s+/g, '_');
+    doc.save(`Sales_Report_${safeLabel}.pdf`);
+  })();
 }

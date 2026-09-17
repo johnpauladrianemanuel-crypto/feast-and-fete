@@ -884,9 +884,9 @@ export default function CustomerReviewPaymentContent() {
 
       {/* TERMS AND CONDITIONS MODAL */}
       {showTermsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:p-4">
+          <div className="bg-card border border-border rounded-2xl flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden p-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 sm:max-h-[calc(100dvh-2rem)] sm:p-6">
+            <div className="flex shrink-0 items-center justify-between mb-3 sm:mb-4">
               <h3 className="text-lg font-bold text-foreground">Terms and Conditions</h3>
               <button
                 type="button"
@@ -897,7 +897,7 @@ export default function CustomerReviewPaymentContent() {
               </button>
             </div>
 
-            <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-muted/5 p-2 mb-4">
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-muted/5 p-2 mb-3 sm:mb-4">
               <AppImage
                 src="/assets/images/image2.jpg"
                 alt="Terms and Conditions"
@@ -907,7 +907,7 @@ export default function CustomerReviewPaymentContent() {
               />
             </div>
 
-            <div className="mb-5 p-3 rounded-xl bg-muted/30 border border-border">
+            <div className="mb-3 shrink-0 rounded-xl border border-border bg-muted/30 p-3 sm:mb-5">
               <label className="flex items-start gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -924,7 +924,7 @@ export default function CustomerReviewPaymentContent() {
               </label>
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex shrink-0 justify-end gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setShowTermsModal(false)}

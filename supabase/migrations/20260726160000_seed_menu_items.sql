@@ -79,8 +79,8 @@ BEGIN
     ('item-010', 'Chicken Afritada', 'Chicken', 'chicken',
      'Chicken pieces braised in a vibrant tomato-based sauce with potatoes, carrots, bell peppers, and green peas. A Filipino household staple.',
      620, 'Good for 8–10 persons',
-     'https://img.rocket.new/generatedImages/rocket_gen_img_1b8f554d2-1773070447030.png',
-     'Chicken Afritada Filipino chicken stew in tomato sauce with vegetables in a tray',
+    'https://upload.wikimedia.org/wikipedia/commons/b/bf/Chicken_Afritada%2C_Mar_2024.jpg',
+    'Chicken Afritada Filipino chicken stew in tomato sauce with potatoes, carrots, bell peppers, and green peas',
      true, 22, 145, false, NULL),
 
     ('item-011', 'Chicken Tinola', 'Chicken', 'chicken',

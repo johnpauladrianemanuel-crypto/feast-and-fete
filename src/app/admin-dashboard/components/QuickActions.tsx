@@ -44,7 +44,7 @@ export default function QuickActions() {
       toast.info(`Fetching ${range.label} order records...`);
 
       const supabase = createClient();
-      let query = supabase.from('orders').select('*');
+      let query = supabase.from('orders').select('*, order_items(*)');
 
       if (range.days) {
         // Use a rolling period ending today.
@@ -74,17 +74,21 @@ export default function QuickActions() {
         customer_name:
           o.customer_name ||
           (o.first_name ? `${o.first_name} ${o.last_name || ''}`.trim() : 'Guest Customer'),
-        items_summary: Array.isArray(o.items)
-          ? o.items.map((i: any) => `${i.quantity || 1}x ${i.name || i.menuItem?.name || 'Item'}`).join(', ')
+        items_summary: Array.isArray(o.order_items)
+          ? o.order_items
+              .map((item: any) => `${item.quantity || 1}x ${item.menu_item_name || item.name || item.menuItem?.name || 'Item'}`)
+              .join(', ')
+          : Array.isArray(o.items)
+          ? o.items.map((item: any) => `${item.quantity || 1}x ${item.name || item.menuItem?.name || 'Item'}`).join(', ')
           : typeof o.items === 'string'
           ? o.items
-          : 'Food Items',
+          : 'No item details',
         total_amount: Number(o.total_amount || o.totalPrice || o.total || 0),
         status: o.status || 'Completed',
       }));
 
       // Generate the PDF
-      generateSalesReportPDF(reportOrders, {
+      await generateSalesReportPDF(reportOrders, {
         dateRangeLabel: range.label,
         generatedBy: 'Admin Representative',
       });

@@ -43,7 +43,7 @@ export interface Order {
 interface OrderDetailModalProps {
   order: Order | null;
   onClose: () => void;
-  onStatusUpdate?: (orderId: string, newStatus: OrderStatus) => void;
+  onStatusUpdate?: (orderId: string, newStatus: OrderStatus, reason?: string) => void;
   updatingId?: string | null;
 }
 
@@ -98,6 +98,10 @@ export default function OrderDetailModal({
   const handleStatusChange = async (newStatus: OrderStatus) => {
     if (newStatus === currentStatus) return;
 
+    const cancellationReason =
+      newStatus === 'Cancelled' ? window.prompt('Please enter a reason for cancelling this order:')?.trim() : undefined;
+    if (newStatus === 'Cancelled' && !cancellationReason) return;
+
     setUpdating(true);
     setEmailStatus('idle');
 
@@ -108,6 +112,7 @@ export default function OrderDetailModal({
         .update({
           status: newStatus,
           updated_at: new Date().toISOString(),
+          ...(cancellationReason ? { notes: `Cancelled: ${cancellationReason}` } : {}),
         })
         .eq('id', order.id);
 
@@ -151,7 +156,7 @@ export default function OrderDetailModal({
 
       // 3. Notify parent page.tsx
       if (onStatusUpdate) {
-        onStatusUpdate(order.id, newStatus);
+        onStatusUpdate(order.id, newStatus, cancellationReason);
       }
     } catch (err) {
       console.error('Failed to update order status:', err);
