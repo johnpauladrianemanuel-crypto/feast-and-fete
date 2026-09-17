@@ -104,6 +104,16 @@
   }
 }
 
+/* Legacy admin screens still contain inline dark-theme text colors. Keep them readable
+   on the light admin surfaces while following the active admin theme. */
+body:has(aside [href="/admin-dashboard"]) [style*="#F5EDE0"] {
+  color: var(--admin-text) !important;
+}
+
+body:has(aside [href="/admin-dashboard"]) [style*="#C8A99A"] {
+  color: var(--admin-muted) !important;
+}
+
 @layer utilities {
   .font-display {
     font-family: var(--font-display);

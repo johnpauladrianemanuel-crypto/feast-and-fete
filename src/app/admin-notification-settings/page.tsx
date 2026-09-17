@@ -208,7 +208,7 @@ export default function AdminNotificationSettingsPage() {
           {/* Page Header */}
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>
+              <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>
                 Notification Settings
               </h1>
               <p className="text-sm mt-1" style={{ color: 'var(--admin-muted)' }}>
@@ -247,7 +247,7 @@ export default function AdminNotificationSettingsPage() {
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: '#F5EDE0' }}>{alert.label}</p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--admin-text)' }}>{alert.label}</p>
                     <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--admin-muted)' }}>
                       {alert.description}
                     </p>

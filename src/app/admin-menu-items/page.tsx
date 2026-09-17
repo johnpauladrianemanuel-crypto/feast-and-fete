@@ -300,7 +300,7 @@ export default function AdminMenuItemsPage() {
         <div className="px-6 lg:px-8 py-6 max-w-screen-2xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>
+              <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>
                 Menu Items
               </h1>
               <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>
@@ -419,7 +419,7 @@ export default function AdminMenuItemsPage() {
                     </div>
                     <div className="p-4 flex-1 flex flex-col gap-2">
                       <div>
-                        <p className="font-semibold text-sm leading-tight" style={{ color: '#F5EDE0' }}>
+                        <p className="font-semibold text-sm leading-tight" style={{ color: 'var(--admin-text)' }}>
                           {item.name}
                         </p>
                         <p className="text-xs mt-0.5" style={{ color: 'var(--admin-muted)' }}>

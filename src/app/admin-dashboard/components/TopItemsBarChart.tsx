@@ -55,14 +55,14 @@ export default function TopItemsBarChart({ data }: Props) {
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(74,46,32,0.5)" horizontal={false} />
         <XAxis
           type="number"
-          tick={{ fill: '#8A6A58', fontSize: 10, fontFamily: 'var(--font-sans)' }}
+          tick={{ fill: 'var(--admin-muted)', fontSize: 10, fontFamily: 'var(--font-sans)' }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
           type="category"
           dataKey="shortName"
-          tick={{ fill: '#C8A99A', fontSize: 10, fontFamily: 'var(--font-sans)' }}
+          tick={{ fill: 'var(--admin-muted)', fontSize: 10, fontFamily: 'var(--font-sans)' }}
           axisLine={false}
           tickLine={false}
           width={80}

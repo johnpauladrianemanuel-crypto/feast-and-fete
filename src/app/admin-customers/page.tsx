@@ -80,7 +80,7 @@ export default function AdminCustomersPage() {
         <AdminTopbar />
         <div className="px-6 lg:px-8 py-6 max-w-screen-2xl mx-auto space-y-6">
           <div>
-            <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>Customers</h1>
+            <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>Customers</h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>
               {loading ? 'Loading…' : `${customers.length} registered customers`}
             </p>
@@ -178,7 +178,7 @@ export default function AdminCustomersPage() {
                               <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 gradient-brand">
                                 <span className="text-xs font-bold text-primary-foreground">{initial}</span>
                               </div>
-                              <span className="font-medium" style={{ color: '#F5EDE0' }}>{displayName}</span>
+                              <span className="font-medium" style={{ color: 'var(--admin-text)' }}>{displayName}</span>
                             </div>
                           </td>
                           <td className="px-5 py-3.5">

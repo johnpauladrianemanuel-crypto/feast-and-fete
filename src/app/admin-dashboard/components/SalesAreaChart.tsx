@@ -47,13 +47,13 @@ export default function SalesAreaChart({ data }: Props) {
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(74,46,32,0.6)" vertical={false} />
         <XAxis
           dataKey="date"
-          tick={{ fill: '#8A6A58', fontSize: 10, fontFamily: 'var(--font-sans)' }}
+          tick={{ fill: 'var(--admin-muted)', fontSize: 10, fontFamily: 'var(--font-sans)' }}
           axisLine={false}
           tickLine={false}
           interval={4}
         />
         <YAxis
-          tick={{ fill: '#8A6A58', fontSize: 10, fontFamily: 'var(--font-sans)' }}
+          tick={{ fill: 'var(--admin-muted)', fontSize: 10, fontFamily: 'var(--font-sans)' }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v: number) => `₱${(v / 1000).toFixed(0)}k`}

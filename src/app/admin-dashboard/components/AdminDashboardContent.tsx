@@ -38,7 +38,7 @@ export default function AdminDashboardContent() {
         {/* Page heading */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>
+            <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>
               Good morning, Admin 👋
             </h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>

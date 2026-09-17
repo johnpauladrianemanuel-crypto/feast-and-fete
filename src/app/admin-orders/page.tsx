@@ -230,7 +230,7 @@ export default function AdminOrdersPage() {
           {/* Page Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>
+              <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>
                 Active Orders
               </h1>
               <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>
@@ -396,7 +396,7 @@ export default function AdminOrdersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium" style={{ color: '#F5EDE0' }}>
+                        <p className="font-medium" style={{ color: 'var(--admin-text)' }}>
                           {order.customer_name}
                         </p>
                         <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>
@@ -406,7 +406,7 @@ export default function AdminOrdersPage() {
                       <td className="px-4 py-3" style={{ color: 'var(--admin-muted)' }}>
                         {order.order_items?.length ?? 0} item{(order.order_items?.length ?? 0) !== 1 ? 's' : ''}
                       </td>
-                      <td className="px-4 py-3 font-semibold" style={{ color: '#F5EDE0' }}>
+                      <td className="px-4 py-3 font-semibold" style={{ color: 'var(--admin-text)' }}>
                         ₱{Number(order.total_amount).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 capitalize" style={{ color: 'var(--admin-muted)' }}>

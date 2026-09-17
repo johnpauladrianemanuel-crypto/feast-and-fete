@@ -132,7 +132,7 @@ export default function AdminInventoryPage() {
         <div className="px-6 lg:px-8 py-6 max-w-screen-2xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>Inventory & Stock Management</h1>
+              <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>Inventory & Stock Management</h1>
               <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>Real-time stock tracking for menu items (Low stock threshold: ≤ 7)</p>
             </div>
             <button
@@ -219,7 +219,7 @@ export default function AdminInventoryPage() {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: STATUS_STYLES[item.status].dot }} />
-                          <span className="font-medium" style={{ color: '#F5EDE0' }}>{item.name}</span>
+                          <span className="font-medium" style={{ color: 'var(--admin-text)' }}>{item.name}</span>
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-xs" style={{ color: 'var(--admin-muted)' }}>{item.unit}</td>

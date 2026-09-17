@@ -115,7 +115,7 @@ export default function RecentOrdersTable() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b" style={{ borderColor: 'var(--admin-border)' }}>
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#F5EDE0', letterSpacing: '0.06em' }}>
+          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--admin-text)', letterSpacing: '0.06em' }}>
             Recent Orders
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--admin-muted)' }}>
@@ -212,13 +212,13 @@ export default function RecentOrdersTable() {
                         </span>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold truncate max-w-[110px]" style={{ color: '#F5EDE0' }}>{order.customer_name}</p>
+                        <p className="text-xs font-semibold truncate max-w-[110px]" style={{ color: 'var(--admin-text)' }}>{order.customer_name}</p>
                         <p className="text-xs truncate max-w-[110px]" style={{ color: 'var(--admin-muted)' }}>{order.customer_phone}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-xs" style={{ color: '#C8A99A' }}>
+                    <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>
                       {new Date(order.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                     </p>
                     <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>
@@ -226,7 +226,7 @@ export default function RecentOrdersTable() {
                     </p>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-xs" style={{ color: '#C8A99A' }}>
+                    <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>
                       {order.order_items?.length ?? 0} item{(order.order_items?.length ?? 0) !== 1 ? 's' : ''}
                     </p>
                     <p className="text-xs truncate max-w-[120px]" style={{ color: 'var(--admin-muted)' }}>
@@ -244,7 +244,7 @@ export default function RecentOrdersTable() {
                     <PaymentBadge method={order.payment_method} />
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs font-medium capitalize" style={{ color: '#C8A99A' }}>{order.payment_method?.replace('_', ' ')}</span>
+                    <span className="text-xs font-medium capitalize" style={{ color: 'var(--admin-muted)' }}>{order.payment_method?.replace('_', ' ')}</span>
                   </td>
                   <td className="px-4 py-3">
                     <OrderStatusBadge status={order.status} />

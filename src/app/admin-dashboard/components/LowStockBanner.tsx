@@ -18,7 +18,7 @@ export default function LowStockBanner({ items, onDismiss }: Props) {
         <Icon name="ExclamationTriangleIcon" size={18} className="text-error" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold" style={{ color: '#F5EDE0' }}>
+        <p className="text-sm font-bold" style={{ color: 'var(--admin-text)' }}>
           {outOfStock.length > 0
             ? `${outOfStock.length} ingredient${outOfStock.length > 1 ? 's' : ''} OUT OF STOCK — action required`
             : `${lowStock.length} ingredient${lowStock.length > 1 ? 's' : ''} running low`}

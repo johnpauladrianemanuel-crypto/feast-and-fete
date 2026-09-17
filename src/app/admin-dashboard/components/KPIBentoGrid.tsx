@@ -19,7 +19,7 @@ function KPICard({ title, value, subtitle, icon, trend, variant, colSpan = '' }:
       card: 'var(--admin-card)',
       icon: 'rgba(212,160,23,0.15)',
       iconColor: '#D4A017',
-      valueColor: '#F5EDE0',
+      valueColor: 'var(--admin-text)',
       trendBg: 'rgba(45,122,79,0.12)',
       trendColor: '#2D7A4F',
     },

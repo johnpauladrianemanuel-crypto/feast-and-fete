@@ -1,9 +1,10 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NavItem {
   id: string;
@@ -28,6 +29,8 @@ export default function AdminSidebar() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut } = useAuth();
 
   const applyTheme = (dark: boolean) => {
     const root = document.documentElement;
@@ -84,6 +87,15 @@ export default function AdminSidebar() {
     localStorage.setItem('theme', next ? 'dark' : 'light');
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push('/admin-signin');
+    } catch (error) {
+      console.error('Admin logout failed:', error);
+    }
+  };
+
   return (
     <aside
       className="flex flex-col h-full transition-all duration-300 ease-in-out flex-shrink-0"
@@ -117,7 +129,7 @@ export default function AdminSidebar() {
               className="flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 group relative"
               style={{
                 background: isActive ? 'rgba(212,160,23,0.12)' : 'transparent',
-                color: isActive ? '#D4A017' : '#C8A99A',
+                color: isActive ? '#D4A017' : 'var(--admin-muted)',
               }}
               title={collapsed ? item.label : undefined}
             >
@@ -128,7 +140,7 @@ export default function AdminSidebar() {
                   className={isActive ? 'text-secondary flex-shrink-0' : 'text-admin-muted group-hover:text-secondary transition-colors flex-shrink-0'}
                 />
                 {!collapsed && (
-                  <span className="text-sm font-medium truncate" style={{ color: isActive ? '#D4A017' : '#C8A99A' }}>
+                  <span className="text-sm font-medium truncate" style={{ color: isActive ? '#D4A017' : 'var(--admin-muted)' }}>
                     {item.label}
                   </span>
                 )}
@@ -159,16 +171,17 @@ export default function AdminSidebar() {
 
       {/* Bottom Section */}
       <div className="border-t px-2 py-3 space-y-1" style={{ borderColor: 'var(--admin-border)' }}>
-        {/* Customer site link */}
-        <Link
-          href="/menu-browse-screen"
+        {/* Logout */}
+        <button
+          type="button"
+          onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group"
           style={{ color: 'var(--admin-muted)' }}
-          title={collapsed ? 'Customer Site' : undefined}
+          title={collapsed ? 'Logout' : undefined}
         >
-          <Icon name="ArrowTopRightOnSquareIcon" size={18} className="text-admin-muted group-hover:text-secondary transition-colors" />
-          {!collapsed && <span className="text-sm font-medium" style={{ color: 'var(--admin-muted)' }}>Customer Site</span>}
-        </Link>
+          <Icon name="ArrowRightOnRectangleIcon" size={18} className="text-admin-muted group-hover:text-secondary transition-colors" />
+          {!collapsed && <span className="text-sm font-medium" style={{ color: 'var(--admin-muted)' }}>Logout</span>}
+        </button>
 
         {/* Theme Toggle */}
         <button

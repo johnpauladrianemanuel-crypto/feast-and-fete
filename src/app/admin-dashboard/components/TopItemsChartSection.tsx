@@ -24,7 +24,7 @@ export default function TopItemsChartSection() {
       style={{ background: 'var(--admin-card)', border: '1px solid var(--admin-border)' }}
     >
       <div className="mb-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#F5EDE0', letterSpacing: '0.06em' }}>
+        <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--admin-text)', letterSpacing: '0.06em' }}>
           Top Selling Items
         </h2>
         <p className="text-xs mt-1" style={{ color: 'var(--admin-muted)' }}>

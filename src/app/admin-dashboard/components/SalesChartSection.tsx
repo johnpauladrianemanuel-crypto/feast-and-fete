@@ -28,7 +28,7 @@ export default function SalesChartSection() {
     >
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#F5EDE0', letterSpacing: '0.06em' }}>
+          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--admin-text)', letterSpacing: '0.06em' }}>
             Sales — Last 30 Days
           </h2>
           {loading ? (
@@ -45,12 +45,12 @@ export default function SalesChartSection() {
               </div>
               <div className="w-px h-8" style={{ background: 'var(--admin-border)' }} />
               <div>
-                <p className="font-display text-xl font-bold tabular-nums" style={{ color: '#F5EDE0' }}>{totalOrders}</p>
+                <p className="font-display text-xl font-bold tabular-nums" style={{ color: 'var(--admin-text)' }}>{totalOrders}</p>
                 <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>Total orders</p>
               </div>
               <div className="w-px h-8" style={{ background: 'var(--admin-border)' }} />
               <div>
-                <p className="font-display text-xl font-bold tabular-nums" style={{ color: '#F5EDE0' }}>₱{avgDaily.toLocaleString()}</p>
+                <p className="font-display text-xl font-bold tabular-nums" style={{ color: 'var(--admin-text)' }}>₱{avgDaily.toLocaleString()}</p>
                 <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>Avg/day</p>
               </div>
             </div>

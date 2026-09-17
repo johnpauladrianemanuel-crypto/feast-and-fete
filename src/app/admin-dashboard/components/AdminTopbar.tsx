@@ -115,7 +115,7 @@ export default function AdminTopbar() {
     >
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--admin-muted)' }}>
-        <span className="font-medium" style={{ color: '#F5EDE0' }}>Dashboard</span>
+        <span className="font-medium" style={{ color: 'var(--admin-text)' }}>Dashboard</span>
         <Icon name="ChevronRightIcon" size={14} className="text-admin-muted" />
         <span>Overview</span>
       </div>
@@ -136,7 +136,7 @@ export default function AdminTopbar() {
             style={{ background: notifOpen ? 'rgba(212,160,23,0.12)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--admin-border)' }}
             aria-label="Notifications"
           >
-            <Icon name="BellIcon" size={16} style={{ color: '#C8A99A' }} />
+            <Icon name="BellIcon" size={16} style={{ color: 'var(--admin-muted)' }} />
             {unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-secondary" />}
           </button>
           {notifOpen && (
@@ -145,7 +145,7 @@ export default function AdminTopbar() {
               style={{ background: 'var(--admin-card)', border: '1px solid var(--admin-border)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
             >
               <div className="px-4 py-2 flex items-center justify-between border-b" style={{ borderColor: 'var(--admin-border)' }}>
-                <span className="text-sm font-semibold" style={{ color: '#F5EDE0' }}>Notifications</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--admin-text)' }}>Notifications</span>
                 {unreadCount > 0 && (
                   <button onClick={handleMarkAllRead} className="text-xs px-2 py-0.5 rounded-full font-bold transition-opacity hover:opacity-80" style={{ background: 'rgba(212,160,23,0.15)', color: '#D4A017' }}>
                     {unreadCount} new
@@ -162,7 +162,7 @@ export default function AdminTopbar() {
                   >
                     <span className="text-base flex-shrink-0 mt-0.5">{getNotificationIcon(n.type)}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs leading-snug" style={{ color: !n.read ? '#F5EDE0' : 'var(--admin-muted)' }}>
+                      <p className="text-xs leading-snug" style={{ color: !n.read ? 'var(--admin-text)' : 'var(--admin-muted)' }}>
                         {n.title}: {n.message}
                       </p>
                       <p className="text-xs mt-0.5" style={{ color: 'var(--admin-muted)' }}>{timeAgo(n.created_at)}</p>

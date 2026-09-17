@@ -48,8 +48,8 @@ function StarDisplay({ rating, count }: { rating: number; count: number }) {
           </svg>
         ))}
       </div>
-      <span className="text-sm font-bold text-foreground">{rating.toFixed(1)}</span>
-      <span className="text-sm text-muted-foreground">({count} reviews)</span>
+      <span className="text-sm font-bold" style={{ color: '#2C1810' }}>{rating.toFixed(1)}</span>
+      <span className="text-sm" style={{ color: '#5A4033' }}>({count} reviews)</span>
     </div>
   );
 }
@@ -281,7 +281,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               <StarDisplay rating={ratingSummary.averageRating} count={ratingSummary.reviewCount} />
             )}
 
-<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '14px', color: 'var(--muted-foreground)' }}>              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '14px', color: '#5A4033' }}>              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Icon name="UsersIcon" size={16} />
                 <span>{item.servingSize}</span>
               </div>
@@ -290,23 +290,23 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <div style={{ borderTop: '1px solid #E8D9C4' }} />
 
             <div>
-              <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>
+              <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#5A4033', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 About this dish
               </h3>
-              <p style={{ fontSize: '14px', color: 'var(--muted-foreground)', lineHeight: 1.6, margin: 0 }}>
+              <p style={{ fontSize: '14px', color: '#3A2518', lineHeight: 1.6, margin: 0 }}>
                 {item.description}
               </p>
             </div>
 
             {item.ingredients && (
               <div>
-                <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>
+                <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#5A4033', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Ingredients
                 </h3>
-                <p style={{ fontSize: '14px', color: 'var(--muted-foreground)', lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontSize: '14px', color: '#3A2518', lineHeight: 1.6, margin: 0 }}>
                   {item.ingredients}
                 </p>
               </div>
@@ -315,14 +315,14 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
             {/* Customizations */}
             {item.customizations && item.customizations.length > 0 && (
               <>
-                <div style={{ borderTop: '1px solid var(--border)' }} />
+                <div style={{ borderTop: '1px solid #E8D9C4' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>
+                  <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#5A4033', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     I-Customize ang Order Mo
                   </h3>
                   {item.customizations.map(customization => (
                     <div key={customization.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 600, color: '#2C1810' }}>
                         {customization.label}
                       </label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -337,9 +337,9 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                                 fontSize: '13px',
                                 fontWeight: isSelected ? 700 : 500,
                                 borderRadius: '20px',
-                                border: isSelected ? '2px solid var(--primary)' : '1.5px solid var(--border)',
-                                background: isSelected ? 'var(--primary)' : 'var(--muted)',
-                                color: isSelected ? 'var(--primary-foreground)' : 'var(--foreground)',
+                                border: isSelected ? '2px solid #7B1C2E' : '1.5px solid #D6BFA8',
+                                background: isSelected ? '#7B1C2E' : '#F5EDE0',
+                                color: isSelected ? '#FFFFFF' : '#2C1810',
                                 cursor: 'pointer',
                                 transition: 'all 180ms ease',
                                 boxShadow: isSelected ? '0 2px 10px rgba(123,28,46,0.25)' : 'none',
@@ -357,7 +357,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
             )}
 
             <div>
-              <label htmlFor="dish-order-note" style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>
+              <label htmlFor="dish-order-note" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#5A4033', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Note for this dish
               </label>
               <textarea
@@ -367,24 +367,24 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                 rows={2}
                 maxLength={240}
                 placeholder="e.g. Less spicy, sauce on the side"
-                style={{ width: '100%', resize: 'vertical', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', fontSize: '14px', color: 'var(--foreground)', background: '#ffffff', outline: 'none' }}
+                style={{ width: '100%', resize: 'vertical', border: '1px solid #B89478', borderRadius: '10px', padding: '10px 12px', fontSize: '14px', color: '#2C1810', background: '#FFFFFF', outline: 'none' }}
               />
             </div>
 
             {/* Quantity + Add to Cart */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingTop: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--muted)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', borderRadius: '12px', overflow: 'hidden', border: '1px solid #D6BFA8', background: '#F5EDE0' }}>
                 <button
                   onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                  style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--foreground)' }}
+                  style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#2C1810' }}
                   aria-label="Decrease quantity"
                 >
                   <Icon name="MinusIcon" size={14} />
                 </button>
-                <span style={{ width: '40px', textAlign: 'center', fontSize: '14px', fontWeight: 700, color: 'var(--foreground)' }}>{quantity}</span>
+                <span style={{ width: '40px', textAlign: 'center', fontSize: '14px', fontWeight: 700, color: '#2C1810' }}>{quantity}</span>
                 <button
                   onClick={() => setQuantity(q => Math.min(item.stock, q + 1))}
-                  style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--foreground)' }}
+                  style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#2C1810' }}
                   aria-label="Increase quantity"
                 >
                   <Icon name="PlusIcon" size={14} />

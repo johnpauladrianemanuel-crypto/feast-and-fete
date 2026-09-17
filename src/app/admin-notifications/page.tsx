@@ -117,7 +117,7 @@ export default function AdminNotificationsPage() {
         <div className="px-6 lg:px-8 py-6 max-w-screen-2xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>Notifications</h1>
+              <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>Notifications</h1>
               <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>
                 {loading ? 'Loading…' : unreadCount > 0 ? <span style={{ color: '#D4A017' }}>{unreadCount} unread</span> : 'All caught up!'} {!loading && `· ${notifications.length} total`}
               </p>
@@ -169,7 +169,7 @@ export default function AdminNotificationsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold" style={{ color: '#F5EDE0' }}>{notif.title}</p>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--admin-text)' }}>{notif.title}</p>
                         {!notif.read && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#D4A017' }} />}
                       </div>
                       <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--admin-muted)' }}>{notif.message}</p>

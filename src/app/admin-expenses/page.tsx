@@ -88,7 +88,7 @@ export default function AdminExpensesPage() {
         <div className="px-6 lg:px-8 py-6 max-w-screen-2xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold" style={{ color: '#F5EDE0' }}>Expenses</h1>
+              <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>Expenses</h1>
               <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>Track operational costs and spending</p>
             </div>
             <button
@@ -175,7 +175,7 @@ export default function AdminExpensesPage() {
                           {exp.category}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5" style={{ color: '#F5EDE0' }}>{exp.description}</td>
+                      <td className="px-5 py-3.5" style={{ color: 'var(--admin-text)' }}>{exp.description}</td>
                       <td className="px-5 py-3.5 font-semibold" style={{ color: '#D4A017' }}>₱{Number(exp.amount).toLocaleString()}</td>
                       <td className="px-5 py-3.5">
                         <button onClick={() => handleDelete(exp.id)} className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10 cursor-pointer" style={{ color: 'var(--admin-muted)' }}>

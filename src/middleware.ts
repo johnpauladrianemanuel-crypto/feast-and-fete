@@ -33,10 +33,11 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const url = request.nextUrl.clone();
 
-  // Harangan ang lahat ng /admin-* pages kung walang user
-  if (url.pathname.startsWith('/admin-')) {
+  // Keep the admin sign-in page public, but protect every other admin route.
+  if (url.pathname.startsWith('/admin-') && url.pathname !== '/admin-signin') {
     if (!user) {
-      url.pathname = '/sign-up-login-screen';
+      url.pathname = '/admin-signin';
+      url.searchParams.set('next', request.nextUrl.pathname);
       return NextResponse.redirect(url);
     }
   }
