@@ -172,6 +172,7 @@ export default function ReviewModal({ items, reviewerName, userId, guestProfileI
               {currentItem.menuItemImage ? (
                 <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-border">
                   <AppImage
+                    key={currentItem.menuItemId}
                     src={currentItem.menuItemImage}
                     alt={currentItem.menuItemImageAlt || currentItem.menuItemName}
                     width={64}

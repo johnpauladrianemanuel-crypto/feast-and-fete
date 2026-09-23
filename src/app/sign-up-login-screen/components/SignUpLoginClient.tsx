@@ -163,6 +163,15 @@ export default function SignUpLoginClient() {
         {/* Pinagaan at mas maliwanag na overlay para luminaw ang sliding pictures */}
         <div className="absolute inset-0 bg-black/20 pointer-events-none z-0" />
 
+        {/* Floating brand mark over the food collage */}
+        <div className="absolute top-8 left-24 z-30 w-20 h-20 rounded-full bg-white/95 p-2 shadow-2xl border-2 border-secondary/70 flex items-center justify-center">
+          <img
+            src="/assets/images/Logo123.png"
+            alt="Feast & Fête logo"
+            className="w-full h-full object-contain rounded-full"
+          />
+        </div>
+
         {/* Decorative circles */}
         <div
           className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10 auth-float-a z-10"
@@ -254,7 +263,7 @@ export default function SignUpLoginClient() {
       {/* Auth Card Panel (Left side on desktop) with precisely aligned logo container matching AuthCard width */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 auth-right-panel relative">
         <div className="w-full max-w-md mb-8 flex items-center gap-4 auth-fade-up" style={{ animationDelay: '0.1s' }}>
-          <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/90 p-1.5 shadow-md flex items-center justify-center border border-amber-200/60 backdrop-blur-md flex-shrink-0">
+          <div className="w-12 h-12 rounded-full overflow-hidden bg-white/90 p-1.5 shadow-md flex items-center justify-center border border-amber-200/60 backdrop-blur-md flex-shrink-0">
             <img src="/assets/images/Logo123.png" alt="Feast & Fête Logo" className="w-full h-full object-contain" />
           </div>
           <div>

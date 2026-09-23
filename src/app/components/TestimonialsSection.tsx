@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 
 interface Review {
   id: string;
+  menu_item_id: string;
   reviewer_name: string;
   rating: number;
   review_text: string | null;
@@ -18,6 +19,8 @@ interface DisplayTestimonial {
   quote: string;
   rating: number;
   avatar?: string;
+  orderImage?: string;
+  orderImageAlt?: string;
 }
 
 const FALLBACK_TESTIMONIALS: DisplayTestimonial[] = [
@@ -62,19 +65,32 @@ export default function TestimonialsSection() {
     const supabase = createClient();
     const { data: reviewsData } = await supabase
       .from('item_reviews')
-      .select('id, reviewer_name, rating, review_text, created_at')
+      .select('id, menu_item_id, reviewer_name, rating, review_text, created_at')
       .not('review_text', 'is', null)
       .gte('rating', 4)
       .order('created_at', { ascending: false });
 
     if (reviewsData && reviewsData.length > 0) {
-      const realTestimonials: DisplayTestimonial[] = (reviewsData as Review[]).map((r) => ({
-        id: r.id,
-        name: r.reviewer_name || 'Verified Customer',
-        role: 'VERIFIED CUSTOMER',
-        quote: r.review_text || '',
-        rating: Number(r.rating) || 5,
-      }));
+      const reviews = reviewsData as Review[];
+      const menuItemIds = [...new Set(reviews.map((review) => review.menu_item_id))];
+      const { data: menuItems } = await supabase
+        .from('menu_items')
+        .select('id, image, image_alt')
+        .in('id', menuItemIds);
+      const menuItemsById = new Map((menuItems || []).map((menuItem) => [menuItem.id, menuItem]));
+
+      const realTestimonials: DisplayTestimonial[] = reviews.map((r) => {
+        const menuItem = menuItemsById.get(r.menu_item_id);
+        return {
+          id: r.id,
+          name: r.reviewer_name || 'Verified Customer',
+          role: 'VERIFIED CUSTOMER',
+          quote: r.review_text || '',
+          rating: Number(r.rating) || 5,
+          orderImage: menuItem?.image || undefined,
+          orderImageAlt: menuItem?.image_alt || `${r.reviewer_name}'s ordered dish`,
+        };
+      });
 
       setTestimonials([...realTestimonials, ...FALLBACK_TESTIMONIALS]);
     }
@@ -168,11 +184,22 @@ export default function TestimonialsSection() {
             {marqueeItems.map((item, index) => (
               <div
                 key={`${item.id}-${index}`}
-                className="flex-none w-[300px] sm:w-[340px] bg-card border border-border rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
+                className="relative flex-none w-[300px] sm:w-[340px] overflow-hidden bg-white/85 dark:bg-card border border-border rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
               >
-                <div>
+                {item.orderImage && (
+                  <>
+                    <img
+                      src={item.orderImage}
+                      alt={item.orderImageAlt || 'Ordered dish'}
+                      className="absolute inset-0 w-full h-full object-cover opacity-25 dark:opacity-40"
+                    />
+                    <div className="absolute inset-0 bg-[#FDF8F0]/72 dark:bg-card/60" />
+                  </>
+                )}
+
+                <div className="relative z-10">
                   {/* Stars */}
-                  <div className="flex gap-1 text-[#059669] text-sm mb-4">
+                  <div className="flex gap-1 text-[#D4AF37] text-sm mb-4">
                     {Array.from({ length: item.rating }).map((_, i) => (
                       <span key={i}>★</span>
                     ))}
@@ -185,7 +212,7 @@ export default function TestimonialsSection() {
                 </div>
 
                 {/* Author Info & Avatar */}
-                <div className="flex items-center gap-3 mt-8 pt-4 border-t border-border">
+                <div className="relative z-10 flex items-center gap-3 mt-8 pt-4 border-t border-border">
                   {item.avatar ? (
                     <img
                       src={item.avatar}

@@ -56,7 +56,7 @@ export default function HeroSection() {
           </div>
         ))}
         {/* Dark Overlay para lumutang at mabasa nang maayos ang text */}
-        <div className="absolute inset-0 bg-black/75 backdrop-blur-[2px] z-10" />
+        <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] z-10" />
       </div>
 
       {/* Animated noise grain overlay kung meron man sa styles mo */}

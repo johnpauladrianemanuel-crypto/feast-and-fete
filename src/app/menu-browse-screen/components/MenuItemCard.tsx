@@ -69,14 +69,10 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
   const cardRef = useRef<HTMLDivElement>(null);
   const catColor = CATEGORY_COLORS[item.categorySlug] ?? { bg: 'rgba(100,100,100,0.1)', text: '#555' };
 
-  // Checks active state
   const rawIsActive = item.isActive ?? (item as { is_active?: boolean }).is_active;
-  
-  // Auto-deactivate logic check: Deactivate ONLY when stock is 0
   const isAutoDeactivated = item.stock === 0;
   const isInactive = rawIsActive === false || isAutoDeactivated;
 
-  // Extract deactivation reason from item
   const deactivationReason =
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivationReason ??
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivation_reason ??
@@ -84,11 +80,9 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailableReason ??
     (isAutoDeactivated ? 'Automatically deactivated due to zero stock remaining.' : undefined);
 
-  // Low stock warning: Active pa rin pero warning kapag below 5 (1 to 4 stocks)
   const isLowStock = item.stock > 0 && item.stock < 5;
   const isOutOfStock = item.stock === 0;
 
-  // Auto Deactivate Trigger to Database if stock is 0 and still active
   useEffect(() => {
     if (item.stock === 0 && rawIsActive !== false) {
       const autoDeactivate = async () => {
@@ -109,7 +103,6 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
     }
   }, [item.stock, item.id, rawIsActive]);
 
-  // Intersection Observer for scroll-triggered entrance
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
@@ -170,8 +163,8 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
   return (
     <div
       ref={cardRef}
-      className={`bg-card border rounded-2xl overflow-hidden menu-card-3d group flex flex-col ${
-        isInactive ? 'cursor-not-allowed select-none border-stone-800' : 'border-border cursor-pointer'
+      className={`bg-card border rounded-2xl overflow-hidden menu-card-3d group flex flex-col justify-between h-full transition-all duration-300 ${
+        isInactive ? 'cursor-not-allowed select-none border-stone-800/80 opacity-90' : 'border-border cursor-pointer hover:shadow-xl hover:-translate-y-1'
       }`}
       style={{
         opacity: visible ? 1 : 0,
@@ -196,161 +189,156 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
       }}
       aria-label={`View details for ${item.name}`}
     >
-      {/* Image */}
-      <div className="relative h-48 overflow-hidden flex-shrink-0 bg-muted">
-        <AppImage
-          src={item.image}
-          alt={item.imageAlt}
-          width={320}
-          height={192}
-          className={`w-full h-full object-cover transition-transform duration-500 ${
-            isInactive ? 'filter grayscale contrast-125 brightness-30 blur-[2px]' : 'group-hover:scale-108'
-          }`}
-          style={{
-            opacity: imageLoaded ? 1 : 0,
-            transition: 'opacity 350ms ease, transform 500ms ease, filter 350ms ease',
-          }}
-          onLoad={() => setImageLoaded(true)}
-        />
-        {!imageLoaded && (
-          <div
-            className="absolute inset-0"
+      <div>
+        {/* Image Box */}
+        <div className="relative h-48 overflow-hidden flex-shrink-0 bg-muted">
+          <AppImage
+            src={item.image}
+            alt={item.imageAlt}
+            width={320}
+            height={192}
+            className={`w-full h-full object-cover transition-transform duration-500 ${
+              isInactive ? 'filter grayscale contrast-125 brightness-30 blur-[2px]' : 'group-hover:scale-108'
+            }`}
             style={{
-              background: 'linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%)',
-              backgroundSize: '200% 100%',
-              animation: 'skeletonPulse 1.4s ease-in-out infinite',
+              opacity: imageLoaded ? 1 : 0,
+              transition: 'opacity 350ms ease, transform 500ms ease, filter 350ms ease',
             }}
+            onLoad={() => setImageLoaded(true)}
           />
-        )}
+          {!imageLoaded && (
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'skeletonPulse 1.4s ease-in-out infinite',
+              }}
+            />
+          )}
 
-        {isInactive && (
-          <div
-            className="absolute inset-0"
-            style={{ background: 'rgba(10, 5, 3, 0.75)' }}
-          />
-        )}
+          {isInactive && (
+            <div
+              className="absolute inset-0"
+              style={{ background: 'rgba(10, 5, 3, 0.75)' }}
+            />
+          )}
 
-        {!isInactive && (
-          <div
-            className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none"
-            style={{
-              background: 'linear-gradient(180deg, transparent 40%, rgba(44,24,16,0.35) 100%)',
-              transition: 'opacity 350ms ease',
-            }}
-          />
-        )}
+          {!isInactive && (
+            <div
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none"
+              style={{
+                background: 'linear-gradient(180deg, transparent 40%, rgba(44,24,16,0.35) 100%)',
+                transition: 'opacity 350ms ease',
+              }}
+            />
+          )}
 
-        {/* Category badge */}
-        <div className="absolute top-3 left-3">
-          <span
-            className="px-2.5 py-1 text-xs font-semibold rounded-full backdrop-blur-sm"
-            style={{ background: catColor.bg, color: catColor.text, border: `1px solid ${catColor.text}30` }}
-          >
-            {item.category}
-          </span>
+          {/* Category badge */}
+          <div className="absolute top-3 left-3">
+            <span
+              className="px-2.5 py-1 text-xs font-semibold rounded-full backdrop-blur-md shadow-sm"
+              style={{ background: catColor.bg, color: '#111111', border: `1px solid ${catColor.text}30` }}
+            >
+              {item.category}
+            </span>
+          </div>
+
+          {/* Featured badge */}
+          {item.featured && !isInactive && (
+            <div className="absolute top-3 right-3">
+              <span
+                className="px-2.5 py-1 text-xs font-bold rounded-full"
+                style={{
+                  background: 'rgba(212,160,23,0.92)',
+                  color: '#2C1810',
+                  boxShadow: '0 2px 8px rgba(212,160,23,0.4)',
+                  animation: 'featuredGlow 2.5s ease-in-out infinite',
+                }}
+              >
+                ⭐ Best Seller
+              </span>
+            </div>
+          )}
+
+          {/* Unavailable badge */}
+          {isInactive && (
+            <div className="absolute top-3 right-3">
+              <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-red-950/90 text-red-200 border border-red-800/50 shadow-md backdrop-blur-sm flex items-center gap-1">
+                <Icon name="ExclamationTriangleIcon" size={12} className="text-red-400" />
+                Unavailable
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Featured badge */}
-        {item.featured && !isInactive && (
-          <div className="absolute top-3 right-3">
-            <span
-              className="px-2 py-1 text-xs font-bold rounded-full"
-              style={{
-                background: 'rgba(212,160,23,0.92)',
-                color: '#2C1810',
-                boxShadow: '0 2px 8px rgba(212,160,23,0.4)',
-                animation: 'featuredGlow 2.5s ease-in-out infinite',
-              }}
-            >
-              ⭐ Best Seller
-            </span>
+        {/* Content Section */}
+        <div className="p-4 space-y-3">
+          <div>
+            <h3 className={`font-display text-base font-bold leading-snug line-clamp-1 ${isInactive ? 'text-stone-400' : 'text-foreground'}`}>
+              {item.name}
+            </h3>
+            <p className={`text-xs mt-1.5 line-clamp-2 leading-relaxed ${isInactive ? 'text-stone-500' : 'text-muted-foreground'}`}>
+              {item.description}
+            </p>
           </div>
-        )}
 
-        {/* Unavailable badge */}
-        {isInactive && (
-          <div className="absolute top-3 right-3">
-            <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-red-950/90 text-red-200 border border-red-800/50 shadow-md backdrop-blur-sm flex items-center gap-1">
-              <Icon name="ExclamationTriangleIcon" size={12} className="text-red-400" />
-              Unavailable
-            </span>
+          {/* Deactivation banner */}
+          {isInactive && (
+            <div className="p-2.5 rounded-xl border border-red-900/40 bg-stone-950/90 backdrop-blur-sm space-y-1">
+              <div className="flex items-center gap-1.5 text-red-400 font-semibold text-xs">
+                <Icon name="ExclamationCircleIcon" size={14} className="shrink-0" />
+                <span>Not available right now</span>
+              </div>
+              {deactivationReason && (
+                <p className="text-[11px] text-stone-300 italic line-clamp-1 pl-5">
+                  {deactivationReason}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Rating display */}
+          {ratingSummary && ratingSummary.reviewCount > 0 && (
+            <StarDisplay rating={ratingSummary.averageRating} count={ratingSummary.reviewCount} />
+          )}
+
+          {/* Serving size & Available Stock Count */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+            <div className="flex items-center gap-1.5">
+              <Icon name="UsersIcon" size={13} className="text-muted-foreground flex-shrink-0" />
+              <span>{item.servingSize}</span>
+            </div>
+
+            <div className={`font-semibold text-[11px] px-2 py-0.5 rounded-md ${
+              item.stock > 5 
+                ? 'text-emerald-500/90 bg-emerald-500/10' 
+                : isLowStock 
+                ? 'text-amber-500/90 bg-amber-500/10 animate-pulse' 
+                : 'text-red-500/90 bg-red-500/10'
+            }`}>
+              Stock: {item.stock} left
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="p-4 flex flex-col flex-1 space-y-3">
-        <div className="flex-1">
-          <h3 className={`font-display text-base font-bold leading-snug line-clamp-2 ${isInactive ? 'text-stone-400' : 'text-foreground'}`}>
-            {item.name}
-          </h3>
-          <p className={`text-xs mt-1.5 line-clamp-2 leading-relaxed ${isInactive ? 'text-stone-500' : 'text-muted-foreground'}`}>
-            {item.description}
-          </p>
-        </div>
-
-        {/* Deactivation banner */}
-        {isInactive && (
-          <div className="p-3 rounded-xl border border-red-900/40 bg-stone-950/90 backdrop-blur-sm space-y-1">
-            <div className="flex items-center gap-1.5 text-red-400 font-semibold text-xs">
-              <Icon name="ExclamationCircleIcon" size={15} className="shrink-0" />
-              <span>This Item is not available right now</span>
-            </div>
-            {deactivationReason ? (
-              <p className="text-xs text-stone-300 italic pl-5">
-                Reason: {deactivationReason}
-              </p>
-            ) : (
-              <p className="text-xs text-stone-400 italic pl-5">
-                Reason: Temporarily unavailable
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Rating display */}
-        {ratingSummary && ratingSummary.reviewCount > 0 && (
-          <StarDisplay rating={ratingSummary.averageRating} count={ratingSummary.reviewCount} />
-        )}
-
-        {/* Serving size & Available Stock Count */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <Icon name="UsersIcon" size={12} className="text-muted-foreground flex-shrink-0" />
-            <span>{item.servingSize}</span>
-          </div>
-          {/* Stock Display for Users */}
-          <div className="font-semibold text-amber-500/90 bg-amber-500/10 px-2 py-0.5 rounded-md">
-            Stock: {item.stock} left
-          </div>
-        </div>
-
-        {/* Low stock warning (Triggers when below 5, i.e., 1 to 4 stocks) */}
-        {isLowStock && !isInactive && (
-          <div
-            className="flex items-center gap-1.5 text-xs font-medium"
-            style={{ color: 'var(--warning)', animation: 'lowStockPulse 1.8s ease-in-out infinite' }}
-          >
-            <Icon name="ExclamationTriangleIcon" size={12} />
-            Only {item.stock} trays left!
-          </div>
-        )}
-
-        {/* Price + Add to Cart */}
-        <div className="flex items-center justify-between pt-1">
+      {/* Footer / Price & CTA */}
+      <div className="p-4 pt-0">
+        <div className="flex items-center justify-between pt-2 border-t border-border/40">
           <div>
-            <span className={`font-display text-xl font-bold tabular-nums ${isInactive ? 'text-stone-500' : 'text-primary'}`}>
+            <span className={`font-display text-lg md:text-xl font-bold tabular-nums ${isInactive ? 'text-stone-500' : 'text-primary'}`}>
               ₱{item.price.toLocaleString()}
             </span>
-            <span className="text-xs text-muted-foreground ml-1">/ tray</span>
+            <span className="text-[11px] text-muted-foreground ml-0.5">/ tray</span>
           </div>
           <button
             onClick={handleAdd}
             disabled={isInactive || isOutOfStock}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs md:text-sm font-semibold rounded-xl transition-all ${
               isInactive
                 ? 'bg-stone-900/90 text-stone-500 border border-stone-800/60 cursor-not-allowed opacity-80'
-                : 'disabled:opacity-40 disabled:cursor-not-allowed add-cart-btn'
+                : 'disabled:opacity-40 disabled:cursor-not-allowed add-cart-btn active:scale-95'
             }`}
             style={{
               background: isInactive

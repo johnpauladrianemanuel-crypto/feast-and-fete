@@ -43,6 +43,8 @@ interface Order {
 interface ReviewableItem {
   menuItemId: string;
   menuItemName: string;
+  menuItemImage?: string;
+  menuItemImageAlt?: string;
   orderId?: string;
 }
 
@@ -126,12 +128,27 @@ export default function CustomerOrdersPage() {
   const completedCount = orders.filter(o => o.status === 'Completed').length;
   const totalSpent = orders.filter(o => o.status === 'Completed').reduce((s, o) => s + (o.total_amount || 0), 0);
 
-  function openReviewModal(order: Order) {
-    const items: ReviewableItem[] = (order.order_items || []).map(item => ({
+  async function openReviewModal(order: Order) {
+    const orderItems = order.order_items || [];
+    const itemIds = orderItems.map(item => item.menu_item_id);
+    const { data: menuItems } = await supabase
+      .from('menu_items')
+      .select('id, image, image_alt')
+      .in('id', itemIds);
+    const imageById = new Map(
+      (menuItems || []).map(item => [item.id, { image: item.image, imageAlt: item.image_alt }])
+    );
+
+    const items: ReviewableItem[] = orderItems.map(item => {
+      const menuItem = imageById.get(item.menu_item_id);
+      return {
       menuItemId: item.menu_item_id,
       menuItemName: item.menu_item_name,
+      menuItemImage: menuItem?.image || undefined,
+      menuItemImageAlt: menuItem?.imageAlt || item.menu_item_name,
       orderId: order.id,
-    }));
+      };
+    });
     setReviewItems(items);
     setReviewerName(order.customer_name || user?.email || 'Customer');
     setShowReview(true);
