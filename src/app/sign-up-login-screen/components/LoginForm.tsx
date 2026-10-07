@@ -226,7 +226,9 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
 
     setIsResetSending(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
 
       if (error) {
         toast.error(error.message);

@@ -85,6 +85,7 @@ export default function OrderDetailModal({
   const [updating, setUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<string>('Pending');
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -96,6 +97,17 @@ export default function OrderDetailModal({
   if (!mounted || !order) return null;
 
   const handleStatusChange = async (newStatus: OrderStatus) => {
+    if (newStatus === currentStatus) return;
+
+    if (newStatus === 'Confirmed') {
+      setShowPaymentConfirmation(true);
+      return;
+    }
+
+    await updateOrderStatus(newStatus);
+  };
+
+  const updateOrderStatus = async (newStatus: OrderStatus) => {
     if (newStatus === currentStatus) return;
 
     const cancellationReason =
@@ -347,6 +359,47 @@ export default function OrderDetailModal({
           </button>
         </div>
       </div>
+      {showPaymentConfirmation && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="payment-confirmation-title"
+            aria-describedby="payment-confirmation-description"
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <Icon name="ExclamationTriangleIcon" size={24} className="text-amber-500" />
+              <h3 id="payment-confirmation-title" className="text-lg font-bold text-foreground">
+                Confirm Payment Received
+              </h3>
+            </div>
+            <p id="payment-confirmation-description" className="text-sm leading-relaxed text-muted-foreground">
+              Have you received the 50% payment? If not, please wait for it before confirming this order.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPaymentConfirmation(false)}
+                className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+              >
+                Wait for Payment
+              </button>
+              <button
+                type="button"
+                disabled={updating || updatingId === order.id}
+                onClick={() => {
+                  setShowPaymentConfirmation(false);
+                  void updateOrderStatus('Confirmed');
+                }}
+                className="rounded-xl gradient-brand px-4 py-2.5 text-sm font-bold text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Yes, Confirm Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );

@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CustomerNavbar from '@/components/CustomerNavbar';
@@ -80,10 +81,25 @@ export default function CustomerReviewPaymentContent() {
   const [termsError, setTermsError] = useState('');
   const profileFieldsLocked = Boolean(user && savedAddress);
 
+  useEffect(() => {
+    if (!showTermsModal) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showTermsModal]);
+
   const deliveryFee = deliveryMethod === 'delivery' ? 150 : 0;
   const priorityFee = orderType === 'priority' ? PRIORITY_FEE : 0;
   const total = totalAmount + deliveryFee + priorityFee;
   const itemCount = state.items.reduce((s, i) => s + i.quantity, 0);
+  const cashPaymentLabel = deliveryMethod === 'pickup' ? 'Cash On Pick Up' : 'Cash on Delivery';
+  const cashPaymentDescription = deliveryMethod === 'pickup'
+    ? 'Pay when you pick up your order'
+    : 'Pay when your order arrives';
 
   useEffect(() => {
     const gp = getGuestProfile();
@@ -697,9 +713,11 @@ export default function CustomerReviewPaymentContent() {
                       <span className="text-2xl flex-shrink-0">{opt.icon}</span>
                       <div className="min-w-0">
                         <p className={`text-sm font-semibold truncate ${paymentMethod === opt.value ? 'text-primary' : 'text-foreground'}`}>
-                          {opt.label}
+                          {opt.value === 'cash_on_delivery' ? cashPaymentLabel : opt.label}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">{opt.desc}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {opt.value === 'cash_on_delivery' ? cashPaymentDescription : opt.desc}
+                        </p>
                       </div>
                       {paymentMethod === opt.value && (
                         <div className="ml-auto w-5 h-5 rounded-full gradient-brand flex items-center justify-center flex-shrink-0">
@@ -768,7 +786,11 @@ export default function CustomerReviewPaymentContent() {
                   <span className="text-lg">{PAYMENT_OPTIONS.find(p => p.value === paymentMethod)?.icon}</span>
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">Payment via</p>
-                    <p className="text-sm font-semibold text-foreground truncate">{PAYMENT_OPTIONS.find(p => p.value === paymentMethod)?.label}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {paymentMethod === 'cash_on_delivery'
+                        ? cashPaymentLabel
+                        : PAYMENT_OPTIONS.find(p => p.value === paymentMethod)?.label}
+                    </p>
                   </div>
                 </div>
 
@@ -883,8 +905,8 @@ export default function CustomerReviewPaymentContent() {
       )}
 
       {/* TERMS AND CONDITIONS MODAL */}
-      {showTermsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:p-4">
+      {showTermsModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex min-h-full items-center justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:p-4">
           <div className="bg-card border border-border rounded-2xl flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden p-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 sm:max-h-[calc(100dvh-2rem)] sm:p-6">
             <div className="flex shrink-0 items-center justify-between mb-3 sm:mb-4">
               <h3 className="text-lg font-bold text-foreground">Terms and Conditions</h3>
@@ -947,7 +969,8 @@ export default function CustomerReviewPaymentContent() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
