@@ -50,6 +50,7 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [cancelRequest, setCancelRequest] = useState<{ orderId: string; reason: string }>({ orderId: '', reason: '' });
+  const [paymentConfirmationOrderId, setPaymentConfirmationOrderId] = useState<string | null>(null);
   
   // State para sa Modal Form ng Completed & Cancelled Orders
   const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -183,6 +184,14 @@ export default function AdminOrdersPage() {
   };
 
   const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
+    const order = orders.find((item) => item.id === orderId);
+    if (order?.status === newStatus) return;
+
+    if (newStatus === 'Confirmed') {
+      setPaymentConfirmationOrderId(orderId);
+      return;
+    }
+
     if (newStatus === 'Cancelled') {
       setCancelRequest({ orderId, reason: '' });
       return;
@@ -468,7 +477,7 @@ export default function AdminOrdersPage() {
 
                           {NEXT_STATUS[order.status] && (
                             <button
-                              onClick={() => updateStatus(order.id, NEXT_STATUS[order.status]!)}
+                              onClick={() => handleStatusChange(order.id, NEXT_STATUS[order.status]!)}
                               disabled={updatingId === order.id}
                               className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 whitespace-nowrap cursor-pointer"
                               style={{
@@ -802,6 +811,52 @@ export default function AdminOrdersPage() {
                 style={{ background: '#B91C1C', color: '#FFF7ED' }}
               >
                 Confirm cancellation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentConfirmationOrderId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div
+            className="w-full max-w-md rounded-2xl border p-6 shadow-2xl"
+            style={{ background: 'var(--admin-bg)', borderColor: 'var(--admin-border)' }}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="payment-confirmation-title"
+            aria-describedby="payment-confirmation-description"
+          >
+            <div className="flex items-center gap-3">
+              <Icon name="ExclamationTriangleIcon" size={24} style={{ color: '#FBBF24' }} />
+              <h2 id="payment-confirmation-title" className="text-lg font-bold" style={{ color: '#F5EDE0' }}>
+                Confirm Payment Received
+              </h2>
+            </div>
+            <p id="payment-confirmation-description" className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--admin-muted)' }}>
+              Have you received the 50% payment? If not, please wait for it before confirming this order.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPaymentConfirmationOrderId(null)}
+                className="rounded-xl px-4 py-2 text-sm font-medium"
+                style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+              >
+                Wait for Payment
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const orderId = paymentConfirmationOrderId;
+                  setPaymentConfirmationOrderId(null);
+                  void updateStatus(orderId, 'Confirmed');
+                }}
+                disabled={updatingId === paymentConfirmationOrderId}
+                className="rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: '#8B1E2D', color: '#FFF7ED' }}
+              >
+                Yes, Confirm Order
               </button>
             </div>
           </div>
