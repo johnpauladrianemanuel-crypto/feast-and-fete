@@ -8,8 +8,6 @@ import MenuSearch from './MenuSearch';
 import Icon from '@/components/ui/AppIcon';
 import MenuItemDetailModal from './MenuItemDetailModal';
 
-const CHICKEN_AFRITADA_IMAGE = 'https://upload.wikimedia.org/wikipedia/commons/b/bf/Chicken_Afritada%2C_Mar_2024.jpg';
-
 export type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'name-asc' | 'sold-desc';
 
 export default function MenuBrowseContent() {
@@ -122,10 +120,8 @@ export default function MenuBrowseContent() {
     description: item.description,
     price: item.price,
     servingSize: item.servingSize,
-    image: item.id === 'item-010' || item.name.toLowerCase() === 'chicken afritada' ? CHICKEN_AFRITADA_IMAGE : item.image,
-    imageAlt: item.id === 'item-010' || item.name.toLowerCase() === 'chicken afritada'
-      ? 'Chicken Afritada with chicken pieces, carrots, potatoes, and tomato sauce'
-      : item.imageAlt,
+    image: item.image,
+    imageAlt: item.imageAlt,
     ingredients: item.ingredients,
     isActive: item.isActive,
     unavailableReason: item.unavailableReason,

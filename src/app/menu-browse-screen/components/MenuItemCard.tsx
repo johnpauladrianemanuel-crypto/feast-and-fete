@@ -197,7 +197,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
             alt={item.imageAlt}
             width={320}
             height={192}
-            className={`w-full h-full object-cover transition-transform duration-500 ${
+            className={`menu-photo w-full h-full object-cover object-center transition-transform duration-500 ${
               isInactive ? 'filter grayscale contrast-125 brightness-30 blur-[2px]' : 'group-hover:scale-108'
             }`}
             style={{
@@ -330,7 +330,9 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
             <span className={`font-display text-lg md:text-xl font-bold tabular-nums ${isInactive ? 'text-stone-500' : 'text-primary'}`}>
               ₱{item.price.toLocaleString()}
             </span>
-            <span className="text-[11px] text-muted-foreground ml-0.5">/ tray</span>
+            <span className="text-[11px] text-muted-foreground ml-0.5">
+              / {item.categorySlug === 'drinks' ? 'bottle' : 'tray'}
+            </span>
           </div>
           <button
             onClick={handleAdd}

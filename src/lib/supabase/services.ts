@@ -76,7 +76,18 @@ export interface AdminNotification {
 function rowToMenuItem(row: Record<string, unknown>): MenuItem {
   const rawActive = row.is_active ?? row.isActive;
   const description = String(row.description ?? '');
-  const localDescription = MENU_ITEMS.find(item => item.id === row.id)?.description;
+  const localMenuItem = MENU_ITEMS.find(item => item.id === row.id);
+  const localDescription = localMenuItem?.description;
+  const databaseImage = row.image as string;
+  const useLocalMenuImage =
+    (
+      (localMenuItem?.categorySlug === 'drinks' &&
+        (!databaseImage || databaseImage.includes('rocket.new/generatedImages'))) ||
+      (row.id === 'item-010' &&
+        (!databaseImage || databaseImage.includes('Chicken_Afritada'))) ||
+      (row.id === 'item-024' &&
+        (!databaseImage || databaseImage.includes('rocket.new/generatedImages')))
+    );
   const localBaseDescription = localDescription?.split(/\s+Ingredients:\s*/i, 2)[0].trim();
   const descriptionIngredients = description.match(/\s+Ingredients:\s*(.*)$/i)?.[1]?.trim() ?? '';
   const localIngredients = localDescription?.match(/\s+Ingredients:\s*(.*)$/i)?.[1]?.trim() ?? '';
@@ -96,8 +107,8 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
     description: resolvedDescription,
     price: Number(row.price),
     servingSize: (row.serving_size as string) || (row.servingSize as string) || '',
-    image: row.image as string,
-    imageAlt: row.image_alt as string,
+    image: useLocalMenuImage ? localMenuItem?.image ?? databaseImage : databaseImage,
+    imageAlt: useLocalMenuImage ? localMenuItem?.imageAlt ?? (row.image_alt as string) : (row.image_alt as string),
     ingredients: String(row.ingredients ?? '').trim() || descriptionIngredients || localIngredients,
     isActive: rawActive !== undefined && rawActive !== null ? Boolean(rawActive) : true,
     unavailableReason: (row.unavailable_reason as string) || (row.unavailableReason as string) || '',

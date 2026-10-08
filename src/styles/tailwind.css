@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .menu-photo {
+    filter: saturate(0.92) contrast(1.04) brightness(1.02) sepia(0.04);
+  }
+}
+
 :root {
   --background: #FDF8F0;
   --foreground: #2C1810;

@@ -123,6 +123,7 @@ export default function LandingFooter() {
         <div className="footer-v2-bottom-bar mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-white/25">© 2026 Feast & Fête. All rights reserved.</p>
           <div className="flex gap-6">
+            <a href="/assets/images/IMAGE_CREDITS.md" className="text-xs text-white/25 hover:text-white/60 transition-colors">Photo Credits</a>
             <a href="#" className="text-xs text-white/25 hover:text-white/60 transition-colors">Privacy Policy</a>
             <a href="#" className="text-xs text-white/25 hover:text-white/60 transition-colors">Terms of Service</a>
           </div>

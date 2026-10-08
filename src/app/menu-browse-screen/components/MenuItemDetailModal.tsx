@@ -138,7 +138,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               alt={item.imageAlt || item.name}
               width={580}
               height={290}
-              className="w-full h-full object-cover"
+              className="menu-photo w-full h-full object-cover object-center"
             />
 
             <div 
@@ -194,7 +194,9 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                 <div className="font-display text-2xl sm:text-3xl font-extrabold text-primary">
                   ₱{item.price.toLocaleString()}
                 </div>
-                <div className="text-xs font-semibold text-stone-600">per tray</div>
+                <div className="text-xs font-semibold text-stone-600">
+                  per {item.categorySlug === 'drinks' ? 'bottle' : 'tray'}
+                </div>
               </div>
             </div>
           </div>
