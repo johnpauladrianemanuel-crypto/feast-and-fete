@@ -55,8 +55,8 @@ export default function HeroSection() {
             />
           </div>
         ))}
-        {/* Dark Overlay para lumutang at mabasa nang maayos ang text */}
-        <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] z-10" />
+        {/* Light gradient keeps the food photos vivid while preserving text contrast. */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/35 via-black/15 to-black/5 z-10" />
       </div>
 
       {/* Animated noise grain overlay kung meron man sa styles mo */}
@@ -82,7 +82,7 @@ export default function HeroSection() {
             </h1>
           </div>
 
-          <p className="text-white/55 text-base lg:text-lg leading-relaxed max-w-md">
+          <p className="text-white/90 text-base lg:text-lg leading-relaxed max-w-md">
             Premium catering for birthdays, christenings, fiestas & family gatherings — delivered across Metro Manila.
           </p>
 
@@ -114,7 +114,7 @@ export default function HeroSection() {
             ].map((stat) => (
               <div key={stat.label} className="space-y-0.5">
                 <p className="text-xl font-black text-secondary tabular-nums">{stat.value}</p>
-                <p className="text-xs text-white/40 font-medium">{stat.label}</p>
+                <p className="text-xs text-white/70 font-medium">{stat.label}</p>
               </div>
             ))}
           </div>

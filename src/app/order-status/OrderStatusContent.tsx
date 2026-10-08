@@ -8,6 +8,7 @@ import Icon from '@/components/ui/AppIcon';
 import ReviewModal from '@/app/components/ReviewModal';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled' | string;
 
@@ -371,6 +372,7 @@ export default function OrderStatusContent() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [mounted, setMounted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -443,6 +445,45 @@ export default function OrderStatusContent() {
   useEffect(() => {
     if (user) fetchMyOrders();
   }, [user, fetchMyOrders]);
+
+  const handleCancelOrder = async (order: Order) => {
+    if (!user || normalizeStatus(order.status) !== 'pending') return;
+    if (!window.confirm(`Cancel order ${order.order_number}? This cannot be undone.`)) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .update({ status: 'Cancelled', updated_at: new Date().toISOString() })
+        .eq('id', order.id)
+        .eq('user_id', user.id)
+        .eq('status', 'Pending')
+        .select('id, status, updated_at')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Failed to cancel order:', error.message);
+        toast.error('Unable to cancel your order. Please try again.');
+        return;
+      }
+
+      if (!data) {
+        toast.error('The order status changed before cancellation. Refreshing its latest status.');
+        await fetchMyOrders();
+        return;
+      }
+
+      const cancelledOrder = { ...order, ...data };
+      setSelectedOrder(cancelledOrder);
+      setMyOrders(prev => prev.map(item => item.id === order.id ? cancelledOrder : item));
+      toast.success('Your order has been cancelled.');
+    } catch (error) {
+      console.error('Failed to cancel order:', error);
+      toast.error('Unable to cancel your order. Please try again.');
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
 
   useEffect(() => {
     if (!activeOrder?.id || !user) return;
@@ -683,6 +724,8 @@ export default function OrderStatusContent() {
                     onOpenReview={() => openReviewModal(selectedOrder)}
                     hasReviewed={isCurrentOrderReviewed}
                     onHideOrder={() => setShowHistory(true)}
+                    onCancel={() => handleCancelOrder(selectedOrder)}
+                    isCancelling={cancellingOrderId === selectedOrder.id}
                   />
                 )
               )}
@@ -731,6 +774,8 @@ function OrderDetail({
   onOpenReview,
   hasReviewed,
   onHideOrder,
+  onCancel,
+  isCancelling,
 }: {
   order: Order;
   lastUpdated: Date | null;
@@ -739,6 +784,8 @@ function OrderDetail({
   onOpenReview: () => void;
   hasReviewed: boolean;
   onHideOrder?: () => void;
+  onCancel: () => void;
+  isCancelling: boolean;
 }) {
   const [visible, setVisible] = useState(false);
   const prevStatus = useRef(order.status);
@@ -982,6 +1029,20 @@ function OrderDetail({
               <span className="text-primary">₱{Number(order.total_amount).toLocaleString()}</span>
             </div>
           </div>
+
+          {normStatus === 'pending' && (
+            <div className="mt-6 flex justify-end border-t border-border pt-5">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={isCancelling}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Icon name={isCancelling ? 'ArrowPathIcon' : 'XMarkIcon'} size={16} className={isCancelling ? 'animate-spin' : ''} />
+                {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

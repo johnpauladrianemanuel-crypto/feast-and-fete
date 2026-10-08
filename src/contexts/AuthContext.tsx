@@ -3,6 +3,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+const SIGN_UP_EMAIL_REDIRECT =
+  'https://feast-and-fete-two.vercel.app/auth/callback?next=%2Fsign-up-login-screen';
+
 const AuthContext = createContext<any>({});
 
 export const useAuth = () => {
@@ -81,7 +84,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUp = async (email: string, password: string, metadata = {}) => {
     const signUpPayload: any = { email, password };
     const signUpOptions: any = {
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: SIGN_UP_EMAIL_REDIRECT },
     };
 
     const metaDataPayload: Record<string, string> = {};
@@ -108,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (error.message?.includes('Database error saving new user')) {
       const { data: fallbackData, error: fallbackError } = await supabase.auth.signUp({
         ...signUpPayload,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: SIGN_UP_EMAIL_REDIRECT },
       });
       if (!fallbackError) return fallbackData;
     }
