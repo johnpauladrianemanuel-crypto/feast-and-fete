@@ -79,6 +79,7 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
   const localMenuItem = MENU_ITEMS.find(item => item.id === row.id);
   const localDescription = localMenuItem?.description;
   const databaseImage = row.image as string;
+  const databaseServingSize = (row.serving_size as string) || (row.servingSize as string) || '';
   const useLocalMenuImage =
     (
       (localMenuItem?.categorySlug === 'drinks' &&
@@ -86,8 +87,13 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
       (row.id === 'item-010' &&
         (!databaseImage || databaseImage.includes('Chicken_Afritada'))) ||
       (row.id === 'item-024' &&
-        (!databaseImage || databaseImage.includes('rocket.new/generatedImages')))
+        (!databaseImage || databaseImage.includes('rocket.new/generatedImages'))) ||
+      ((row.id === 'item-015' || row.id === 'item-017') &&
+        !databaseImage?.startsWith('/assets/images/'))
     );
+  const useLocalServingSize =
+    (row.id === 'item-025' && databaseServingSize === 'Per Bottle') ||
+    (row.id === 'item-028' && databaseServingSize === 'Per Bottle');
   const localBaseDescription = localDescription?.split(/\s+Ingredients:\s*/i, 2)[0].trim();
   const descriptionIngredients = description.match(/\s+Ingredients:\s*(.*)$/i)?.[1]?.trim() ?? '';
   const localIngredients = localDescription?.match(/\s+Ingredients:\s*(.*)$/i)?.[1]?.trim() ?? '';
@@ -106,7 +112,7 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
     categorySlug: row.category_slug as string,
     description: resolvedDescription,
     price: Number(row.price),
-    servingSize: (row.serving_size as string) || (row.servingSize as string) || '',
+    servingSize: useLocalServingSize ? localMenuItem?.servingSize ?? databaseServingSize : databaseServingSize,
     image: useLocalMenuImage ? localMenuItem?.image ?? databaseImage : databaseImage,
     imageAlt: useLocalMenuImage ? localMenuItem?.imageAlt ?? (row.image_alt as string) : (row.image_alt as string),
     ingredients: String(row.ingredients ?? '').trim() || descriptionIngredients || localIngredients,

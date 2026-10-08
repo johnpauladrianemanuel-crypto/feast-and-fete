@@ -642,9 +642,7 @@ export default function CustomerNavbar() {
               )}
             </div>
 
-            <Link href="/menu-browse-screen?category=Packed+Meals" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Packed Meals</Link>
-            <Link href="/menu-browse-screen?category=Packages" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Packages</Link>
-            <Link href="/menu-browse-screen?category=Catering" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Catering</Link>
+            <Link href="/menu-browse-screen?category=packages" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Packages</Link>
             <Link href="/faq" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">FAQ</Link>
             <Link href="/about" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">About</Link>
             <Link href="/contact" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Contact</Link>

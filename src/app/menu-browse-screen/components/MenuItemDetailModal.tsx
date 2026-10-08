@@ -7,6 +7,7 @@ import { MenuItem } from '@/lib/supabase/services';
 import { useCart } from '@/lib/cartContext';
 import { toast } from 'sonner';
 import { MenuItemRatingSummary } from '@/lib/supabase/services';
+import { getMenuItemUnitLabel } from '@/lib/menuItemUnit';
 
 interface Props {
   item: MenuItem | null;
@@ -195,7 +196,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                   ₱{item.price.toLocaleString()}
                 </div>
                 <div className="text-xs font-semibold text-stone-600">
-                  per {item.categorySlug === 'drinks' ? 'bottle' : 'tray'}
+                  per {getMenuItemUnitLabel(item)}
                 </div>
               </div>
             </div>

@@ -7,6 +7,7 @@ import { useCart } from '@/lib/cartContext';
 import { toast } from 'sonner';
 import { MenuItemRatingSummary } from '@/lib/supabase/services';
 import { createClient } from '@/lib/supabase/client';
+import { getMenuItemUnitLabel } from '@/lib/menuItemUnit';
 
 interface Props {
   item: MenuItem;
@@ -331,7 +332,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
               ₱{item.price.toLocaleString()}
             </span>
             <span className="text-[11px] text-muted-foreground ml-0.5">
-              / {item.categorySlug === 'drinks' ? 'bottle' : 'tray'}
+              / {getMenuItemUnitLabel(item)}
             </span>
           </div>
           <button

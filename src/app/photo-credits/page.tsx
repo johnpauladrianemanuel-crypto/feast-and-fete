@@ -44,6 +44,20 @@ const PHOTO_CREDITS = [
     license: 'CC0',
     licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
   },
+  {
+    item: 'Baked Macaroni Filipino-Style',
+    creator: 'Roderick Suñaz Sumalinog',
+    source: 'https://commons.wikimedia.org/wiki/File:Bake_mac.jpg',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+  },
+  {
+    item: 'Seafood Kare-Kare',
+    creator: 'Unknown author (Wikimedia Commons)',
+    source: 'https://commons.wikimedia.org/wiki/File:Seafood_Kare_-_Kare.jpg',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+  },
 ];
 
 export default function PhotoCreditsPage() {
