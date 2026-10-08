@@ -6,6 +6,77 @@
   .menu-photo {
     filter: saturate(0.92) contrast(1.04) brightness(1.02) sepia(0.04);
   }
+
+  .brand-gold-shimmer {
+    position: relative;
+    display: inline-block;
+    background: linear-gradient(
+      110deg,
+      #b8860b 0%,
+      #ffd700 24%,
+      #fff1a8 38%,
+      #d4a017 50%,
+      #fff4bf 62%,
+      #ffd700 76%,
+      #b8860b 100%
+    );
+    background-size: 250% 100%;
+    background-clip: text;
+    color: transparent;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 5px rgb(255 215 0 / 0.28));
+    animation: brand-gold-glow 2.8s ease-in-out infinite, brand-gold-shimmer 4s linear infinite;
+  }
+
+  .brand-gold-shimmer::before,
+  .brand-gold-shimmer::after {
+    position: absolute;
+    color: #ffe680;
+    -webkit-text-fill-color: #ffe680;
+    line-height: 1;
+    pointer-events: none;
+    text-shadow: 0 0 5px rgb(255 215 0 / 0.9), 0 0 12px rgb(255 215 0 / 0.65);
+    animation: brand-gold-sparkle 1.8s ease-in-out infinite;
+  }
+
+  .brand-gold-shimmer::before {
+    content: '✦';
+    top: -0.45em;
+    right: -0.55em;
+    font-size: 0.42em;
+  }
+
+  .brand-gold-shimmer::after {
+    content: '✧';
+    bottom: -0.25em;
+    left: 0.35em;
+    font-size: 0.38em;
+    animation-delay: 0.9s;
+  }
+}
+
+@keyframes brand-gold-shimmer {
+  from { background-position: 100% 50%; }
+  to { background-position: -150% 50%; }
+}
+
+@keyframes brand-gold-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgb(255 215 0 / 0.22)); }
+  50% { filter: drop-shadow(0 0 8px rgb(255 215 0 / 0.58)); }
+}
+
+@keyframes brand-gold-sparkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.7) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(18deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-gold-shimmer,
+  .brand-gold-shimmer::before,
+  .brand-gold-shimmer::after {
+    animation: none;
+  }
 }
 
 :root {

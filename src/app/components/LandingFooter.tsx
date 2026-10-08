@@ -1,9 +1,15 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export default function LandingFooter() {
+  const { user, loading } = useAuth();
+
   const socialLinks = [
     {
       name: 'Facebook',
@@ -67,10 +73,20 @@ export default function LandingFooter() {
             <div className="space-y-4">
               <p className="text-xs font-black text-white uppercase tracking-[0.2em]">Menu</p>
               <ul className="space-y-2.5">
-                {['Beef Trays', 'Pork Trays', 'Chicken Trays', 'Seafood', 'Desserts', 'Packages']?.map(item => (
-                  <li key={item}>
-                    <Link href="/menu-browse-screen" className="text-sm text-white/40 hover:text-white transition-colors">
-                      {item}
+                {[
+                  { label: 'Beef Trays', category: 'beef' },
+                  { label: 'Pork Trays', category: 'pork' },
+                  { label: 'Chicken Trays', category: 'chicken' },
+                  { label: 'Seafood', category: 'seafood' },
+                  { label: 'Desserts', category: 'desserts' },
+                  { label: 'Packages', category: 'packages' },
+                ].map(item => (
+                  <li key={item.label}>
+                    <Link
+                      href={`/menu-browse-screen?category=${item.category}`}
+                      className="text-sm text-white/40 hover:text-white transition-colors"
+                    >
+                      {item.label}
                     </Link>
                   </li>
                 ))}
@@ -81,14 +97,27 @@ export default function LandingFooter() {
               <p className="text-xs font-black text-white uppercase tracking-[0.2em]">Account</p>
               <ul className="space-y-2.5">
                 {[
-                  { label: 'Create Account', href: '/sign-up-login-screen' },
-                  { label: 'Sign In', href: '/sign-up-login-screen' },
-                  { label: 'My Orders', href: '/sign-up-login-screen' },
-                  { label: 'My Profile', href: '/sign-up-login-screen' },
-                ]?.map(item => (
-                  <li key={item?.label}>
-                    <Link href={item?.href} className="text-sm text-white/40 hover:text-white transition-colors">
-                      {item?.label}
+                  { label: 'Create Account', href: '/sign-up-login-screen?tab=register', isCreateAccount: true },
+                  { label: 'Sign In', href: '/sign-up-login-screen?tab=login', isSignIn: true },
+                  { label: 'My Orders', href: '/customer-orders' },
+                  { label: 'My Profile', href: '/customer-profile' },
+                ].map(item => (
+                  <li key={item.label}>
+                    <Link
+                      href={item.href}
+                      onClick={event => {
+                        if (!item.isSignIn && !item.isCreateAccount) return;
+                        if (loading) {
+                          event.preventDefault();
+                          toast.info('Checking your sign-in status. Please try again in a moment.');
+                        } else if (user) {
+                          event.preventDefault();
+                          toast.info(item.isCreateAccount ? 'You Have A Account' : 'You Are Already Sign In');
+                        }
+                      }}
+                      className="text-sm text-white/40 hover:text-white transition-colors"
+                    >
+                      {item.label}
                     </Link>
                   </li>
                 ))}
@@ -99,12 +128,15 @@ export default function LandingFooter() {
               <p className="text-xs font-black text-white uppercase tracking-[0.2em]">Contact</p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-2">
-                  <Icon name="PhoneIcon" size={13} className="text-secondary mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-white/40">0917-123-4567</span>
-                </li>
-                <li className="flex items-start gap-2">
                   <Icon name="EnvelopeIcon" size={13} className="text-secondary mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-white/40">feastandfete@gmail.com</span>
+                  <a
+                    href="https://mail.google.com/mail/?view=cm&fs=1&to=feastandfete%40gmail.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-white/40 hover:text-white transition-colors"
+                  >
+                    feastandfete@gmail.com
+                  </a>
                 </li>
                 <li className="flex items-start gap-2">
                   <Icon name="ClockIcon" size={13} className="text-secondary mt-0.5 flex-shrink-0" />
@@ -123,9 +155,9 @@ export default function LandingFooter() {
         <div className="footer-v2-bottom-bar mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-white/25">© 2026 Feast & Fête. All rights reserved.</p>
           <div className="flex gap-6">
-            <a href="/assets/images/IMAGE_CREDITS.md" className="text-xs text-white/25 hover:text-white/60 transition-colors">Photo Credits</a>
-            <a href="#" className="text-xs text-white/25 hover:text-white/60 transition-colors">Privacy Policy</a>
-            <a href="#" className="text-xs text-white/25 hover:text-white/60 transition-colors">Terms of Service</a>
+            <Link href="/photo-credits" className="text-xs text-white/25 hover:text-white/60 transition-colors">Photo Credits</Link>
+            <Link href="/privacy-policy" className="text-xs text-white/25 hover:text-white/60 transition-colors">Privacy Policy</Link>
+            <Link href="/terms-of-service" className="text-xs text-white/25 hover:text-white/60 transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>

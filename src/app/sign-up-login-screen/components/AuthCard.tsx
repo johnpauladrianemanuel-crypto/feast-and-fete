@@ -29,6 +29,13 @@ export default function AuthCard({ onSuccess }: AuthCardProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab === 'register' || tab === 'login') {
+      setActiveTab(tab);
+    }
+  }, []);
+
   // Animate tab switch
   function switchTab(tab: 'login' | 'register' | 'forgot') {
     if (tab === activeTab || animating) return;

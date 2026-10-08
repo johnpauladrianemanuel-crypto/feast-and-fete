@@ -344,13 +344,10 @@ export default function CustomerNavbar() {
     <nav className="sticky top-0 z-50 bg-black/30 backdrop-blur-md border-b border-white/10 transition-all duration-200" ref={dropdownRef}>
       <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 xl:px-10">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & White-to-Gold Faded Brand Text */}
+          {/* Logo & gold shimmer brand text */}
           <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
             <AppLogo size={48} />
-            <span 
-              className="font-display text-2xl font-bold bg-gradient-to-r from-white via-[#FFF0B3] to-[#FFD700] bg-clip-text text-transparent hidden sm:block" 
-              style={{ letterSpacing: '-0.01em' }}
-            >
+            <span className="brand-gold-shimmer hidden font-display text-2xl font-bold sm:block">
               Feast & Fête
             </span>
           </Link>
@@ -622,14 +619,25 @@ export default function CustomerNavbar() {
 
               {mobileFoodTraysOpen && (
                 <div className="pl-4 space-y-1 my-1 border-l border-white/10 ml-2">
-                  <Link href="/menu-browse-screen?category=Beef" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Beef</Link>
-                  <Link href="/menu-browse-screen?category=Chicken" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Chicken</Link>
-                  <Link href="/menu-browse-screen?category=Pork" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Pork</Link>
-                  <Link href="/menu-browse-screen?category=Fish" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Fish</Link>
-                  <Link href="/menu-browse-screen?category=Seafood" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Seafood</Link>
-                  <Link href="/menu-browse-screen?category=Vegetable" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Vegetable</Link>
-                  <Link href="/menu-browse-screen?category=Pasta" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Pasta</Link>
-                  <Link href="/menu-browse-screen?category=Noodles" onClick={() => setMobileOpen(false)} className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10">Noodles</Link>
+                  {[
+                    { label: 'Beef', category: 'beef' },
+                    { label: 'Chicken', category: 'chicken' },
+                    { label: 'Pork', category: 'pork' },
+                    { label: 'Fish', category: 'fish' },
+                    { label: 'Seafood', category: 'seafood' },
+                    { label: 'Vegetable', category: 'vegetables' },
+                    { label: 'Pasta', category: 'pasta' },
+                    { label: 'Noodles', category: 'pasta' },
+                  ].map(item => (
+                    <Link
+                      key={item.label}
+                      href={`/menu-browse-screen?category=${item.category}`}
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-1.5 px-2 rounded text-sm text-white/80 hover:bg-white/10"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
                 </div>
               )}
             </div>
@@ -637,10 +645,10 @@ export default function CustomerNavbar() {
             <Link href="/menu-browse-screen?category=Packed+Meals" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Packed Meals</Link>
             <Link href="/menu-browse-screen?category=Packages" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Packages</Link>
             <Link href="/menu-browse-screen?category=Catering" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Catering</Link>
-            <Link href="/menu-browse-screen?category=FAQ" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">FAQ</Link>
-            <Link href="/menu-browse-screen?category=About" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">About</Link>
-            <Link href="/menu-browse-screen?category=Contact" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Contact</Link>
-            <Link href="/menu-browse-screen?category=Blogs" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Blogs</Link>
+            <Link href="/faq" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">FAQ</Link>
+            <Link href="/about" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">About</Link>
+            <Link href="/contact" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Contact</Link>
+            <Link href="/blogs" onClick={() => setMobileOpen(false)} className="block px-2 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 transition-colors">Blogs</Link>
 
             <hr className="my-2 border-white/10" />
 

@@ -520,18 +520,12 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
       <AnimatedPanel show={showChoicePanel}>
         <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
           <p className="text-sm font-semibold text-foreground text-center">Continue as Guest with:</p>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => { setShowGuestOptions(false); setGuestMethod('phone'); }}
-              className="flex flex-col items-center gap-2 py-4 px-3 rounded-xl border border-border bg-card hover:border-primary"
-            >
-              <Icon name="PhoneIcon" size={28} className="text-primary" />
-            </button>
+          <div className="grid grid-cols-1 gap-3">
             <button
               type="button"
               onClick={() => { setShowGuestOptions(false); setGuestMethod('gmail'); }}
-              className="flex flex-col items-center gap-2 py-4 px-3 rounded-xl border border-border bg-card hover:border-primary"
+              aria-label="Continue as guest with Gmail"
+              className="flex items-center justify-center gap-3 py-4 px-3 rounded-xl border border-border bg-card hover:border-primary"
             >
               <svg width="28" height="28" viewBox="0 0 48 48">
                 <path fill="#EA4335" d="M24 5.457c6.288 0 10.56 2.718 12.984 4.986l9.54-9.3C41.172 1.332 33.228-2 24-2 14.628-2 6.48 3.348 2.172 11.22l11.1 8.628C15.468 13.2 19.26 5.457 24 5.457z"/>
@@ -539,6 +533,7 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
                 <path fill="#FBBC05" d="M13.272 28.695A13.8 13.8 0 0 1 12.6 24c0-1.638.24-3.228.672-4.695L2.172 10.677A23.94 23.94 0 0 0 0 24c0 3.876.924 7.536 2.556 10.776l10.716-6.081z"/>
                 <path fill="#34A853" d="M24 48c6.48 0 11.916-2.148 15.888-5.832l-7.2-5.592c-2.148 1.44-4.896 2.292-8.688 2.292-4.74 0-8.532-3.204-9.936-7.512l-10.716 6.081C6.48 44.652 14.628 48 24 48z"/>
               </svg>
+              <span className="text-sm font-semibold text-foreground">Continue with Gmail</span>
             </button>
           </div>
           <button type="button" onClick={resetGuestFlow} className="w-full text-xs text-muted-foreground text-center">

@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { fetchMenuItems, fetchAllMenuItemRatings, fetchCategories, MenuItemRatingSummary, MenuItem, Category } from '@/lib/supabase/services';
 import { createClient } from '@/lib/supabase/client';
 import MenuGrid from './MenuGrid';
@@ -11,6 +12,7 @@ import MenuItemDetailModal from './MenuItemDetailModal';
 export type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'name-asc' | 'sold-desc';
 
 export default function MenuBrowseContent() {
+  const searchParams = useSearchParams();
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('featured');
@@ -21,6 +23,10 @@ export default function MenuBrowseContent() {
   const [headerVisible, setHeaderVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+
+  useEffect(() => {
+    setActiveCategory(searchParams.get('category') || 'all');
+  }, [searchParams]);
 
   useEffect(() => {
     const t1 = setTimeout(() => setHeaderVisible(true), 80);
@@ -73,7 +79,12 @@ export default function MenuBrowseContent() {
     let items = [...menuItems];
 
     if (activeCategory !== 'all') {
-      items = items.filter(i => i.categorySlug === activeCategory);
+      items = activeCategory === 'fish'
+        ? items.filter(i =>
+          i.categorySlug === 'seafood' &&
+          /\b(fish|mackerel|tanigue|salmon|tuna)\b/i.test(`${i.name} ${i.description} ${i.ingredients}`)
+        )
+        : items.filter(i => i.categorySlug === activeCategory);
     }
 
     if (searchQuery.trim()) {
@@ -110,6 +121,7 @@ export default function MenuBrowseContent() {
 
   const activeCategoryName =
     activeCategory === 'all' ? 'All Items'
+      : activeCategory === 'fish' ? 'Fish'
       : categories.find(c => c.slug === activeCategory)?.name ?? 'Items';
 
   const mappedItems = filteredItems.map(item => ({
