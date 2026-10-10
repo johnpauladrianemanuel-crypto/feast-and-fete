@@ -8,6 +8,7 @@ import Icon from '@/components/ui/AppIcon';
 import ReviewModal from '@/app/components/ReviewModal';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getOrderStatusLabel, getOrderWorkflowStatus } from '@/lib/orderWorkflow';
 import { toast } from 'sonner';
 
 type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled' | string;
@@ -112,7 +113,35 @@ const TIMELINE_STEPS: {
   },
 ];
 
-const STATUS_ORDER = ['pending', 'confirmed', 'preparing', 'ready', 'shipped', 'completed'];
+const PICKUP_TIMELINE_STEPS = TIMELINE_STEPS.filter((step) => step.status !== 'shipped').map(
+  (step) => {
+    if (step.status === 'preparing') {
+      return {
+        ...step,
+        label: 'In the Kitchen',
+        desc: 'Our chefs are preparing your order for pickup.',
+        etaLabel: 'Kitchen',
+      };
+    }
+    if (step.status === 'ready') {
+      return {
+        ...step,
+        label: 'Ready for Pickup',
+        desc: 'Your order is ready. Please pick it up at Feast & Fête Kitchen.',
+        etaLabel: 'Ready for Pickup',
+      };
+    }
+    return step;
+  }
+);
+
+function getOrderWorkflow(deliveryMethod: Order['delivery_method']) {
+  const steps = deliveryMethod === 'pickup' ? PICKUP_TIMELINE_STEPS : TIMELINE_STEPS;
+  return {
+    steps,
+    statusOrder: steps.map((step) => step.status).concat('completed'),
+  };
+}
 
 const PAYMENT_LABELS: Record<string, string> = {
   gcash: 'GCash',
@@ -136,15 +165,19 @@ function normalizeStatus(status: string | null | undefined): string {
   return status.trim().toLowerCase();
 }
 
-function getStepState(stepStatus: string, currentStatus: string): 'completed' | 'active' | 'upcoming' {
+function getStepState(
+  stepStatus: string,
+  currentStatus: string,
+  statusOrder: string[]
+): 'completed' | 'active' | 'upcoming' {
   const normCurrent = normalizeStatus(currentStatus);
   const normStep = normalizeStatus(stepStatus);
 
   if (normCurrent === 'cancelled') return 'upcoming';
   if (normCurrent === 'completed') return 'completed';
 
-  const stepIdx = STATUS_ORDER.indexOf(normStep);
-  const currentIdx = STATUS_ORDER.indexOf(normCurrent);
+  const stepIdx = statusOrder.indexOf(normStep);
+  const currentIdx = statusOrder.indexOf(normCurrent);
 
   if (currentIdx === -1) return stepIdx === 0 ? 'active' : 'upcoming';
   if (stepIdx < currentIdx) return 'completed';
@@ -152,7 +185,7 @@ function getStepState(stepStatus: string, currentStatus: string): 'completed' | 
   return 'upcoming';
 }
 
-function AnimatedProgressBar({ percent, status }: { percent: number; status: string }) {
+function AnimatedProgressBar({ percent, order }: { percent: number; order: Order }) {
   const [displayPercent, setDisplayPercent] = useState(0);
   const animRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -166,14 +199,20 @@ function AnimatedProgressBar({ percent, status }: { percent: number; status: str
     };
   }, [percent]);
 
-  const totalSteps = TIMELINE_STEPS.length;
-  const stepPercents = TIMELINE_STEPS.map((_, i) => Math.round((i / (totalSteps - 1)) * 100));
+  const { steps } = getOrderWorkflow(order.delivery_method);
+  const totalSteps = steps.length;
+  const statusOrder = steps.map((step) => step.status);
+  const stepPercents = steps.map((_, i) => Math.round((i / (totalSteps - 1)) * 100));
 
   return (
     <div className="mb-8">
       <div className="flex justify-between mb-3 px-1">
-        {TIMELINE_STEPS.map((step) => {
-          const state = getStepState(step.status, status);
+        {steps.map((step) => {
+          const state = getStepState(
+            step.status,
+            getOrderWorkflowStatus(order.delivery_method, order.status),
+            statusOrder
+          );
           return (
             <div key={step.status} className="flex flex-col items-center gap-1" style={{ width: `${100 / totalSteps}%` }}>
               <div
@@ -266,7 +305,9 @@ function AnimatedProgressBar({ percent, status }: { percent: number; status: str
         <span className="text-xs font-semibold" style={{ color: '#D4A017' }}>
           {displayPercent}% Complete
         </span>
-        <span className="text-xs text-muted-foreground">Completed</span>
+        <span className="text-xs text-muted-foreground">
+          {order.delivery_method === 'pickup' ? 'Ready for Pickup' : 'Completed'}
+        </span>
       </div>
 
       <style>{`
@@ -280,10 +321,11 @@ function AnimatedProgressBar({ percent, status }: { percent: number; status: str
 }
 
 function StageCard({ order }: { order: Order }) {
-  const normStatus = normalizeStatus(order.status);
-  const currentIdx = STATUS_ORDER.indexOf(normStatus);
-  const currentStep = TIMELINE_STEPS[currentIdx >= 0 && currentIdx < TIMELINE_STEPS.length ? currentIdx : 0];
-  const nextStep = TIMELINE_STEPS[currentIdx + 1];
+  const normStatus = normalizeStatus(getOrderWorkflowStatus(order.delivery_method, order.status));
+  const { steps, statusOrder } = getOrderWorkflow(order.delivery_method);
+  const currentIdx = statusOrder.indexOf(normStatus);
+  const currentStep = steps[currentIdx >= 0 && currentIdx < steps.length ? currentIdx : 0];
+  const nextStep = steps[currentIdx + 1];
 
   if (normStatus === 'cancelled' || normStatus === 'completed') return null;
 
@@ -549,7 +591,17 @@ export default function OrderStatusContent() {
   }
 
   const normStatus = normalizeStatus(activeOrder?.status);
-  const currentStepIndex = activeOrder ? STATUS_ORDER.indexOf(normStatus) : -1;
+  const activeWorkflow = activeOrder ? getOrderWorkflow(activeOrder.delivery_method) : null;
+  const workflowStatus = activeOrder
+    ? normalizeStatus(getOrderWorkflowStatus(activeOrder.delivery_method, activeOrder.status))
+    : normStatus;
+  const currentStepIndex = activeWorkflow
+    ? activeWorkflow.statusOrder.indexOf(workflowStatus)
+    : -1;
+  const progressStepCount =
+    activeOrder?.delivery_method === 'pickup'
+      ? activeWorkflow?.steps.length
+      : activeWorkflow?.statusOrder.length;
   
   const progressPercent =
     activeOrder && normStatus !== 'cancelled'
@@ -559,7 +611,7 @@ export default function OrderStatusContent() {
             0,
             Math.min(
               100,
-              Math.round((Math.max(0, currentStepIndex) / (STATUS_ORDER.length - 1)) * 100)
+              Math.round((Math.max(0, currentStepIndex) / Math.max(1, (progressStepCount || 1) - 1)) * 100)
             )
           )
       : 0;
@@ -747,6 +799,7 @@ function OrderDetail({
   }, [order.status]);
 
   const normStatus = normalizeStatus(order.status);
+  const workflow = getOrderWorkflow(order.delivery_method);
   const badge = STATUS_BADGE[normStatus] || STATUS_BADGE.pending;
 
   return (
@@ -762,7 +815,8 @@ function OrderDetail({
         <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3 animate-pulse">
           <Icon name="ArrowPathIcon" size={18} className="text-green-600" />
           <p className="text-sm font-semibold text-green-700">
-            Order status updated to <strong className="capitalize">{normStatus}</strong>!
+            Order status updated to{' '}
+            <strong>{getOrderStatusLabel(order.delivery_method, order.status)}</strong>!
           </p>
         </div>
       )}
@@ -791,7 +845,7 @@ function OrderDetail({
           <div className="flex flex-col items-end gap-2">
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${badge.bg} ${badge.text}`}>
               {badge.dot && <span className="w-2 h-2 rounded-full bg-current animate-pulse" />}
-              <span className="capitalize">{normStatus}</span>
+              <span>{getOrderStatusLabel(order.delivery_method, order.status)}</span>
             </span>
             {lastUpdated && (
               <span className="text-[11px] text-muted-foreground flex items-center gap-1">
@@ -857,12 +911,16 @@ function OrderDetail({
             Order Timeline
           </h3>
 
-          <AnimatedProgressBar percent={progressPercent} status={order.status} />
+          <AnimatedProgressBar percent={progressPercent} order={order} />
           <StageCard order={order} />
 
           <div className="space-y-4">
-            {TIMELINE_STEPS.map((step) => {
-              const state = getStepState(step.status, order.status);
+            {workflow.steps.map((step) => {
+              const state = getStepState(
+                step.status,
+                getOrderWorkflowStatus(order.delivery_method, order.status),
+                workflow.statusOrder
+              );
               return (
                 <div key={step.status} className="flex items-start gap-3">
                   <div
@@ -1024,7 +1082,7 @@ function OrderHistoryView({
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-bold text-primary">{o.order_number}</span>
                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text}`}>
-                      <span className="capitalize">{norm}</span>
+                      <span>{getOrderStatusLabel(o.delivery_method, o.status)}</span>
                     </span>
                     {isReviewed && (
                       <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">

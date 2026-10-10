@@ -79,7 +79,7 @@ export default function CartReviewContent() {
                         )}
                       </div>
                       <button
-                        onClick={() => removeItem(item?.menuItem?.id)}
+                        onClick={() => removeItem(item?.id)}
                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
                         aria-label={`Remove ${item?.menuItem?.name}`}
                       >
@@ -89,7 +89,7 @@ export default function CartReviewContent() {
                     <div className="flex items-center justify-between mt-3">
                       <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
                         <button
-                          onClick={() => updateQuantity(item?.menuItem?.id, item?.quantity - 1)}
+                          onClick={() => updateQuantity(item?.id, item?.quantity - 1)}
                           className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-card transition-colors text-foreground"
                           aria-label="Decrease quantity"
                         >
@@ -97,7 +97,7 @@ export default function CartReviewContent() {
                         </button>
                         <span className="w-6 text-center text-sm font-semibold text-foreground tabular-nums">{item?.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item?.menuItem?.id, item?.quantity + 1)}
+                          onClick={() => updateQuantity(item?.id, item?.quantity + 1)}
                           className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-card transition-colors text-foreground"
                           aria-label="Increase quantity"
                         >

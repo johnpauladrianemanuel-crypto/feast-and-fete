@@ -42,6 +42,29 @@ const TIMELINE_STEPS = [
   { label: 'Ready for Delivery / Pickup', desc: 'Your order is packed and ready to go.', icon: 'TruckIcon', time: 'Event day' },
 ];
 
+function getTimelineSteps(deliveryMethod: OrderData['deliveryMethod']) {
+  if (deliveryMethod !== 'pickup') return TIMELINE_STEPS;
+
+  return TIMELINE_STEPS.map((step) => {
+    if (step.label === 'Preparation') {
+      return {
+        ...step,
+        label: 'Kitchen',
+        desc: 'Our chefs are preparing your order for pickup.',
+      };
+    }
+    if (step.label === 'Ready for Delivery / Pickup') {
+      return {
+        ...step,
+        label: 'Ready for Pickup',
+        desc: 'Your order is ready. Please pick it up at Feast & Fête Kitchen.',
+        icon: 'BuildingStorefrontIcon',
+      };
+    }
+    return step;
+  });
+}
+
 export default function OrderConfirmationContent() {
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -162,7 +185,9 @@ export default function OrderConfirmationContent() {
         {/* Order Details */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <div className="bg-card rounded-2xl border border-border p-5" style={{ boxShadow: 'var(--shadow-3d)' }}>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Delivery Details</h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              {order.deliveryMethod === 'pickup' ? 'Pickup Details' : 'Delivery Details'}
+            </h3>
             <div className="space-y-2">
               <div className="flex items-start gap-2">
                 <Icon name={order.deliveryMethod === 'delivery' ? 'TruckIcon' : 'BuildingStorefrontIcon'} size={16} className="text-primary mt-0.5 flex-shrink-0" />
@@ -239,7 +264,7 @@ export default function OrderConfirmationContent() {
           <div className="relative">
             <div className="absolute left-5 top-5 bottom-5 w-0.5 bg-border" />
             <div className="space-y-6">
-              {TIMELINE_STEPS.map((step, idx) => (
+              {getTimelineSteps(order.deliveryMethod).map((step, idx) => (
                 <div key={step.label} className="flex gap-4 relative">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${
                     idx === 0 ? 'gradient-brand' : 'bg-muted border-2 border-border'

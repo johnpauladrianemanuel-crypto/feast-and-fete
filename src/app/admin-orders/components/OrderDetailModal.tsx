@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '@/components/ui/AppIcon';
 import { createClient } from '@/lib/supabase/client';
+import { getAvailableOrderStatuses, getOrderStatusLabel } from '@/lib/orderWorkflow';
 
 export type OrderStatus =
   | 'Pending'
@@ -66,6 +67,10 @@ const STATUS_OPTIONS: OrderStatus[] = [
   'Completed',
   'Cancelled',
 ];
+
+function getAvailableStatuses(order: Order): OrderStatus[] {
+  return getAvailableOrderStatuses(order.delivery_method, order.status, STATUS_OPTIONS);
+}
 
 const PAYMENT_LABELS: Record<string, string> = {
   gcash: 'GCash',
@@ -205,7 +210,7 @@ export default function OrderDetailModal({
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text}`}
               >
-                {currentStatus}
+                {getOrderStatusLabel(order.delivery_method, currentStatus)}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -228,7 +233,7 @@ export default function OrderDetailModal({
               Update Order Status
             </label>
             <div className="flex flex-wrap gap-2">
-              {STATUS_OPTIONS.map((status) => {
+              {getAvailableStatuses(order).map((status) => {
                 const isActive = currentStatus.toLowerCase() === status.toLowerCase();
                 const isCurrentlyUpdating = updating || updatingId === order.id;
 
@@ -243,7 +248,7 @@ export default function OrderDetailModal({
                         : 'bg-card border border-border text-foreground hover:bg-muted'
                     } disabled:opacity-50`}
                   >
-                    {status}
+                    {getOrderStatusLabel(order.delivery_method, status)}
                   </button>
                 );
               })}

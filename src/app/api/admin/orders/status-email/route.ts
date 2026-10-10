@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@/lib/supabase/server';
+import { getOrderStatusLabel } from '@/lib/orderWorkflow';
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => {
@@ -66,7 +67,9 @@ export async function POST(request: Request) {
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('order_number, customer_name, customer_email, status, total_amount, notes')
+      .select(
+        'order_number, customer_name, customer_email, status, delivery_method, total_amount, notes'
+      )
       .eq('id', orderId)
       .maybeSingle();
 
@@ -91,7 +94,7 @@ export async function POST(request: Request) {
     const trackingUrl = `${baseUrl}/order-status?order=${encodeURIComponent(order.order_number)}`;
     const customerName = escapeHtml(order.customer_name || 'Customer');
     const orderNumber = escapeHtml(order.order_number);
-    const status = escapeHtml(order.status);
+    const status = escapeHtml(getOrderStatusLabel(order.delivery_method, order.status));
     const cancellationNote =
       order.status === 'Cancelled' && order.notes
         ? `<p style="margin:16px 0;color:#6b7280;"><strong>Note:</strong> ${escapeHtml(order.notes)}</p>`

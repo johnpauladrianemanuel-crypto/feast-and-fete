@@ -5,6 +5,11 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
 import Icon from '@/components/ui/AppIcon';
 import { createClient } from '@/lib/supabase/client';
+import {
+  getAvailableOrderStatuses,
+  getNextOrderStatus,
+  getOrderStatusLabel,
+} from '@/lib/orderWorkflow';
 import OrderDetailModal, { Order, OrderStatus } from './components/OrderDetailModal';
 
 const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string }> = {
@@ -27,13 +32,13 @@ const ALL_STATUSES: OrderStatus[] = [
   'Cancelled',
 ];
 
-const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
-  Pending: 'Confirmed',
-  Confirmed: 'Preparing',
-  Preparing: 'Ready',
-  Ready: 'Shipped',
-  Shipped: 'Completed',
-};
+function getNextStatus(order: Order): OrderStatus | undefined {
+  return getNextOrderStatus(order.delivery_method, order.status);
+}
+
+function getAvailableStatuses(order: Order): OrderStatus[] {
+  return getAvailableOrderStatuses(order.delivery_method, order.status, ALL_STATUSES);
+}
 
 const PAYMENT_LABELS: Record<string, string> = {
   gcash: 'GCash',
@@ -559,7 +564,7 @@ export default function AdminOrdersPage() {
                             color: STATUS_COLORS[order.status]?.text,
                           }}
                         >
-                          {order.status}
+                          {getOrderStatusLabel(order.delivery_method, order.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -577,11 +582,9 @@ export default function AdminOrdersPage() {
                             Details
                           </button>
 
-                          {NEXT_STATUS[order.status] && (
+                          {getNextStatus(order) && (
                             <button
-                              onClick={() =>
-                                handleStatusChange(order.id, NEXT_STATUS[order.status]!)
-                              }
+                              onClick={() => handleStatusChange(order.id, getNextStatus(order)!)}
                               disabled={updatingId === order.id}
                               className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 whitespace-nowrap cursor-pointer"
                               style={{
@@ -592,7 +595,7 @@ export default function AdminOrdersPage() {
                             >
                               {updatingId === order.id
                                 ? 'Updating...'
-                                : `→ ${NEXT_STATUS[order.status]}`}
+                                : `→ ${getOrderStatusLabel(order.delivery_method, getNextStatus(order)!)}`}
                             </button>
                           )}
 
@@ -609,13 +612,13 @@ export default function AdminOrdersPage() {
                               background: 'var(--admin-surface)',
                             }}
                           >
-                            {ALL_STATUSES.map((status) => (
+                            {getAvailableStatuses(order).map((status) => (
                               <option
                                 key={status}
                                 value={status}
                                 style={{ background: '#1A0F0A', color: '#F5EDE0' }}
                               >
-                                {status}
+                                {getOrderStatusLabel(order.delivery_method, status)}
                               </option>
                             ))}
                           </select>
