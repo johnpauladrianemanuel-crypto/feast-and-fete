@@ -140,7 +140,7 @@ function timeAgo(dateStr: string): string {
 
 export default function CustomerNavbar() {
   const { totalItems, toggleCart } = useCart();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
 
   const [profileOpen, setProfileOpen] = useState(false);
@@ -310,14 +310,28 @@ export default function CustomerNavbar() {
   const isRead = (n: CustomerNotification) => n.read || readIds.has(n.id);
   const unreadCount = notifications.filter((n) => !isRead(n)).length;
 
+  // FIXED LOGOUT METHOD
   const handleSignOut = async () => {
     try {
-      await signOut();
       setProfileOpen(false);
       setNotificationsOpen(false);
-      router?.push('/');
-    } catch {
-      // ignore
+
+      // Signout only the local scope for customer session
+      await supabase.auth.signOut({ scope: 'local' });
+
+      // Clean up customer specific storage if any
+      if (typeof window !== 'undefined') {
+        Object.keys(window.localStorage).forEach((key) => {
+          if (key.startsWith('sb-user-')) {
+            window.localStorage.removeItem(key);
+          }
+        });
+      }
+
+      router.push('/sign-up-login-screen');
+      router.refresh();
+    } catch (err) {
+      console.error('Logout error:', err);
     }
   };
 

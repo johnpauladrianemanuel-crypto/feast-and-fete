@@ -5,12 +5,25 @@ import {
   type CookieOptions,
 } from '@supabase/ssr';
 
-const PFX = 'sb_';
-
 type CookieToSet = {
   name: string;
   value: string;
   options?: CookieOptions;
+};
+
+/**
+ * Determine if current browser path belongs to Admin domain/routes
+ */
+const isAdminRoute = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.startsWith('/admin');
+};
+
+/**
+ * Get prefix based on route to separate Admin and User sessions completely
+ */
+const getPrefix = (): string => {
+  return isAdminRoute() ? 'sb-admin-' : 'sb-user-';
 };
 
 /**
@@ -31,14 +44,9 @@ const canUseCookies = (() => {
     const key = '__sb_test__';
 
     try {
-      document.cookie =
-        `${key}=1; Path=/; SameSite=None; Secure; Partitioned`;
-
+      document.cookie = `${key}=1; Path=/; SameSite=None; Secure; Partitioned`;
       cache = document.cookie.includes(key);
-
-      document.cookie =
-        `${key}=; Path=/; Max-Age=0; SameSite=None; Secure`;
-
+      document.cookie = `${key}=; Path=/; Max-Age=0; SameSite=None; Secure`;
       return cache;
     } catch {
       cache = false;
@@ -48,7 +56,7 @@ const canUseCookies = (() => {
 })();
 
 /**
- * Read cookies from document.cookie.
+ * Read cookies from document.cookie filtered by current scope prefix.
  */
 const fromCookies = (): Array<{
   name: string;
@@ -58,6 +66,8 @@ const fromCookies = (): Array<{
     return [];
   }
 
+  const currentPrefix = getPrefix();
+
   return document.cookie
     .split(';')
     .filter(Boolean)
@@ -65,7 +75,7 @@ const fromCookies = (): Array<{
       const trimmed = cookie.trim();
       const equalIndex = trimmed.indexOf('=');
 
-      const name =
+      const rawName =
         equalIndex >= 0
           ? trimmed.slice(0, equalIndex)
           : trimmed;
@@ -83,15 +93,19 @@ const fromCookies = (): Array<{
       }
 
       return {
-        name: name.trim(),
+        name: rawName.trim(),
         value,
       };
     })
-    .filter((cookie) => Boolean(cookie.name));
+    .filter((cookie) => cookie.name.startsWith(currentPrefix))
+    .map((cookie) => ({
+      name: cookie.name.slice(currentPrefix.length),
+      value: cookie.value,
+    }));
 };
 
 /**
- * Read Supabase values from localStorage.
+ * Read Supabase values from localStorage filtered by current scope prefix.
  */
 const fromStorage = (): Array<{
   name: string;
@@ -101,13 +115,14 @@ const fromStorage = (): Array<{
     return [];
   }
 
+  const currentPrefix = getPrefix();
+
   try {
     return Object.keys(window.localStorage)
-      .filter((key) => key.startsWith(PFX))
+      .filter((key) => key.startsWith(currentPrefix))
       .map((key) => ({
-        name: key.slice(PFX.length),
-        value:
-          window.localStorage.getItem(key) ?? '',
+        name: key.slice(currentPrefix.length),
+        value: window.localStorage.getItem(key) ?? '',
       }));
   } catch {
     return [];
@@ -115,7 +130,7 @@ const fromStorage = (): Array<{
 };
 
 /**
- * Set browser cookie.
+ * Set browser cookie with prefix scope.
  */
 const setCookie = (
   name: string,
@@ -126,8 +141,10 @@ const setCookie = (
     return;
   }
 
+  const prefixedName = `${getPrefix()}${name}`;
+
   let cookie =
-    `${name}=${encodeURIComponent(value)}; ` +
+    `${prefixedName}=${encodeURIComponent(value)}; ` +
     `Path=${options?.path ?? '/'}; ` +
     `SameSite=None; Secure; Partitioned`;
 
@@ -154,12 +171,14 @@ const setCookie = (
 };
 
 /**
- * Delete browser cookie.
+ * Delete browser cookie with prefix scope.
  */
 const deleteCookie = (name: string): void => {
   if (typeof document === 'undefined') {
     return;
   }
+
+  const prefixedName = `${getPrefix()}${name}`;
 
   const host =
     typeof window !== 'undefined'
@@ -180,17 +199,17 @@ const deleteCookie = (name: string): void => {
 
   variants.forEach((attributes) => {
     document.cookie =
-      `${name}=; Max-Age=0; ${attributes}`;
+      `${prefixedName}=; Max-Age=0; ${attributes}`;
 
     domains.forEach((domain) => {
       document.cookie =
-        `${name}=; Max-Age=0; Domain=${domain}; ${attributes}`;
+        `${prefixedName}=; Max-Age=0; Domain=${domain}; ${attributes}`;
     });
   });
 };
 
 /**
- * Create Supabase browser client.
+ * Create Supabase browser client with isolated session scope.
  */
 export function createClient() {
   const supabaseUrl =
@@ -222,50 +241,37 @@ export function createClient() {
             : fromStorage();
         },
 
-        setAll(
-          cookiesToSet: CookieToSet[]
-        ): void {
+        setAll(cookiesToSet: CookieToSet[]): void {
           if (typeof document === 'undefined') {
             return;
           }
 
+          const currentPrefix = getPrefix();
+
           if (canUseCookies()) {
             cookiesToSet.forEach(
-              ({
-                name,
-                value,
-                options,
-              }) => {
+              ({ name, value, options }) => {
                 if (value) {
-                  setCookie(
-                    name,
-                    value,
-                    options
-                  );
+                  setCookie(name, value, options);
                 } else {
                   deleteCookie(name);
                 }
               }
             );
-
             return;
           }
 
           cookiesToSet.forEach(
-            ({
-              name,
-              value,
-              options,
-            }) => {
+            ({ name, value, options }) => {
               try {
                 if (value) {
                   window.localStorage.setItem(
-                    `${PFX}${name}`,
+                    `${currentPrefix}${name}`,
                     value
                   );
                 } else {
                   window.localStorage.removeItem(
-                    `${PFX}${name}`
+                    `${currentPrefix}${name}`
                   );
                 }
               } catch {
@@ -273,11 +279,7 @@ export function createClient() {
               }
 
               if (value) {
-                setCookie(
-                  name,
-                  value,
-                  options
-                );
+                setCookie(name, value, options);
               }
             }
           );
@@ -285,7 +287,8 @@ export function createClient() {
       },
 
       auth: {
-        autoRefreshToken: false,
+        storageKey: `${getPrefix()}auth-token`,
+        autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
       },
