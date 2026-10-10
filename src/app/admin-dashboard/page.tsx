@@ -15,15 +15,25 @@ export default function AdminDashboardPage() {
     async function checkAdminAuth() {
       try {
         const supabase = createClient();
-        
-        // 1. Get current Supabase session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
 
-        // 2. Check both Supabase Session and Local Storage flags
-        const adminProfile = typeof window !== 'undefined' ? localStorage.getItem('adminProfile') : null;
-        const userRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+        if (authError || !user) {
+          setIsAuthenticated(false);
+          router.replace('/admin-signin');
+          return;
+        }
 
-        if (error || !session || (!session.user && !adminProfile && userRole !== 'admin')) {
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+        if (profile?.role !== 'admin') {
           setIsAuthenticated(false);
           router.replace('/admin-signin');
           return;

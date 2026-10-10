@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 const SIGN_UP_EMAIL_REDIRECT =
@@ -20,30 +20,60 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const authSyncId = useRef(0);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    }).catch(() => {
-      setSession(null);
-      setUser(null);
-      setLoading(false);
-    });
+    const syncAuthState = async (nextSession: any) => {
+      const syncId = ++authSyncId.current;
+      setSession(nextSession);
+
+      if (!nextSession?.user) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', nextSession.user.id)
+          .maybeSingle();
+
+        if (syncId !== authSyncId.current) return;
+        if (error) throw error;
+
+        setUser(profile?.role === 'customer' ? nextSession.user : null);
+      } catch (error) {
+        if (syncId !== authSyncId.current) return;
+        console.error('Failed to verify signed-in user role:', error);
+        setUser(null);
+      } finally {
+        if (syncId === authSyncId.current) setLoading(false);
+      }
+    };
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: nextSession } }) => {
+        void syncAuthState(nextSession);
+      })
+      .catch((error) => {
+        console.error('Failed to load auth session:', error);
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      });
 
     let subscription: { unsubscribe: () => void } | null = null;
     try {
-      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-        try {
-          setSession(session);
-          setUser(session?.user ?? null);
-          setLoading(false);
-        } catch {}
+      const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        setTimeout(() => void syncAuthState(nextSession), 0);
       });
       subscription = data.subscription;
-    } catch {
+    } catch (error) {
+      console.error('Failed to subscribe to auth changes:', error);
       setLoading(false);
     }
 
@@ -52,18 +82,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         subscription?.unsubscribe();
       } catch {}
     };
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     try {
       const guestId = localStorage.getItem('guestProfileId');
       const guestContactType = localStorage.getItem('guestContactType');
       const guestContactValue = localStorage.getItem('guestContactValue');
-      if (!user && guestId) {
-        setUser({ id: `guest:${guestId}`, user_metadata: { full_name: 'Guest' }, is_guest: true, guestProfileId: guestId, guestContactType, guestContactValue });
+      if (!loading && !session && !user && guestId) {
+        setUser({
+          id: `guest:${guestId}`,
+          user_metadata: { full_name: 'Guest' },
+          is_guest: true,
+          guestProfileId: guestId,
+          guestContactType,
+          guestContactValue,
+        });
       }
-    } catch {}
-  }, []);
+    } catch (error) {
+      console.error('Failed to restore guest session:', error);
+    }
+  }, [loading, session, user]);
 
   // 🌟 IDINAGDAG: Function para ma-update agad ang user state (pangalan, avatar, metadata) sa buong app
   const updateUserProfile = (updatedFields: { fullName?: string; avatarUrl?: string; [key: string]: any }) => {
