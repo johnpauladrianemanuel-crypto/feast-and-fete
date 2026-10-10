@@ -141,7 +141,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
     formState: { errors },
   } = useForm<RegisterFormData>({
     defaultValues: {
-      region: 'NCR',
+      region: '',
     }
   });
 
@@ -152,15 +152,14 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
   async function onSubmit(data: RegisterFormData) {
     setIsLoading(true);
     try {
-      const fullAddress = `${data.street}, ${data.barangay}, ${data.city}, ${data.region}`;
-      await signUp(data.email, data.password, {
-        fullName: data.fullName,
-        phone: data.phone,
+      const fullName = data.fullName.trim();
+      const phone = data.phone.trim();
+      const street = data.street.trim();
+      const fullAddress = `${street}, ${data.barangay}, ${data.city}, ${data.region}`;
+      await signUp(data.email.trim(), data.password, {
+        fullName,
+        phone,
         address: fullAddress,
-        region: data.region,
-        city: data.city,
-        barangay: data.barangay,
-        street_address: data.street,
       });
 
       setRegisteredEmail(data.email);
@@ -243,6 +242,8 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
           {...register('fullName', {
             required: 'Full name is required',
             minLength: { value: 3, message: 'Enter your full name (at least 3 characters)' },
+            validate: (value) =>
+              Boolean(value.trim()) || 'Full name is required',
           })}
         />
         {errors.fullName?.message && (
@@ -286,7 +287,7 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
           id="reg-phone"
           type="tel"
           className="input-field"
-          placeholder="09XX-XXX-XXXX"
+          placeholder="09171234567"
           autoComplete="tel"
           {...register('phone', {
             required: 'Mobile number is required',
@@ -314,16 +315,20 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
             <select
               {...register('region', { required: 'Region is required' })}
               onChange={(e) => {
-                setValue('region', e.target.value);
-                setValue('city', '');
-                setValue('barangay', '');
+                setValue('region', e.target.value, { shouldDirty: true, shouldValidate: true });
+                setValue('city', '', { shouldDirty: true, shouldValidate: true });
+                setValue('barangay', '', { shouldDirty: true, shouldValidate: true });
               }}
               className="input-field text-xs py-2"
             >
+              <option value="">Select region</option>
               {REGION_OPTIONS.map(r => (
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
+            {errors.region?.message && (
+              <p className="mt-1 text-xs text-error">{errors.region.message}</p>
+            )}
           </div>
 
           <div>
@@ -331,8 +336,8 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
             <select
               {...register('city', { required: 'City is required' })}
               onChange={(e) => {
-                setValue('city', e.target.value);
-                setValue('barangay', '');
+                setValue('city', e.target.value, { shouldDirty: true, shouldValidate: true });
+                setValue('barangay', '', { shouldDirty: true, shouldValidate: true });
               }}
               className="input-field text-xs py-2"
             >
@@ -341,6 +346,9 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
                 <option key={city} value={city}>{city}</option>
               ))}
             </select>
+            {errors.city?.message && (
+              <p className="mt-1 text-xs text-error">{errors.city.message}</p>
+            )}
           </div>
 
           <div>
@@ -354,6 +362,9 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
                 <option key={b} value={b}>{b}</option>
               ))}
             </select>
+            {errors.barangay?.message && (
+              <p className="mt-1 text-xs text-error">{errors.barangay.message}</p>
+            )}
           </div>
         </div>
 
@@ -363,8 +374,14 @@ export default function RegisterForm({ onSwitchToLogin }: Props) {
             type="text"
             className="input-field"
             placeholder="e.g. 123 Rizal St."
-            {...register('street', { required: 'Street address is required' })}
+            {...register('street', {
+              required: 'Street address is required',
+              validate: (value) => Boolean(value.trim()) || 'Street address is required',
+            })}
           />
+          {errors.street?.message && (
+            <p className="mt-1 text-xs text-error">{errors.street.message}</p>
+          )}
         </div>
       </div>
 

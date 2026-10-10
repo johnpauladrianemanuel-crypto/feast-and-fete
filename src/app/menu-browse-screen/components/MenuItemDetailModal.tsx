@@ -95,8 +95,6 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
   }, [onClose]);
 
   const catColor = CATEGORY_COLORS[item.categorySlug] ?? { bg: 'rgba(100,100,100,0.1)', text: '#555' };
-  const isOutOfStock = item.stock <= 0;
-  const isLowStock = item.stock > 0 && item.stock <= 5;
 
   function handleAdd() {
     const customizationsToSave = Object.keys(selectedCustomizations).length > 0 ? selectedCustomizations : undefined;
@@ -164,17 +162,6 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                 </span>
               )}
 
-              {isLowStock && (
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-amber-500 text-black shadow-md">
-                  🔥 Only {item.stock} left!
-                </span>
-              )}
-
-              {isOutOfStock && (
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white shadow-md">
-                  Unavailable
-                </span>
-              )}
             </div>
 
             {/* Close Button on Top Right */}
@@ -208,13 +195,10 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               <StarDisplay rating={ratingSummary.averageRating} count={ratingSummary.reviewCount} />
             )}
 
-            <div className="flex items-center justify-between text-sm text-stone-700">
+            <div className="flex items-center text-sm text-stone-700">
               <div className="flex items-center gap-2">
                 <Icon name="UsersIcon" size={16} />
                 <span>{item.servingSize}</span>
-              </div>
-              <div className={`font-semibold ${item.stock > 0 ? 'text-amber-600' : 'text-red-600'}`}>
-                Available Stock: {item.stock}
               </div>
             </div>
 
@@ -304,7 +288,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                 </button>
                 <span className="w-10 text-center text-sm font-bold text-stone-900">{quantity}</span>
                 <button
-                  onClick={() => setQuantity(q => Math.min(item.stock, q + 1))}
+                  onClick={() => setQuantity(q => q + 1)}
                   className="w-10 h-10 flex items-center justify-center hover:bg-stone-200 text-stone-800 transition-colors"
                   aria-label="Increase quantity"
                 >
@@ -314,21 +298,16 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
 
               <button
                 onClick={handleAdd}
-                disabled={isOutOfStock}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-bold rounded-xl text-white shadow-lg transition-all active:scale-95 ${
-                  isOutOfStock ? 'opacity-40 cursor-not-allowed bg-stone-400' : ''
-                }`}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-bold rounded-xl text-white shadow-lg transition-all active:scale-95"
                 style={{
-                  background: isOutOfStock
-                    ? undefined
-                    : addedPulse
+                  background: addedPulse
                     ? 'linear-gradient(135deg, #2D7A4F 0%, #3DA866 100%)'
                     : 'linear-gradient(135deg, #7B1C2E 0%, #9B2C3E 100%)',
                 }}
-                aria-label={`Add ${item.name} to cart`}
+                aria-label={`Add ${item.name} to Cart`}
               >
                 <Icon name={addedPulse ? 'CheckIcon' : 'ShoppingCartIcon'} size={16} />
-                {isOutOfStock ? 'Unavailable' : addedPulse ? 'Added to Cart!' : `Add ${quantity > 1 ? `${quantity}×` : ''} to Cart — ₱${(item.price * quantity).toLocaleString()}`}
+                {addedPulse ? 'Added to Cart!' : `Add ${quantity > 1 ? `${quantity}×` : ''} to Cart — ₱${(item.price * quantity).toLocaleString()}`}
               </button>
             </div>
           </div>

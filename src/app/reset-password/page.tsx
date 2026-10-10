@@ -13,60 +13,71 @@ function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [isSessionValid, setIsSessionValid] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [verificationError, setVerificationError] = useState('');
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
   useEffect(() => {
+    let active = true;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY' && active) {
+        setIsSessionValid(true);
+        setChecking(false);
+      }
+    });
+
     async function verifyToken() {
       const tokenHash = searchParams.get('token_hash');
       const code = searchParams.get('code');
-      const type = searchParams.get('type') || 'recovery';
 
       // 1. Verify via token_hash (Recommended OTP flow)
       if (tokenHash) {
         const { error } = await supabase.auth.verifyOtp({
           token_hash: tokenHash,
-          type: type as 'recovery',
+          type: 'recovery',
         });
 
-        if (!error) {
+        if (!error && active) {
           setIsSessionValid(true);
           setChecking(false);
           return;
         }
+        if (error && active) setVerificationError('This password link is invalid or has expired.');
       }
 
       // 2. Verify via PKCE code (Fallback)
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
+        if (!error && active) {
           setIsSessionValid(true);
           setChecking(false);
           return;
         }
+        if (error && active) setVerificationError('This password link is invalid or has expired.');
       }
 
-      // 3. Check for existing active session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setIsSessionValid(true);
-      } else {
+      if (active) {
         setIsSessionValid(false);
+        setChecking(false);
       }
-      
-      setChecking(false);
     }
 
-    verifyToken();
+    void verifyToken();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, [searchParams, supabase]);
 
   async function handleUpdatePassword(e: React.FormEvent) {
     e.preventDefault();
 
-    if (newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters long.');
+    if (newPassword.length < 8 || !/(?=.*[0-9!@#$%^&*])/.test(newPassword)) {
+      toast.error('Password must be at least 8 characters and include a number or symbol.');
       return;
     }
 
@@ -84,9 +95,7 @@ function ResetPasswordForm() {
         toast.error(error.message);
       } else {
         toast.success('Password updated successfully! Redirecting...');
-        setTimeout(() => {
-          router.push('/sign-up-login-screen');
-        }, 1500);
+        window.setTimeout(() => router.push('/sign-up-login-screen'), 1500);
       }
     } catch {
       toast.error('Failed to update password.');
@@ -112,6 +121,11 @@ function ResetPasswordForm() {
           <p className="text-sm text-muted-foreground">
             The password reset link is invalid or has expired. Please request a new link.
           </p>
+          {verificationError && (
+            <p role="alert" className="text-sm text-error">
+              {verificationError}
+            </p>
+          )}
           <button
             onClick={() => router.push('/sign-up-login-screen')}
             className="w-full py-2.5 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl"
@@ -128,7 +142,9 @@ function ResetPasswordForm() {
       <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
         <div className="text-center space-y-1">
           <h2 className="text-2xl font-bold text-foreground">Set New Password</h2>
-          <p className="text-xs text-muted-foreground">Enter your new password below.</p>
+          <p className="text-xs text-muted-foreground">
+            Your email is verified. Enter your new password below.
+          </p>
         </div>
 
         <form onSubmit={handleUpdatePassword} className="space-y-4">
@@ -138,10 +154,10 @@ function ResetPasswordForm() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
+                onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new password"
                 required
-                minLength={6}
+                minLength={8}
                 className="input-field pr-10"
               />
               <button
@@ -155,14 +171,16 @@ function ResetPasswordForm() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-foreground">Confirm New Password</label>
+            <label className="block text-xs font-semibold text-foreground">
+              Confirm New Password
+            </label>
             <input
               type={showPassword ? 'text' : 'password'}
               value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm new password"
               required
-              minLength={6}
+              minLength={8}
               className="input-field"
             />
           </div>
@@ -172,7 +190,11 @@ function ResetPasswordForm() {
             disabled={loading}
             className="w-full py-3 gradient-brand text-primary-foreground font-semibold text-sm rounded-xl flex items-center justify-center gap-2"
           >
-            {loading ? <Icon name="ArrowPathIcon" size={16} className="animate-spin" /> : 'Update Password'}
+            {loading ? (
+              <Icon name="ArrowPathIcon" size={16} className="animate-spin" />
+            ) : (
+              'Update Password'
+            )}
           </button>
         </form>
       </div>
@@ -182,11 +204,13 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Icon name="ArrowPathIcon" size={28} className="animate-spin text-primary" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Icon name="ArrowPathIcon" size={28} className="animate-spin text-primary" />
+        </div>
+      }
+    >
       <ResetPasswordForm />
     </Suspense>
   );

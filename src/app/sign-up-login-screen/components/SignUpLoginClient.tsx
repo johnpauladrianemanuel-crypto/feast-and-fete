@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthCard from '@/app/sign-up-login-screen/components/AuthCard';
-import { ADMIN_PASSWORD } from '@/app/sign-up-login-screen/components/adminPassword';
 import WelcomeSplash from '@/components/WelcomeSplash';
 import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
@@ -13,12 +12,6 @@ export default function SignUpLoginClient() {
   const supabase = createClient();
   const [welcomeUser, setWelcomeUser] = useState<string | null>(null);
   const [isClosed, setIsClosed] = useState(false);
-
-  // Admin Modal State
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const checkStoreStatus = async () => {
@@ -68,23 +61,6 @@ export default function SignUpLoginClient() {
     const timer = setInterval(checkStoreStatus, 10000);
     return () => clearInterval(timer);
   }, []);
-
-  // Direct Password Validation Handler
-  const handleAdminSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    if (adminPassword === ADMIN_PASSWORD) {
-      document.cookie = "admin_session=true; path=/; max-age=28800; SameSite=Lax";
-      setIsAdminModalOpen(false);
-      router.push('/admin-dashboard');
-    } else {
-      setError('Incorrect password. Please try again.');
-    }
-
-    setLoading(false);
-  };
 
   if (isClosed) {
     return (
@@ -274,71 +250,6 @@ export default function SignUpLoginClient() {
 
         <AuthCard onSuccess={(name) => setWelcomeUser(name)} />
 
-        {/* Admin Access Modal */}
-        {isAdminModalOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white border border-stone-200 text-stone-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAdminModalOpen(false);
-                  setError('');
-                }}
-                className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 transition"
-              >
-                ✕
-              </button>
-
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-900 font-bold">
-                  🔒
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-stone-900">Admin Access</h2>
-                  <p className="text-xs text-stone-500">Enter admin password to continue</p>
-                </div>
-              </div>
-
-              <form onSubmit={handleAdminSubmit} className="space-y-4">
-                {error && (
-                  <div className="text-red-600 text-xs bg-red-50 border border-red-200 p-3 rounded-xl">
-                    {error}
-                  </div>
-                )}
-
-                <div>
-                  <input
-                    type="password"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="Admin password"
-                    className="w-full p-3.5 rounded-xl bg-stone-50 border border-stone-300 text-stone-900 placeholder-stone-400 focus:outline-none focus:border-rose-800 focus:ring-1 focus:ring-rose-800 transition"
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-[#7B1C2E] hover:bg-[#5A1020] text-white font-medium py-3.5 rounded-xl transition disabled:opacity-50 shadow-md"
-                >
-                  {loading ? 'Verifying...' : 'Enter Admin Panel'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAdminModalOpen(false);
-                    setError('');
-                  }}
-                  className="w-full text-center text-xs text-stone-500 hover:text-stone-700 pt-1 transition"
-                >
-                  Cancel
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Tailwind keyframes injection for smooth continuous sliding track */}

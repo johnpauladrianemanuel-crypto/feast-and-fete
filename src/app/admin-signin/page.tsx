@@ -4,9 +4,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-const ADMIN_EMAIL = 'admin1@feastandfete.com';
-const ADMIN_PASSWORD = 'johnpaulmanuel23';
-
 export default function AdminSignInPage() {
   const router = useRouter();
   const [inputVal, setInputVal] = useState('');
@@ -20,42 +17,34 @@ export default function AdminSignInPage() {
     setLoading(true);
 
     try {
-      // Normalize input: allow either 'ADMIN1' or 'admin1@feastandfete.com'
+      const supabase = createClient();
       const cleanInput = inputVal.trim().toLowerCase();
       const targetEmail = cleanInput.includes('@') ? cleanInput : `${cleanInput}@feastandfete.com`;
-
-      // 1. Local Guard Check
-      if (targetEmail !== ADMIN_EMAIL.toLowerCase() || password !== ADMIN_PASSWORD) {
-        setErrorMsg('Invalid admin credentials.');
-        setLoading(false);
-        return;
-      }
-
-      const supabase = createClient();
-
-      // 2. Sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: ADMIN_EMAIL,
-        password: password,
+        email: targetEmail,
+        password,
       });
 
-      if (error || !data.user) {
-        setErrorMsg('Authentication failed on the server.');
-        setLoading(false);
-        return;
+      if (error) throw error;
+      if (!data.user) throw new Error('Supabase did not return a signed-in user.');
+
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      if (profileError) {
+        await supabase.auth.signOut();
+        throw profileError;
+      }
+      if (profile?.role !== 'admin') {
+        await supabase.auth.signOut();
+        throw new Error('This account does not have admin access.');
       }
 
-      // 3. Set local storage flags
-      localStorage.setItem('userRole', 'admin');
-      localStorage.setItem(
-        'adminProfile',
-        JSON.stringify({ email: data.user.email, id: data.user.id })
-      );
-
-      // 4. Redirect to Dashboard
       router.replace('/admin-dashboard');
-    } catch (err: any) {
-      setErrorMsg('An unexpected error occurred. Please try again.');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Sign-in failed. Please try again.');
       setLoading(false);
     }
   };
@@ -84,15 +73,13 @@ export default function AdminSignInPage() {
               required
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
-              placeholder="ADMIN1 or admin1@feastandfete.com"
+              placeholder="Email or username"
               className="w-full px-4 py-3 bg-[#1b110e] border border-amber-900/50 rounded-xl text-white placeholder-white/20 text-sm focus:outline-none focus:border-amber-500 transition"
             />
           </div>
 
           <div>
-            <label className="block text-xs text-amber-200/80 mb-2 font-medium">
-              Password
-            </label>
+            <label className="block text-xs text-amber-200/80 mb-2 font-medium">Password</label>
             <input
               type="password"
               required

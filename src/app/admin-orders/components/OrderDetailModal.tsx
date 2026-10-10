@@ -5,7 +5,15 @@ import { createPortal } from 'react-dom';
 import Icon from '@/components/ui/AppIcon';
 import { createClient } from '@/lib/supabase/client';
 
-export type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled' | string;
+export type OrderStatus =
+  | 'Pending'
+  | 'Confirmed'
+  | 'Preparing'
+  | 'Ready'
+  | 'Shipped'
+  | 'Completed'
+  | 'Cancelled'
+  | string;
 
 export interface OrderItem {
   id: string;
@@ -28,6 +36,8 @@ export interface Order {
   event_date: string | null;
   event_time: string | null;
   payment_method: string;
+  payment_reference?: string | null;
+  deposit_amount?: number | null;
   subtotal: number;
   delivery_fee: number;
   total_amount: number;
@@ -86,6 +96,7 @@ export default function OrderDetailModal({
   const [currentStatus, setCurrentStatus] = useState<string>('Pending');
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+  const [paymentVerified, setPaymentVerified] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -100,6 +111,7 @@ export default function OrderDetailModal({
     if (newStatus === currentStatus) return;
 
     if (newStatus === 'Confirmed') {
+      setPaymentVerified(false);
       setShowPaymentConfirmation(true);
       return;
     }
@@ -111,7 +123,9 @@ export default function OrderDetailModal({
     if (newStatus === currentStatus) return;
 
     const cancellationReason =
-      newStatus === 'Cancelled' ? window.prompt('Please enter a reason for cancelling this order:')?.trim() : undefined;
+      newStatus === 'Cancelled'
+        ? window.prompt('Please enter a reason for cancelling this order:')?.trim()
+        : undefined;
     if (newStatus === 'Cancelled' && !cancellationReason) return;
 
     setUpdating(true);
@@ -135,38 +149,26 @@ export default function OrderDetailModal({
 
       setCurrentStatus(newStatus);
 
-      // 2. If status is set to Completed, trigger email receipt API
-      if (newStatus.toLowerCase() === 'completed') {
-        setEmailStatus('sending');
-
-        const orderPayload = {
-          ...order,
-          status: newStatus,
-        };
-
-        try {
-          const res = await fetch('/api/admin/orders/send-receipt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: orderPayload }),
-          });
-
-          const result = await res.json();
-
-          if (res.ok) {
-            setEmailStatus('sent');
-            console.log('Receipt email sent successfully:', result);
-          } else {
-            console.error('Failed to send receipt email:', result);
-            setEmailStatus('error');
-          }
-        } catch (err) {
-          console.error('Error triggering receipt API:', err);
+      setEmailStatus('sending');
+      try {
+        const response = await fetch('/api/admin/orders/status-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.id }),
+        });
+        if (response.ok) {
+          setEmailStatus('sent');
+        } else {
+          const result = (await response.json()) as { error?: string };
+          console.error('Failed to send order status email:', result.error);
           setEmailStatus('error');
         }
+      } catch (emailError) {
+        console.error('Failed to send order status email:', emailError);
+        setEmailStatus('error');
       }
 
-      // 3. Notify parent page.tsx
+      // Notify the parent so its order list reflects the saved status.
       if (onStatusUpdate) {
         onStatusUpdate(order.id, newStatus, cancellationReason);
       }
@@ -188,13 +190,17 @@ export default function OrderDetailModal({
         <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/30">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-lg font-bold text-primary">#{order.order_number}</span>
+              <span className="font-mono text-lg font-bold text-primary">
+                #{order.order_number}
+              </span>
               {order.is_priority && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
                   PRIORITY
                 </span>
               )}
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text}`}>
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text}`}
+              >
                 {currentStatus}
               </span>
             </div>
@@ -243,19 +249,19 @@ export default function OrderDetailModal({
             {emailStatus === 'sending' && (
               <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5 font-medium">
                 <Icon name="ArrowPathIcon" size={14} className="animate-spin" />
-                Sending receipt email to customer...
+                Sending order update email to customer...
               </p>
             )}
             {emailStatus === 'sent' && (
               <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1.5 font-medium">
                 <Icon name="CheckCircleIcon" size={14} />
-                Receipt email sent successfully to {order.customer_email}!
+                Order update email sent successfully to {order.customer_email}!
               </p>
             )}
             {emailStatus === 'error' && (
               <p className="text-xs text-red-600 mt-2 flex items-center gap-1.5 font-medium">
                 <Icon name="ExclamationCircleIcon" size={14} />
-                Status updated, but failed to send email receipt.
+                Status updated, but failed to send the customer email.
               </p>
             )}
           </div>
@@ -285,16 +291,27 @@ export default function OrderDetailModal({
                 </p>
                 {order.delivery_address && (
                   <p className="text-muted-foreground">
-                    <span className="font-medium text-foreground">Address:</span> {order.delivery_address}
+                    <span className="font-medium text-foreground">Address:</span>{' '}
+                    {order.delivery_address}
                   </p>
                 )}
                 {order.event_date && (
                   <p className="text-muted-foreground">
-                    <span className="font-medium text-foreground">Event Date:</span> {order.event_date} {order.event_time ? `(${order.event_time})` : ''}
+                    <span className="font-medium text-foreground">Event Date:</span>{' '}
+                    {order.event_date} {order.event_time ? `(${order.event_time})` : ''}
                   </p>
                 )}
                 <p className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Payment:</span> {PAYMENT_LABELS[order.payment_method] || order.payment_method}
+                  <span className="font-medium text-foreground">Payment:</span>{' '}
+                  {PAYMENT_LABELS[order.payment_method] || order.payment_method}
+                </p>
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground">50% Deposit:</span> ₱
+                  {Number(order.deposit_amount || 0).toLocaleString()}
+                </p>
+                <p className="break-all text-muted-foreground">
+                  <span className="font-medium text-foreground">GCash Reference:</span>{' '}
+                  {order.payment_reference || 'Not provided'}
                 </p>
               </div>
             </div>
@@ -308,7 +325,10 @@ export default function OrderDetailModal({
             </h4>
             <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
               {order.order_items?.map((item) => (
-                <div key={item.id} className="p-3.5 flex items-center justify-between text-sm bg-card">
+                <div
+                  key={item.id}
+                  className="p-3.5 flex items-center justify-between text-sm bg-card"
+                >
                   <div>
                     <p className="font-medium text-foreground">{item.menu_item_name}</p>
                     {item.notes && (
@@ -318,7 +338,9 @@ export default function OrderDetailModal({
                       Qty: {item.quantity} × ₱{Number(item.unit_price).toLocaleString()}
                     </p>
                   </div>
-                  <p className="font-semibold text-foreground">₱{Number(item.subtotal).toLocaleString()}</p>
+                  <p className="font-semibold text-foreground">
+                    ₱{Number(item.subtotal).toLocaleString()}
+                  </p>
                 </div>
               ))}
             </div>
@@ -343,7 +365,9 @@ export default function OrderDetailModal({
               )}
               <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border mt-2">
                 <span>Total Amount</span>
-                <span className="text-primary">₱{Number(order.total_amount || 0).toLocaleString()}</span>
+                <span className="text-primary">
+                  ₱{Number(order.total_amount || 0).toLocaleString()}
+                </span>
               </div>
             </div>
           </div>
@@ -374,22 +398,61 @@ export default function OrderDetailModal({
                 Confirm Payment Received
               </h3>
             </div>
-            <p id="payment-confirmation-description" className="text-sm leading-relaxed text-muted-foreground">
-              Have you received the 50% payment? If not, please wait for it before confirming this order.
+            <p
+              id="payment-confirmation-description"
+              className="text-sm leading-relaxed text-muted-foreground"
+            >
+              Compare the submitted reference with the GCash transaction and verify that the 50%
+              deposit was received. If the amount or reference does not match, choose Wait for
+              Payment and leave the order Pending.
             </p>
+            <div className="mt-3 rounded-lg bg-muted/50 p-3 text-sm">
+              <p>
+                <span className="font-semibold">Deposit:</span> ₱
+                {Number(order.deposit_amount || 0).toLocaleString()}
+              </p>
+              <p className="break-all">
+                <span className="font-semibold">Reference:</span>{' '}
+                {order.payment_reference || 'Not provided'}
+              </p>
+            </div>
+            {order.payment_reference ? (
+              <label className="mt-4 flex items-start gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={paymentVerified}
+                  onChange={(event) => setPaymentVerified(event.target.checked)}
+                  className="mt-0.5 accent-primary"
+                />
+                I verified that the GCash reference matches the received 50% deposit.
+              </label>
+            ) : (
+              <p className="mt-4 text-sm font-medium text-red-600">
+                This order has no GCash reference number and cannot be confirmed.
+              </p>
+            )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setShowPaymentConfirmation(false)}
+                onClick={() => {
+                  setShowPaymentConfirmation(false);
+                  setPaymentVerified(false);
+                }}
                 className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
               >
                 Wait for Payment
               </button>
               <button
                 type="button"
-                disabled={updating || updatingId === order.id}
+                disabled={
+                  updating ||
+                  updatingId === order.id ||
+                  !order.payment_reference?.trim() ||
+                  !paymentVerified
+                }
                 onClick={() => {
                   setShowPaymentConfirmation(false);
+                  setPaymentVerified(false);
                   void updateOrderStatus('Confirmed');
                 }}
                 className="rounded-xl gradient-brand px-4 py-2.5 text-sm font-bold text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-50"

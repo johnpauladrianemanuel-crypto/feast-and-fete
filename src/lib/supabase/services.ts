@@ -18,7 +18,6 @@ export interface MenuItem {
   ingredients?: string;
   isActive: boolean;
   unavailableReason?: string;
-  stock: number;
   soldCount: number;
   featured: boolean;
   customizations?: MenuCustomization[];
@@ -52,6 +51,32 @@ export interface InventoryItem {
   reorderLevel: number;
   status: StockStatus;
   lastUpdated: string;
+  menuItemNames: string[];
+}
+
+export function isStrictInventoryThresholdUnit(unit: string): boolean {
+  const normalizedUnit = unit.trim().toLowerCase();
+  return ['pc', 'pcs', 'piece', 'pieces', 'kg', 'kilogram', 'kilograms'].includes(normalizedUnit);
+}
+
+export function getInventoryReorderLevel(unit: string, configuredLevel: number): number {
+  const normalizedUnit = unit.trim().toLowerCase();
+  if (['pc', 'pcs', 'piece', 'pieces'].includes(normalizedUnit)) return 5;
+  if (['kg', 'kilogram', 'kilograms'].includes(normalizedUnit)) return 3;
+  return configuredLevel;
+}
+
+export function getInventoryStatus(
+  currentStock: number,
+  reorderLevel: number,
+  unit: string
+): StockStatus {
+  if (currentStock <= 0) return 'Out of Stock';
+  const threshold = getInventoryReorderLevel(unit, reorderLevel);
+  const isLowStock = isStrictInventoryThresholdUnit(unit)
+    ? currentStock < threshold
+    : currentStock <= threshold;
+  return isLowStock ? 'Low Stock' : 'OK';
 }
 
 export interface Expense {
@@ -75,6 +100,8 @@ export interface AdminNotification {
 
 function rowToMenuItem(row: Record<string, unknown>): MenuItem {
   const rawActive = row.is_active ?? row.isActive;
+  const unavailableReason = String(row.unavailable_reason ?? row.unavailableReason ?? row.deactivation_reason ?? row.deactivationReason ?? '');
+  const wasDeactivatedForStock = unavailableReason.startsWith('Automatic deactivation: Stock reached 0.');
   const description = String(row.description ?? '');
   const localMenuItem = MENU_ITEMS.find(item => item.id === row.id);
   const localDescription = localMenuItem?.description;
@@ -116,9 +143,8 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
     image: useLocalMenuImage ? localMenuItem?.image ?? databaseImage : databaseImage,
     imageAlt: useLocalMenuImage ? localMenuItem?.imageAlt ?? (row.image_alt as string) : (row.image_alt as string),
     ingredients: String(row.ingredients ?? '').trim() || descriptionIngredients || localIngredients,
-    isActive: rawActive !== undefined && rawActive !== null ? Boolean(rawActive) : true,
-    unavailableReason: (row.unavailable_reason as string) || (row.unavailableReason as string) || '',
-    stock: Number(row.stock),
+    isActive: wasDeactivatedForStock || rawActive === undefined || rawActive === null ? true : Boolean(rawActive),
+    unavailableReason: wasDeactivatedForStock ? '' : unavailableReason,
     soldCount: Number(row.sold_count),
     featured: Boolean(row.featured),
     customizations: row.customizations ? (row.customizations as MenuCustomization[]) : undefined,
@@ -126,14 +152,25 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
 }
 
 function rowToInventoryItem(row: Record<string, unknown>): InventoryItem {
+  const currentStock = Number(row.current_stock);
+  const unit = String(row.unit ?? '');
+  const reorderLevel = getInventoryReorderLevel(unit, Number(row.reorder_level));
+  const status = getInventoryStatus(currentStock, reorderLevel, unit);
+  const menuItemNames = Array.isArray(row.menu_item_ingredients)
+    ? row.menu_item_ingredients
+        .map((link) => (link as { menu_items?: { name?: string } }).menu_items?.name)
+        .filter((name): name is string => typeof name === 'string')
+    : [];
+
   return {
     id: row.id as string,
     name: row.name as string,
-    unit: row.unit as string,
-    currentStock: Number(row.current_stock),
-    reorderLevel: Number(row.reorder_level),
-    status: row.status as StockStatus,
+    unit,
+    currentStock,
+    reorderLevel,
+    status,
     lastUpdated: row.last_updated as string,
+    menuItemNames: [...new Set(menuItemNames)].sort((a, b) => a.localeCompare(b)),
   };
 }
 
@@ -231,7 +268,6 @@ export async function updateMenuItem(
   updates: Partial<{
     name: string;
     price: number;
-    stock: number;
     serving_size: string;
     servingSize: string;
     description: string;
@@ -252,7 +288,6 @@ export async function updateMenuItem(
 
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.price !== undefined) payload.price = Number(updates.price);
-  if (updates.stock !== undefined) payload.stock = Number(updates.stock);
   if (updates.description !== undefined) payload.description = updates.description;
   if (updates.ingredients !== undefined) payload.ingredients = updates.ingredients;
   if (updates.featured !== undefined) payload.featured = Boolean(updates.featured);
@@ -292,13 +327,58 @@ export async function updateMenuItem(
   if (error) throw new Error(error.message);
 }
 
+export async function addInventoryItem(
+  item: Pick<InventoryItem, 'name' | 'unit' | 'currentStock' | 'reorderLevel'>
+): Promise<InventoryItem> {
+  const supabase = createClient();
+  const currentStock = Number(item.currentStock);
+  const unit = item.unit.trim();
+  const reorderLevel = getInventoryReorderLevel(unit, Number(item.reorderLevel));
+  const status = getInventoryStatus(currentStock, reorderLevel, unit);
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .insert({
+      id: crypto.randomUUID(),
+      name: item.name.trim(),
+      unit,
+      current_stock: currentStock,
+      reorder_level: reorderLevel,
+      status,
+      is_counted: true,
+      last_updated: new Date().toISOString().split('T')[0],
+    })
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return rowToInventoryItem(data as Record<string, unknown>);
+}
+
 // ─── Inventory ────────────────────────────────────────────────────────────────
 
 export async function fetchInventoryItems(): Promise<InventoryItem[]> {
   const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  if (!user) throw new Error('Sign in with an admin account to view ingredient inventory.');
+
+  const { data: profile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (profileError) throw new Error(profileError.message);
+  if (profile?.role !== 'admin') {
+    throw new Error(
+      `This account is not authorized to view inventory (Supabase role: ${profile?.role ?? 'missing'}). Set this account's public.user_profiles.role to 'admin', then refresh.`
+    );
+  }
+
   const { data, error } = await supabase
     .from('inventory_items')
-    .select('*')
+    .select('*, menu_item_ingredients(menu_items(name))')
     .order('name');
   if (error) throw new Error(error.message);
   return (data || []).map(rowToInventoryItem);
@@ -307,19 +387,20 @@ export async function fetchInventoryItems(): Promise<InventoryItem[]> {
 export async function updateInventoryItem(
   id: string,
   currentStock: number,
-  reorderLevel: number
+  reorderLevel: number,
+  unit: string
 ): Promise<void> {
   const supabase = createClient();
-  let status: StockStatus = 'OK';
-  if (currentStock === 0) status = 'Out of Stock';
-  else if (currentStock <= reorderLevel) status = 'Low Stock';
+  const effectiveReorderLevel = getInventoryReorderLevel(unit, reorderLevel);
+  const status = getInventoryStatus(currentStock, effectiveReorderLevel, unit);
 
   const { error } = await supabase
     .from('inventory_items')
     .update({
       current_stock: currentStock,
-      reorder_level: reorderLevel,
+      reorder_level: effectiveReorderLevel,
       status,
+      is_counted: true,
       last_updated: new Date().toISOString().split('T')[0],
     })
     .eq('id', id);
@@ -453,7 +534,8 @@ export async function fetchDashboardKPIs(): Promise<DashboardKPIs> {
       .select('status, delivery_method, total_amount, created_at')
       .gte('created_at', `${today}T00:00:00`)
       .lte('created_at', `${today}T23:59:59.999Z`),
-    supabase.from('inventory_items').select('status'),
+    supabase.from('inventory_items')
+      .select('current_stock, reorder_level, is_counted, unit'),
   ]);
 
   const orders = ordersRes.data || [];
@@ -471,8 +553,13 @@ export async function fetchDashboardKPIs(): Promise<DashboardKPIs> {
     .eq('status', 'Pending');
 
   const pendingOrderCount = allPendingRes.count || 0;
-  const lowStockCount = inventory.filter((i: Record<string, unknown>) => i.status === 'Low Stock' || i.status === 'Out of Stock').length;
-  const outOfStockCount = inventory.filter((i: Record<string, unknown>) => i.status === 'Out of Stock').length;
+  const inventoryStatuses = inventory.map((i: Record<string, unknown>) => {
+    const currentStock = Number(i.current_stock);
+    const reorderLevel = Number(i.reorder_level);
+    return getInventoryStatus(currentStock, reorderLevel, String(i.unit ?? ''));
+  });
+  const lowStockCount = inventoryStatuses.filter(status => status === 'Low Stock' || status === 'Out of Stock').length;
+  const outOfStockCount = inventoryStatuses.filter(status => status === 'Out of Stock').length;
 
   return {
     todayRevenue,
@@ -709,46 +796,4 @@ export async function submitItemReview(review: {
     .single();
   if (error) throw new Error(error.message);
   return rowToItemReview(data as Record<string, unknown>);
-}
-
-// ─── Stock Deduction ──────────────────────────────────────────────────────────
-
-/**
- * Deducts stock & updates sold count for a single item
- */
-export async function deductItemStock(menuItemId: string, quantityBought: number): Promise<void> {
-  const supabase = createClient();
-
-  const { data: item, error: fetchError } = await supabase
-    .from('menu_items')
-    .select('stock, sold_count')
-    .eq('id', menuItemId)
-    .single();
-
-  if (fetchError || !item) return;
-
-  const currentStock = Number(item.stock || 0);
-  const currentSoldCount = Number(item.sold_count || 0);
-
-  const newStock = Math.max(0, currentStock - quantityBought);
-  const newSoldCount = currentSoldCount + quantityBought;
-
-  await supabase
-    .from('menu_items')
-    .update({
-      stock: newStock,
-      sold_count: newSoldCount,
-    })
-    .eq('id', menuItemId);
-}
-
-/**
- * Call this function inside your checkout/place order handler
- */
-export async function deductCartStock(cartItems: { id: string; quantity: number }[]): Promise<void> {
-  for (const item of cartItems) {
-    if (item.id && item.quantity > 0) {
-      await deductItemStock(item.id, item.quantity);
-    }
-  }
 }

@@ -114,6 +114,8 @@ function CustomerProfileContent() {
   const supabase = createClient();
   const [profileLoading, setProfileLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sendingPasswordLink, setSendingPasswordLink] = useState(false);
+  const [passwordLinkSent, setPasswordLinkSent] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [form, setForm] = useState({ 
@@ -149,19 +151,26 @@ function CustomerProfileContent() {
     if (!user) return;
     const fetchProfile = async () => {
       setProfileLoading(true);
-      let { data } = await supabase
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', user.id)
         .single();
+      if (error && error.code !== 'PGRST116') {
+        console.error('Failed to load customer profile:', error.message);
+        setUploadError('Unable to load your saved profile details. Please refresh and try again.');
+        setProfileLoading(false);
+        return;
+      }
       if (data) {
         const metadata = user.user_metadata || {};
         const metadataAddress = metadata.address || '';
         const needsMetadataBackfill = Boolean(
           (metadata.phone && !data.phone) || (metadataAddress && !data.address)
         );
+        let profileData = data;
         if (needsMetadataBackfill) {
-          const { data: updatedProfile } = await supabase
+          const { data: updatedProfile, error: backfillError } = await supabase
             .from('user_profiles')
             .update({
               phone: data.phone || metadata.phone,
@@ -170,34 +179,52 @@ function CustomerProfileContent() {
             .eq('id', user.id)
             .select('*')
             .single();
-          if (updatedProfile) data = updatedProfile;
+          if (updatedProfile) profileData = updatedProfile;
+          if (backfillError) {
+            console.error('Failed to restore signup profile details:', backfillError.message);
+          }
         }
-        setProfile(data);
-        setAvatarUrl(data.avatar_url || null);
+        setProfile(profileData);
+        setAvatarUrl(profileData.avatar_url || null);
         
         // Parse address if it follows comma-separated format
-        const addrParts = (data.address || '').split(',').map((s: string) => s.trim());
+        const addrParts = (profileData.address || '').split(',').map((s: string) => s.trim());
         const street = addrParts[0] || '';
         const barangay = addrParts[1] || '';
         const city = addrParts[2] || '';
         const region = addrParts[3] || 'NCR';
 
         setForm({
-          full_name: data.full_name || '',
-          phone: data.phone || '',
+          full_name: profileData.full_name || '',
+          phone: profileData.phone || '',
           region: region,
           city: city,
           barangay: barangay,
           street: street,
-          preferences: data.preferences || '',
+          preferences: profileData.preferences || '',
         });
 
         // Load multiple addresses if stored as JSON array or fallback to single address
-        if (data.additional_addresses && Array.isArray(data.additional_addresses)) {
-          setSavedAddresses(data.additional_addresses);
-        } else if (data.address) {
-          setSavedAddresses([data.address]);
+        if (profileData.additional_addresses && Array.isArray(profileData.additional_addresses)) {
+          setSavedAddresses(profileData.additional_addresses);
+        } else if (profileData.address) {
+          setSavedAddresses([profileData.address]);
         }
+      } else {
+        const metadata = user.user_metadata || {};
+        const addressParts = (metadata.address || '')
+          .split(',')
+          .map((part: string) => part.trim());
+        setForm((current) => ({
+          ...current,
+          full_name: metadata.full_name || current.full_name,
+          phone: metadata.phone || current.phone,
+          street: addressParts[0] || current.street,
+          barangay: addressParts[1] || current.barangay,
+          city: addressParts[2] || current.city,
+          region: addressParts[3] || current.region,
+        }));
+        if (metadata.address) setSavedAddresses([metadata.address]);
       }
       setProfileLoading(false);
     };
@@ -235,7 +262,14 @@ function CustomerProfileContent() {
   }, [user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'region' ? { city: '', barangay: '' } : {}),
+      ...(name === 'city' ? { barangay: '' } : {}),
+    }));
+    setUploadError(null);
   };
 
   const handleAvatarClick = () => {
@@ -282,27 +316,87 @@ function CustomerProfileContent() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    setSaving(true);
-    const fullAddress = `${form.street}, ${form.barangay}, ${form.city}, ${form.region}`;
-    
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ 
-        full_name: form.full_name, 
-        phone: form.phone, 
-        address: fullAddress, 
-        preferences: form.preferences,
-        additional_addresses: savedAddresses 
-      })
-      .eq('id', user.id);
-
-    setSaving(false);
-    if (error) {
-      setUploadError(error.message);
+    const fullName = form.full_name.trim();
+    const phone = form.phone.trim();
+    const street = form.street.trim();
+    const selectedCities = REGION_CITY_MAP[form.region] || [];
+    const selectedBarangays = CITY_BARANGAY_MAP[form.city] || [];
+    if (
+      !fullName ||
+      !phone ||
+      !form.region ||
+      !form.city ||
+      !form.barangay ||
+      !street ||
+      !selectedCities.includes(form.city) ||
+      !selectedBarangays.includes(form.barangay)
+    ) {
+      setUploadError('Complete your name, phone number, and all default delivery address fields before saving.');
       return;
     }
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+
+    const email = user.email || user.user_metadata?.email || profile?.email;
+    if (!email) {
+      setUploadError('Your account email is missing. Please sign in again and retry.');
+      return;
+    }
+
+    setSaving(true);
+    setUploadError(null);
+    const fullAddress = `${street}, ${form.barangay}, ${form.city}, ${form.region}`;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .upsert(
+          {
+            id: user.id,
+            email,
+            full_name: fullName,
+            phone,
+            address: fullAddress,
+            preferences: form.preferences,
+            additional_addresses: savedAddresses,
+          },
+          { onConflict: 'id' }
+        )
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to save customer profile:', error);
+      setUploadError('Unable to save your profile and default delivery address. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendPasswordChangeLink = async () => {
+    const email = user?.email || profile?.email;
+    if (!email) {
+      setUploadError('Your account email is missing. Please sign in again and retry.');
+      return;
+    }
+
+    setSendingPasswordLink(true);
+    setPasswordLinkSent(false);
+    setUploadError(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password?source=profile`,
+      });
+      if (error) throw error;
+      setPasswordLinkSent(true);
+    } catch (error) {
+      console.error('Failed to send password verification email:', error);
+      setUploadError('Unable to send the password change email. Please try again.');
+    } finally {
+      setSendingPasswordLink(false);
+    }
   };
 
   const handleAddAddressSubmit = async (e: React.FormEvent) => {
@@ -383,6 +477,27 @@ function CustomerProfileContent() {
           </div>
         </div>
 
+        <section className="bg-card border border-border rounded-2xl p-6 mb-6">
+          <h3 className="text-base font-bold text-foreground mb-2">Change Password</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            We’ll email a secure verification link to {user.email || profile?.email}. You can set
+            your new password after opening that link.
+          </p>
+          {passwordLinkSent && (
+            <p role="status" className="mb-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+              Verification email sent. Check your inbox and follow the link to change your password.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleSendPasswordChangeLink}
+            disabled={sendingPasswordLink}
+            className="rounded-xl gradient-brand px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {sendingPasswordLink ? 'Sending verification email…' : 'Email Me a Password Change Link'}
+          </button>
+        </section>
+
         {/* Profile Form */}
         <div className="bg-card border border-border rounded-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-5">
@@ -401,14 +516,19 @@ function CustomerProfileContent() {
           </div>
 
           <form onSubmit={handleSave} className="space-y-5">
+            {uploadError && (
+              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {uploadError}
+              </p>
+            )}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
-              <input type="text" name="full_name" value={form.full_name} onChange={handleChange} className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground" />
+              <input type="text" name="full_name" value={form.full_name} onChange={handleChange} required className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground" />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
-              <input type="tel" name="phone" value={form.phone} onChange={handleChange} className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground" />
+              <input type="tel" name="phone" value={form.phone} onChange={handleChange} required className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground" />
             </div>
 
             {/* Structured Address */}
@@ -417,20 +537,21 @@ function CustomerProfileContent() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Region</label>
-                  <select name="region" value={form.region} onChange={handleChange} className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
+                  <select name="region" value={form.region} onChange={handleChange} required className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
+                    <option value="">Select region</option>
                     {REGION_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">City</label>
-                  <select name="city" value={form.city} onChange={handleChange} className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
+                  <select name="city" value={form.city} onChange={handleChange} required className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
                     <option value="">Select city</option>
                     {(REGION_CITY_MAP[form.region] || []).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Barangay</label>
-                  <select name="barangay" value={form.barangay} onChange={handleChange} className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
+                  <select name="barangay" value={form.barangay} onChange={handleChange} required className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground">
                     <option value="">Select barangay</option>
                     {(CITY_BARANGAY_MAP[form.city] || []).map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
@@ -438,7 +559,7 @@ function CustomerProfileContent() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">Street Address / Unit No.</label>
-                <input type="text" name="street" value={form.street} onChange={handleChange} className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground" />
+                <input type="text" name="street" value={form.street} onChange={handleChange} required className="w-full px-3 py-2 rounded-xl border border-border text-xs bg-background text-foreground" />
               </div>
             </div>
 

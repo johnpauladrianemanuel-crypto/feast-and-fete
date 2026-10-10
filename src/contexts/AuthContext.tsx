@@ -81,46 +81,62 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
-  const signUp = async (email: string, password: string, metadata = {}) => {
-    const signUpPayload: any = { email, password };
-    const signUpOptions: any = {
-      options: { emailRedirectTo: SIGN_UP_EMAIL_REDIRECT },
-    };
-
+  const signUp = async (
+    email: string,
+    password: string,
+    metadata: {
+      fullName?: string;
+      avatarUrl?: string;
+      phone?: string;
+      address?: string;
+    } = {}
+  ) => {
     const metaDataPayload: Record<string, string> = {};
     const metadataFields: Record<string, string | undefined> = {
-      full_name: (metadata as any)?.fullName,
-      avatar_url: (metadata as any)?.avatarUrl,
-      phone: (metadata as any)?.phone,
-      address: (metadata as any)?.address,
+      full_name: metadata.fullName,
+      avatar_url: metadata.avatarUrl,
+      phone: metadata.phone,
+      address: metadata.address,
     };
     Object.entries(metadataFields).forEach(([key, value]) => {
       if (value) metaDataPayload[key] = value;
     });
 
-    if (Object.keys(metaDataPayload).length > 0) {
-      signUpOptions.options.data = metaDataPayload;
-    }
-
     const { data, error } = await supabase.auth.signUp({
-      ...signUpPayload,
-      options: signUpOptions.options,
+      email,
+      password,
+      options: {
+        emailRedirectTo: SIGN_UP_EMAIL_REDIRECT,
+        data: metaDataPayload,
+      },
     });
     if (!error) return data;
-
-    if (error.message?.includes('Database error saving new user')) {
-      const { data: fallbackData, error: fallbackError } = await supabase.auth.signUp({
-        ...signUpPayload,
-        options: { emailRedirectTo: SIGN_UP_EMAIL_REDIRECT },
-      });
-      if (!fallbackError) return fallbackData;
-    }
     throw error;
   };
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+
+    if (!data.user) {
+      throw new Error('Supabase did not return a signed-in user.');
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      await supabase.auth.signOut();
+      throw profileError;
+    }
+    if (profile?.role !== 'customer') {
+      await supabase.auth.signOut();
+      throw new Error('Invalid email or password.');
+    }
+
     return data;
   };
 

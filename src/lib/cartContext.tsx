@@ -54,17 +54,8 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const { item, customizations, note } = action.payload;
       const cartId = buildCartId(item.id, customizations, note);
       const existing = state.items.find(ci => ci.id === cartId);
-      
-      // Kunin ang stock limit (support sa iba't ibang naming convention tulad ng stock, stocks, stock_left, atbp.)
-      const maxStock = (item as any).stock ?? (item as any).stocks ?? (item as any).stock_left ?? 999;
       const currentQty = existing ? existing.quantity : 0;
-
-      // Kung ang kasalukuyang dami sa cart ay umabot na o hihigit sa stock, huwag nang magdagdag
-      if (currentQty >= maxStock) {
-        return state;
-      }
-
-      const newQuantity = Math.min(currentQty + 1, maxStock);
+      const newQuantity = currentQty + 1;
 
       if (existing) {
         return {
@@ -104,9 +95,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: state.items.map(item => {
           if (item.id === action.payload.id) {
-            const maxStock = (item.menuItem as any).stock ?? (item.menuItem as any).stocks ?? (item.menuItem as any).stock_left ?? 999;
-            const safeQuantity = Math.min(action.payload.quantity, maxStock);
-            return { ...item, quantity: safeQuantity };
+            return { ...item, quantity: action.payload.quantity };
           }
           return item;
         }),

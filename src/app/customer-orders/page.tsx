@@ -167,10 +167,12 @@ export default function CustomerOrdersPage() {
       const { data } = await supabase
         .from('menu_items')
         .select('*')
-        .in('id', itemIds)
-        .eq('is_active', true);
+        .in('id', itemIds);
 
-      const fetchedItems = data || [];
+      const fetchedItems = (data || []).filter((menuItem: Record<string, unknown>) => {
+        const reason = String(menuItem.deactivation_reason ?? menuItem.unavailable_reason ?? '');
+        return menuItem.is_active === true || reason.startsWith('Automatic deactivation: Stock reached 0.');
+      });
 
       for (const orderItem of order.order_items || []) {
         const dbItem = fetchedItems.find((m: Record<string, unknown>) => m.id === orderItem.menu_item_id);
@@ -187,7 +189,6 @@ export default function CustomerOrdersPage() {
             image: (dbItem.image as string) || '',
             imageAlt: (dbItem.image_alt as string) || dbItem.name as string,
             isActive: dbItem.is_active as boolean,
-            stock: Number(dbItem.stock),
             soldCount: Number(dbItem.sold_count),
             featured: dbItem.featured as boolean,
           };

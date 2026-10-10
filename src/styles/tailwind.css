@@ -7,6 +7,12 @@
     filter: saturate(0.92) contrast(1.04) brightness(1.02) sepia(0.04);
   }
 
+  .menu-click-hand {
+    display: inline-block;
+    filter: drop-shadow(0 2px 2px rgb(44 24 16 / 0.45));
+    animation: menu-click-hand-bob 1.8s ease-in-out infinite;
+  }
+
   .brand-gold-shimmer {
     position: relative;
     display: inline-block;
@@ -71,10 +77,16 @@
   50% { opacity: 1; transform: scale(1.15) rotate(18deg); }
 }
 
+@keyframes menu-click-hand-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .brand-gold-shimmer,
   .brand-gold-shimmer::before,
-  .brand-gold-shimmer::after {
+  .brand-gold-shimmer::after,
+  .menu-click-hand {
     animation: none;
   }
 }

@@ -30,7 +30,9 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const url = request.nextUrl.clone();
 
   // Keep the admin sign-in page public, but protect every other admin route.
@@ -38,6 +40,19 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       url.pathname = '/admin-signin';
       url.searchParams.set('next', request.nextUrl.pathname);
+      return NextResponse.redirect(url);
+    }
+
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (error || profile?.role !== 'admin') {
+      url.pathname = '/admin-signin';
+      url.search = '';
+      url.searchParams.set('error', 'admin_required');
       return NextResponse.redirect(url);
     }
   }

@@ -49,12 +49,18 @@ export default function AdminOrdersPage() {
   const [search, setSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [cancelRequest, setCancelRequest] = useState<{ orderId: string; reason: string }>({ orderId: '', reason: '' });
+  const [cancelRequest, setCancelRequest] = useState<{ orderId: string; reason: string }>({
+    orderId: '',
+    reason: '',
+  });
   const [paymentConfirmationOrderId, setPaymentConfirmationOrderId] = useState<string | null>(null);
-  
+  const [paymentVerified, setPaymentVerified] = useState(false);
+
   // State para sa Modal Form ng Completed & Cancelled Orders
   const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [archiveFilterStatus, setArchiveFilterStatus] = useState<'All' | 'Completed' | 'Cancelled'>('All');
+  const [archiveFilterStatus, setArchiveFilterStatus] = useState<'All' | 'Completed' | 'Cancelled'>(
+    'All'
+  );
   const [archiveSearch, setArchiveSearch] = useState('');
 
   const supabase = createClient();
@@ -72,7 +78,8 @@ export default function AdminOrdersPage() {
         setError('Failed to load orders. Please try again.');
       } else {
         const sortedOrders = ((data as Order[]) || []).sort((a, b) => {
-          const priorityDifference = Number(Boolean(b.is_priority)) - Number(Boolean(a.is_priority));
+          const priorityDifference =
+            Number(Boolean(b.is_priority)) - Number(Boolean(a.is_priority));
           if (priorityDifference !== 0) return priorityDifference;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
@@ -92,31 +99,23 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     const channel = supabase
       .channel('admin_orders_realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        () => {
-          fetchOrders();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          setOrders((prev) =>
-            prev.map((o) =>
-              o.id === payload.new.id
-                ? { ...o, ...(payload.new as Partial<Order>), order_items: o.order_items }
-                : o
-            )
-          );
-          setSelectedOrder((prev) =>
-            prev && prev.id === payload.new.id
-              ? { ...prev, ...(payload.new as Partial<Order>), order_items: prev.order_items }
-              : prev
-          );
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === payload.new.id
+              ? { ...o, ...(payload.new as Partial<Order>), order_items: o.order_items }
+              : o
+          )
+        );
+        setSelectedOrder((prev) =>
+          prev && prev.id === payload.new.id
+            ? { ...prev, ...(payload.new as Partial<Order>), order_items: prev.order_items }
+            : prev
+        );
+      })
       .subscribe();
 
     return () => {
@@ -174,13 +173,56 @@ export default function AdminOrdersPage() {
           const original = previousOrders.find((o) => o.id === selectedOrder.id);
           if (original) setSelectedOrder(original);
         }
+        setError('Failed to update order status. Please try again.');
+        return;
+      }
+
+      try {
+        const emailResponse = await fetch('/api/admin/orders/status-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        });
+        if (!emailResponse.ok) {
+          const result = (await emailResponse.json()) as { error?: string };
+          setError(
+            result.error || 'Order status updated, but the customer email could not be sent.'
+          );
+        }
+      } catch (emailError) {
+        console.error('Failed to send order status email:', emailError);
+        setError('Order status updated, but the customer email could not be sent.');
       }
     } catch (err) {
       console.error('Status update failed:', err);
       setOrders(previousOrders);
+      setError('Failed to update order status. Please try again.');
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const syncOrderStatus = (orderId: string, newStatus: OrderStatus, reason?: string) => {
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId
+          ? {
+              ...order,
+              status: newStatus,
+              notes: reason ? `Cancelled: ${reason}` : order.notes,
+            }
+          : order
+      )
+    );
+    setSelectedOrder((prev) =>
+      prev?.id === orderId
+        ? {
+            ...prev,
+            status: newStatus,
+            notes: reason ? `Cancelled: ${reason}` : prev.notes,
+          }
+        : prev
+    );
   };
 
   const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
@@ -188,6 +230,7 @@ export default function AdminOrdersPage() {
     if (order?.status === newStatus) return;
 
     if (newStatus === 'Confirmed') {
+      setPaymentVerified(false);
       setPaymentConfirmationOrderId(orderId);
       return;
     }
@@ -219,6 +262,7 @@ export default function AdminOrdersPage() {
       o.customer_name.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
+  const paymentConfirmationOrder = orders.find((order) => order.id === paymentConfirmationOrderId);
 
   // Completed & Cancelled orders para sa Modal Form
   const archiveOrders = orders.filter((o) => o.status === 'Completed' || o.status === 'Cancelled');
@@ -232,10 +276,13 @@ export default function AdminOrdersPage() {
 
   const activeStatuses: OrderStatus[] = ['Pending', 'Confirmed', 'Preparing', 'Ready', 'Shipped'];
 
-  const counts = ALL_STATUSES.reduce((acc, s) => {
-    acc[s] = orders.filter((o) => o.status === s).length;
-    return acc;
-  }, {} as Record<OrderStatus, number>);
+  const counts = ALL_STATUSES.reduce(
+    (acc, s) => {
+      acc[s] = orders.filter((o) => o.status === s).length;
+      return acc;
+    },
+    {} as Record<OrderStatus, number>
+  );
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
@@ -258,11 +305,16 @@ export default function AdminOrdersPage() {
           {/* Page Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>
+              <h1
+                className="font-display text-2xl font-bold"
+                style={{ color: 'var(--admin-text)' }}
+              >
                 Active Orders
               </h1>
               <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>
-                {loading ? 'Loading...' : `${activeOrders.length} active order${activeOrders.length !== 1 ? 's' : ''}`}
+                {loading
+                  ? 'Loading...'
+                  : `${activeOrders.length} active order${activeOrders.length !== 1 ? 's' : ''}`}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -302,14 +354,21 @@ export default function AdminOrdersPage() {
               onClick={() => setFilterStatus('All')}
               className="p-4 rounded-2xl flex flex-col justify-between text-left transition-all cursor-pointer"
               style={{
-                background: filterStatus === 'All' ? 'rgba(212,160,23,0.15)' : 'var(--admin-surface)',
+                background:
+                  filterStatus === 'All' ? 'rgba(212,160,23,0.15)' : 'var(--admin-surface)',
                 border: `1px solid ${filterStatus === 'All' ? '#D4A017' : 'var(--admin-border)'}`,
               }}
             >
-              <span className="text-xs font-semibold" style={{ color: filterStatus === 'All' ? '#D4A017' : 'var(--admin-muted)' }}>
+              <span
+                className="text-xs font-semibold"
+                style={{ color: filterStatus === 'All' ? '#D4A017' : 'var(--admin-muted)' }}
+              >
                 All Active
               </span>
-              <span className="text-2xl font-bold mt-2" style={{ color: filterStatus === 'All' ? '#D4A017' : '#F5EDE0' }}>
+              <span
+                className="text-2xl font-bold mt-2"
+                style={{ color: filterStatus === 'All' ? '#D4A017' : '#F5EDE0' }}
+              >
                 {activeOrders.length}
               </span>
             </button>
@@ -326,10 +385,18 @@ export default function AdminOrdersPage() {
                     border: `1px solid ${isSelected ? STATUS_COLORS[status].text : 'var(--admin-border)'}`,
                   }}
                 >
-                  <span className="text-xs font-semibold" style={{ color: isSelected ? STATUS_COLORS[status].text : 'var(--admin-muted)' }}>
+                  <span
+                    className="text-xs font-semibold"
+                    style={{
+                      color: isSelected ? STATUS_COLORS[status].text : 'var(--admin-muted)',
+                    }}
+                  >
                     {status}
                   </span>
-                  <span className="text-2xl font-bold mt-2" style={{ color: STATUS_COLORS[status].text }}>
+                  <span
+                    className="text-2xl font-bold mt-2"
+                    style={{ color: STATUS_COLORS[status].text }}
+                  >
                     {counts[status]}
                   </span>
                 </button>
@@ -377,7 +444,11 @@ export default function AdminOrdersPage() {
           {loading && (
             <div className="space-y-2 animate-pulse">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-14 rounded-xl" style={{ background: 'var(--admin-surface)' }} />
+                <div
+                  key={i}
+                  className="h-14 rounded-xl"
+                  style={{ background: 'var(--admin-surface)' }}
+                />
               ))}
             </div>
           )}
@@ -386,25 +457,40 @@ export default function AdminOrdersPage() {
           {!loading && (
             <div
               className="overflow-x-auto rounded-2xl scrollbar-thin"
-              style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}
+              style={{
+                background: 'var(--admin-surface)',
+                border: '1px solid var(--admin-border)',
+              }}
             >
               <table className="w-full min-w-[1120px] text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--admin-border)' }}>
-                    {['Order #', 'Customer', 'Items', 'Total', 'Method', 'Payment', 'Status', 'Actions'].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${h === 'Actions' ? 'sticky right-0 z-10' : ''}`}
-                          style={{
-                            color: 'var(--admin-muted)',
-                            ...(h === 'Actions' ? { background: 'var(--admin-surface)', boxShadow: '-8px 0 12px rgba(0,0,0,0.12)' } : {}),
-                          }}
-                        >
-                          {h}
-                        </th>
-                      )
-                    )}
+                    {[
+                      'Order #',
+                      'Customer',
+                      'Items',
+                      'Total',
+                      'Method',
+                      'Payment',
+                      'Status',
+                      'Actions',
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${h === 'Actions' ? 'sticky right-0 z-10' : ''}`}
+                        style={{
+                          color: 'var(--admin-muted)',
+                          ...(h === 'Actions'
+                            ? {
+                                background: 'var(--admin-surface)',
+                                boxShadow: '-8px 0 12px rgba(0,0,0,0.12)',
+                              }
+                            : {}),
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -413,13 +499,20 @@ export default function AdminOrdersPage() {
                       key={order.id}
                       className="transition-colors hover:bg-white/5"
                       style={{
-                        borderBottom: i < filteredActive.length - 1 ? '1px solid var(--admin-border)' : 'none',
+                        borderBottom:
+                          i < filteredActive.length - 1 ? '1px solid var(--admin-border)' : 'none',
                       }}
                     >
-                      <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: '#D4A017' }}>
+                      <td
+                        className="px-4 py-3 font-mono text-xs font-semibold"
+                        style={{ color: '#D4A017' }}
+                      >
                         <div className="flex items-center gap-2">
                           {order.is_priority && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(245,158,11,0.18)', color: '#FBBF24' }}>
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                              style={{ background: 'rgba(245,158,11,0.18)', color: '#FBBF24' }}
+                            >
                               PRIORITY
                             </span>
                           )}
@@ -428,19 +521,28 @@ export default function AdminOrdersPage() {
                       </td>
                       <td
                         className="sticky right-0 px-4 py-3"
-                        style={{ background: 'var(--admin-surface)', boxShadow: '-8px 0 12px rgba(0,0,0,0.12)' }}
+                        style={{
+                          background: 'var(--admin-surface)',
+                          boxShadow: '-8px 0 12px rgba(0,0,0,0.12)',
+                        }}
                       >
                         <p className="font-medium" style={{ color: 'var(--admin-text)' }}>
                           {order.customer_name}
                         </p>
                         <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>
-                          {order.event_date ? formatDate(order.event_date) : formatDate(order.created_at)}
+                          {order.event_date
+                            ? formatDate(order.event_date)
+                            : formatDate(order.created_at)}
                         </p>
                       </td>
                       <td className="px-4 py-3" style={{ color: 'var(--admin-muted)' }}>
-                        {order.order_items?.length ?? 0} item{(order.order_items?.length ?? 0) !== 1 ? 's' : ''}
+                        {order.order_items?.length ?? 0} item
+                        {(order.order_items?.length ?? 0) !== 1 ? 's' : ''}
                       </td>
-                      <td className="px-4 py-3 font-semibold" style={{ color: 'var(--admin-text)' }}>
+                      <td
+                        className="px-4 py-3 font-semibold"
+                        style={{ color: 'var(--admin-text)' }}
+                      >
                         ₱{Number(order.total_amount).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 capitalize" style={{ color: 'var(--admin-muted)' }}>
@@ -477,7 +579,9 @@ export default function AdminOrdersPage() {
 
                           {NEXT_STATUS[order.status] && (
                             <button
-                              onClick={() => handleStatusChange(order.id, NEXT_STATUS[order.status]!)}
+                              onClick={() =>
+                                handleStatusChange(order.id, NEXT_STATUS[order.status]!)
+                              }
                               disabled={updatingId === order.id}
                               className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 whitespace-nowrap cursor-pointer"
                               style={{
@@ -486,14 +590,18 @@ export default function AdminOrdersPage() {
                                 border: '1px solid rgba(59,130,246,0.3)',
                               }}
                             >
-                              {updatingId === order.id ? 'Updating...' : `→ ${NEXT_STATUS[order.status]}`}
+                              {updatingId === order.id
+                                ? 'Updating...'
+                                : `→ ${NEXT_STATUS[order.status]}`}
                             </button>
                           )}
 
                           <select
                             value={order.status}
                             disabled={updatingId === order.id}
-                            onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                            onChange={(e) =>
+                              handleStatusChange(order.id, e.target.value as OrderStatus)
+                            }
                             className="px-2 py-1.5 rounded-lg text-xs outline-none cursor-pointer"
                             style={{
                               border: '1px solid var(--admin-border)',
@@ -522,7 +630,9 @@ export default function AdminOrdersPage() {
                         className="px-4 py-10 text-center text-sm"
                         style={{ color: 'var(--admin-muted)' }}
                       >
-                        {activeOrders.length === 0 ? 'No active orders right now.' : 'No active orders match your search/filter.'}
+                        {activeOrders.length === 0
+                          ? 'No active orders right now.'
+                          : 'No active orders match your search/filter.'}
                       </td>
                     </tr>
                   )}
@@ -536,12 +646,15 @@ export default function AdminOrdersPage() {
       {/* MODAL FORM PARA SA COMPLETED & CANCELLED ORDERS */}
       {showArchiveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div 
+          <div
             className="rounded-2xl w-full max-w-6xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border"
             style={{ background: 'var(--admin-bg)', borderColor: 'var(--admin-border)' }}
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--admin-border)', background: 'var(--admin-surface)' }}>
+            <div
+              className="px-6 py-4 border-b flex items-center justify-between"
+              style={{ borderColor: 'var(--admin-border)', background: 'var(--admin-surface)' }}
+            >
               <div>
                 <h2 className="font-display text-xl font-bold" style={{ color: '#F5EDE0' }}>
                   Completed & Cancelled Orders Form
@@ -568,7 +681,10 @@ export default function AdminOrdersPage() {
                     onClick={() => setArchiveFilterStatus('All')}
                     className="px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                     style={{
-                      background: archiveFilterStatus === 'All' ? 'rgba(212,160,23,0.2)' : 'var(--admin-surface)',
+                      background:
+                        archiveFilterStatus === 'All'
+                          ? 'rgba(212,160,23,0.2)'
+                          : 'var(--admin-surface)',
                       border: `1px solid ${archiveFilterStatus === 'All' ? '#D4A017' : 'var(--admin-border)'}`,
                       color: archiveFilterStatus === 'All' ? '#D4A017' : 'var(--admin-muted)',
                     }}
@@ -579,7 +695,10 @@ export default function AdminOrdersPage() {
                     onClick={() => setArchiveFilterStatus('Completed')}
                     className="px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                     style={{
-                      background: archiveFilterStatus === 'Completed' ? STATUS_COLORS['Completed'].bg : 'var(--admin-surface)',
+                      background:
+                        archiveFilterStatus === 'Completed'
+                          ? STATUS_COLORS['Completed'].bg
+                          : 'var(--admin-surface)',
                       border: `1px solid ${archiveFilterStatus === 'Completed' ? STATUS_COLORS['Completed'].text : 'var(--admin-border)'}`,
                       color: STATUS_COLORS['Completed'].text,
                     }}
@@ -590,7 +709,10 @@ export default function AdminOrdersPage() {
                     onClick={() => setArchiveFilterStatus('Cancelled')}
                     className="px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                     style={{
-                      background: archiveFilterStatus === 'Cancelled' ? STATUS_COLORS['Cancelled'].bg : 'var(--admin-surface)',
+                      background:
+                        archiveFilterStatus === 'Cancelled'
+                          ? STATUS_COLORS['Cancelled'].bg
+                          : 'var(--admin-surface)',
                       border: `1px solid ${archiveFilterStatus === 'Cancelled' ? STATUS_COLORS['Cancelled'].text : 'var(--admin-border)'}`,
                       color: STATUS_COLORS['Cancelled'].text,
                     }}
@@ -628,20 +750,32 @@ export default function AdminOrdersPage() {
                 <table className="w-full min-w-[1120px] text-sm">
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--admin-border)' }}>
-                      {['Order #', 'Customer', 'Items', 'Total', 'Method', 'Payment', 'Status', 'Actions'].map(
-                        (h) => (
-                          <th
-                            key={h}
-                            className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${h === 'Actions' ? 'sticky right-0 z-10' : ''}`}
-                            style={{
-                              color: 'var(--admin-muted)',
-                              ...(h === 'Actions' ? { background: 'var(--admin-surface)', boxShadow: '-8px 0 12px rgba(0,0,0,0.12)' } : {}),
-                            }}
-                          >
-                            {h}
-                          </th>
-                        )
-                      )}
+                      {[
+                        'Order #',
+                        'Customer',
+                        'Items',
+                        'Total',
+                        'Method',
+                        'Payment',
+                        'Status',
+                        'Actions',
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${h === 'Actions' ? 'sticky right-0 z-10' : ''}`}
+                          style={{
+                            color: 'var(--admin-muted)',
+                            ...(h === 'Actions'
+                              ? {
+                                  background: 'var(--admin-surface)',
+                                  boxShadow: '-8px 0 12px rgba(0,0,0,0.12)',
+                                }
+                              : {}),
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -650,30 +784,45 @@ export default function AdminOrdersPage() {
                         key={order.id}
                         className="transition-colors hover:bg-white/5"
                         style={{
-                          borderBottom: i < filteredArchive.length - 1 ? '1px solid var(--admin-border)' : 'none',
+                          borderBottom:
+                            i < filteredArchive.length - 1
+                              ? '1px solid var(--admin-border)'
+                              : 'none',
                         }}
                       >
-                        <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: '#D4A017' }}>
+                        <td
+                          className="px-4 py-3 font-mono text-xs font-semibold"
+                          style={{ color: '#D4A017' }}
+                        >
                           {order.order_number}
                         </td>
                         <td
                           className="sticky right-0 px-4 py-3"
-                          style={{ background: 'var(--admin-surface)', boxShadow: '-8px 0 12px rgba(0,0,0,0.12)' }}
+                          style={{
+                            background: 'var(--admin-surface)',
+                            boxShadow: '-8px 0 12px rgba(0,0,0,0.12)',
+                          }}
                         >
                           <p className="font-medium" style={{ color: '#F5EDE0' }}>
                             {order.customer_name}
                           </p>
                           <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>
-                            {order.event_date ? formatDate(order.event_date) : formatDate(order.created_at)}
+                            {order.event_date
+                              ? formatDate(order.event_date)
+                              : formatDate(order.created_at)}
                           </p>
                         </td>
                         <td className="px-4 py-3" style={{ color: 'var(--admin-muted)' }}>
-                          {order.order_items?.length ?? 0} item{(order.order_items?.length ?? 0) !== 1 ? 's' : ''}
+                          {order.order_items?.length ?? 0} item
+                          {(order.order_items?.length ?? 0) !== 1 ? 's' : ''}
                         </td>
                         <td className="px-4 py-3 font-semibold" style={{ color: '#F5EDE0' }}>
                           ₱{Number(order.total_amount).toLocaleString()}
                         </td>
-                        <td className="px-4 py-3 capitalize" style={{ color: 'var(--admin-muted)' }}>
+                        <td
+                          className="px-4 py-3 capitalize"
+                          style={{ color: 'var(--admin-muted)' }}
+                        >
                           {order.delivery_method}
                         </td>
                         <td className="px-4 py-3" style={{ color: 'var(--admin-muted)' }}>
@@ -708,7 +857,9 @@ export default function AdminOrdersPage() {
                             <select
                               value={order.status}
                               disabled={updatingId === order.id}
-                              onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                              onChange={(e) =>
+                                handleStatusChange(order.id, e.target.value as OrderStatus)
+                              }
                               className="px-2 py-1.5 rounded-lg text-xs outline-none cursor-pointer"
                               style={{
                                 border: '1px solid var(--admin-border)',
@@ -747,11 +898,18 @@ export default function AdminOrdersPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t flex justify-end" style={{ borderColor: 'var(--admin-border)', background: 'var(--admin-surface)' }}>
+            <div
+              className="px-6 py-4 border-t flex justify-end"
+              style={{ borderColor: 'var(--admin-border)', background: 'var(--admin-surface)' }}
+            >
               <button
                 onClick={() => setShowArchiveModal(false)}
                 className="px-5 py-2 text-sm font-medium rounded-xl transition-colors cursor-pointer"
-                style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                style={{
+                  background: 'var(--admin-surface)',
+                  border: '1px solid var(--admin-border)',
+                  color: '#F5EDE0',
+                }}
               >
                 Close Form
               </button>
@@ -765,7 +923,7 @@ export default function AdminOrdersPage() {
         <OrderDetailModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onStatusUpdate={updateStatus}
+          onStatusUpdate={syncOrderStatus}
           updatingId={updatingId}
         />
       )}
@@ -788,18 +946,28 @@ export default function AdminOrdersPage() {
             <textarea
               autoFocus
               value={cancelRequest.reason}
-              onChange={(event) => setCancelRequest((prev) => ({ ...prev, reason: event.target.value }))}
+              onChange={(event) =>
+                setCancelRequest((prev) => ({ ...prev, reason: event.target.value }))
+              }
               placeholder="Enter cancellation reason..."
               rows={4}
               className="mt-4 w-full resize-none rounded-xl p-3 text-sm outline-none"
-              style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+              style={{
+                background: 'var(--admin-surface)',
+                border: '1px solid var(--admin-border)',
+                color: '#F5EDE0',
+              }}
             />
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setCancelRequest({ orderId: '', reason: '' })}
                 className="rounded-xl px-4 py-2 text-sm font-medium"
-                style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                style={{
+                  background: 'var(--admin-surface)',
+                  border: '1px solid var(--admin-border)',
+                  color: '#F5EDE0',
+                }}
               >
                 Keep order
               </button>
@@ -829,19 +997,64 @@ export default function AdminOrdersPage() {
           >
             <div className="flex items-center gap-3">
               <Icon name="ExclamationTriangleIcon" size={24} style={{ color: '#FBBF24' }} />
-              <h2 id="payment-confirmation-title" className="text-lg font-bold" style={{ color: '#F5EDE0' }}>
+              <h2
+                id="payment-confirmation-title"
+                className="text-lg font-bold"
+                style={{ color: '#F5EDE0' }}
+              >
                 Confirm Payment Received
               </h2>
             </div>
-            <p id="payment-confirmation-description" className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--admin-muted)' }}>
-              Have you received the 50% payment? If not, please wait for it before confirming this order.
+            <p
+              id="payment-confirmation-description"
+              className="mt-3 text-sm leading-relaxed"
+              style={{ color: 'var(--admin-muted)' }}
+            >
+              Compare the submitted reference with the GCash transaction and verify that the 50%
+              deposit was received. If the amount or reference does not match, keep the order
+              Pending.
             </p>
+            <div
+              className="mt-3 rounded-xl p-3 text-sm"
+              style={{ background: 'var(--admin-surface)', color: '#F5EDE0' }}
+            >
+              <p>
+                <strong>Deposit:</strong> ₱
+                {Number(paymentConfirmationOrder?.deposit_amount || 0).toLocaleString()}
+              </p>
+              <p className="break-all">
+                <strong>GCash Reference:</strong>{' '}
+                {paymentConfirmationOrder?.payment_reference || 'Not provided'}
+              </p>
+            </div>
+            {paymentConfirmationOrder?.payment_reference ? (
+              <label className="mt-4 flex items-start gap-2 text-sm" style={{ color: '#F5EDE0' }}>
+                <input
+                  type="checkbox"
+                  checked={paymentVerified}
+                  onChange={(event) => setPaymentVerified(event.target.checked)}
+                  className="mt-0.5 accent-amber-500"
+                />
+                I verified that the GCash reference matches the received 50% deposit.
+              </label>
+            ) : (
+              <p className="mt-4 text-sm font-medium text-red-400">
+                This order has no GCash reference number and cannot be confirmed.
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setPaymentConfirmationOrderId(null)}
+                onClick={() => {
+                  setPaymentConfirmationOrderId(null);
+                  setPaymentVerified(false);
+                }}
                 className="rounded-xl px-4 py-2 text-sm font-medium"
-                style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: '#F5EDE0' }}
+                style={{
+                  background: 'var(--admin-surface)',
+                  border: '1px solid var(--admin-border)',
+                  color: '#F5EDE0',
+                }}
               >
                 Wait for Payment
               </button>
@@ -850,9 +1063,14 @@ export default function AdminOrdersPage() {
                 onClick={() => {
                   const orderId = paymentConfirmationOrderId;
                   setPaymentConfirmationOrderId(null);
+                  setPaymentVerified(false);
                   void updateStatus(orderId, 'Confirmed');
                 }}
-                disabled={updatingId === paymentConfirmationOrderId}
+                disabled={
+                  updatingId === paymentConfirmationOrderId ||
+                  !paymentConfirmationOrder?.payment_reference?.trim() ||
+                  !paymentVerified
+                }
                 className="rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ background: '#8B1E2D', color: '#FFF7ED' }}
               >

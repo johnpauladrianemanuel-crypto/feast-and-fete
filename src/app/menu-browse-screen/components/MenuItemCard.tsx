@@ -71,38 +71,13 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
   const catColor = CATEGORY_COLORS[item.categorySlug] ?? { bg: 'rgba(100,100,100,0.1)', text: '#555' };
 
   const rawIsActive = item.isActive ?? (item as { is_active?: boolean }).is_active;
-  const isAutoDeactivated = item.stock === 0;
-  const isInactive = rawIsActive === false || isAutoDeactivated;
+  const isInactive = rawIsActive === false;
 
   const deactivationReason =
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivationReason ??
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).deactivation_reason ??
     (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailable_reason ??
-    (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailableReason ??
-    (isAutoDeactivated ? 'Automatically deactivated due to zero stock remaining.' : undefined);
-
-  const isLowStock = item.stock > 0 && item.stock < 5;
-  const isOutOfStock = item.stock === 0;
-
-  useEffect(() => {
-    if (item.stock === 0 && rawIsActive !== false) {
-      const autoDeactivate = async () => {
-        try {
-          const supabase = createClient();
-          await supabase
-            .from('menu_items')
-            .update({
-              is_active: false,
-              deactivation_reason: 'Automatic deactivation: Stock reached 0.'
-            })
-            .eq('id', item.id);
-        } catch (err) {
-          console.error('Failed to auto deactivate item:', err);
-        }
-      };
-      autoDeactivate();
-    }
-  }, [item.stock, item.id, rawIsActive]);
+    (item as { deactivationReason?: string; deactivation_reason?: string; unavailable_reason?: string; unavailableReason?: string }).unavailableReason;
 
   useEffect(() => {
     const el = cardRef.current;
@@ -235,6 +210,15 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
             />
           )}
 
+          {!isInactive && (
+            <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full border border-white/40 bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#7B1C2E] shadow-lg pointer-events-none">
+              <span className="menu-click-hand text-lg leading-none" aria-hidden="true">
+                👆
+              </span>
+              <span>Tap to customize</span>
+            </div>
+          )}
+
           {/* Category badge */}
           <div className="absolute top-3 left-3">
             <span
@@ -304,21 +288,11 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
             <StarDisplay rating={ratingSummary.averageRating} count={ratingSummary.reviewCount} />
           )}
 
-          {/* Serving size & Available Stock Count */}
+          {/* Serving size */}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
             <div className="flex items-center gap-1.5">
               <Icon name="UsersIcon" size={13} className="text-muted-foreground flex-shrink-0" />
               <span>{item.servingSize}</span>
-            </div>
-
-            <div className={`font-semibold text-[11px] px-2 py-0.5 rounded-md ${
-              item.stock > 5 
-                ? 'text-emerald-500/90 bg-emerald-500/10' 
-                : isLowStock 
-                ? 'text-amber-500/90 bg-amber-500/10 animate-pulse' 
-                : 'text-red-500/90 bg-red-500/10'
-            }`}>
-              Stock: {item.stock} left
             </div>
           </div>
         </div>
@@ -337,7 +311,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
           </div>
           <button
             onClick={handleAdd}
-            disabled={isInactive || isOutOfStock}
+            disabled={isInactive}
             className={`flex items-center gap-1.5 px-3.5 py-2 text-xs md:text-sm font-semibold rounded-xl transition-all ${
               isInactive
                 ? 'bg-stone-900/90 text-stone-500 border border-stone-800/60 cursor-not-allowed opacity-80'

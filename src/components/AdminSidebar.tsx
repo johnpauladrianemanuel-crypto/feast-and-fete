@@ -30,7 +30,7 @@ export default function AdminSidebar() {
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
 
   const applyTheme = (dark: boolean) => {
     const root = document.documentElement;
@@ -231,7 +231,9 @@ export default function AdminSidebar() {
           {!collapsed && (
             <div className="overflow-hidden">
               <p className="text-xs font-semibold text-secondary truncate">Admin</p>
-              <p className="text-xs truncate" style={{ color: 'var(--admin-muted)' }}>feast.fete@gmail.com</p>
+              <p className="text-xs truncate" style={{ color: 'var(--admin-muted)' }}>
+                {user?.email || 'Not signed in'}
+              </p>
             </div>
           )}
         </div>

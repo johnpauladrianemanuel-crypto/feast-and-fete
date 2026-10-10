@@ -84,9 +84,6 @@ export default function CartDrawer() {
             </div>
           ) : (
             state?.items?.map(item => {
-              const maxStock = (item?.menuItem as any)?.stock ?? (item?.menuItem as any)?.stocks ?? (item?.menuItem as any)?.stock_left ?? 999;
-              const isAtMax = item?.quantity >= maxStock;
-
               return (
                 <div
                   key={item?.id}
@@ -145,10 +142,7 @@ export default function CartDrawer() {
                       <span className="w-6 text-center text-sm font-medium text-foreground tabular-nums">{item?.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item?.id, item?.quantity + 1)}
-                        disabled={isAtMax}
-                        className={`w-6 h-6 flex items-center justify-center rounded-md border border-border transition-colors text-foreground ${
-                          isAtMax ? 'opacity-40 cursor-not-allowed border-border' : 'hover:border-primary hover:text-primary'
-                        }`}
+                        className="w-6 h-6 flex items-center justify-center rounded-md border border-border hover:border-primary hover:text-primary transition-colors text-foreground"
                         aria-label="Increase quantity"
                       >
                         <Icon name="PlusIcon" size={12} />

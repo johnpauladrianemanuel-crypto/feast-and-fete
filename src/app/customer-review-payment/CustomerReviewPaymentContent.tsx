@@ -31,8 +31,105 @@ interface AddressForm {
 }
 
 const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; icon: string; desc: string }[] = [
-  { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: '💵', desc: 'Pay when your order arrives' },
-  { value: 'gcash', label: 'GCash', icon: '📱', desc: 'Pay via GCash mobile wallet' },
+  {
+    value: 'cash_on_delivery',
+    label: 'Cash on Delivery',
+    icon: '💵',
+    desc: 'Pay the remaining balance when your order arrives',
+  },
+  {
+    value: 'gcash',
+    label: 'GCash',
+    icon: '📱',
+    desc: 'Pay the remaining balance via GCash',
+  },
+];
+
+const TERMS_SECTIONS = [
+  {
+    title: '1. Orders & Lead Time',
+    items: [
+      'All orders must be placed at least two (2) days in advance.',
+      'Same-day orders and those with one (1) day lead time are subject to availability and may be accommodated depending on kitchen capacity.',
+    ],
+  },
+  {
+    title: '2. Preparation & Quality',
+    items: [
+      'All dishes are cooked fresh on the same day of delivery or pick-up to ensure premium quality and flavor.',
+      'Our food is best consumed on the same day it is prepared for optimal taste and freshness.',
+    ],
+  },
+  {
+    title: '3. Customization',
+    items: [
+      'We can customize dishes according to your flavor preferences, serving sizes, and menu combinations upon request.',
+      'Additional charges may apply depending on the level of customization.',
+    ],
+  },
+  {
+    title: '4. Payment Terms',
+    items: [
+      'A 50% deposit of the total order amount is required to submit and secure every order. Pay this deposit through GCash, including when Cash on Delivery or Cash on Pickup is selected for the remaining balance.',
+      'The remaining 50% balance must be settled based on the selected payment method and confirmed order schedule.',
+      'Before payment, an Order Slip will be sent to the client for review and confirmation. Please double-check all details (menu, quantity, delivery date/time, and total amount) before settling payment, as any changes will no longer be accommodated once payment has been made.',
+      'The GCash reference number must be provided and verified by Feast & Fête before an order can be confirmed.',
+      'Orders without confirmed payment within the required time frame may be automatically cancelled.',
+      'All confirmed payments are non-transferable and non-refundable once preparations and ingredient sourcing have begun.',
+    ],
+  },
+  {
+    title: '5. Cancellations & Order Changes',
+    items: [
+      'Cancellations made at least 24 hours before the scheduled date will be subject to approval.',
+      'Same-day cancellations are non-refundable, as ingredients are prepared fresh.',
+      'Any changes to orders (menu, quantity, or delivery time) must be made at least one (1) day in advance and are subject to availability.',
+    ],
+  },
+  {
+    title: '6. Delivery & Pick-Up',
+    items: [
+      'Feast and Fete is based in Marikina City.',
+      'Delivery is available within Marikina and nearby areas, with fees varying based on distance and rider availability.',
+      'For pick-ups, please collect your order at the agreed time to maintain food quality.',
+      'We are not liable for delays caused by third-party couriers, traffic, or weather conditions beyond our control.',
+    ],
+  },
+  {
+    title: '7. Storage & Consumption',
+    items: [
+      'Food trays are best consumed immediately upon delivery.',
+      'If not served right away, please refrigerate promptly and reheat thoroughly before consumption.',
+      'Feast and Fete shall not be held responsible for food quality concerns resulting from improper storage or handling after delivery.',
+    ],
+  },
+  {
+    title: '8. Allergens & Dietary Information',
+    items: [
+      'Some dishes may contain common allergens such as dairy, eggs, nuts, soy, wheat, or seafood.',
+      'Please inform us of any food allergies or dietary restrictions upon ordering.',
+      'Feast and Fete will not be liable for any allergic reactions if such information is not disclosed prior to order confirmation.',
+    ],
+  },
+  {
+    title: '9. Presentation & Packaging',
+    items: [
+      'Food trays are carefully packaged for safe transport; however, minor shifting may occur during delivery.',
+      'Garnishes, presentation, and ingredient availability may vary slightly depending on season and supply.',
+    ],
+  },
+  {
+    title: '10. Event Bookings',
+    items: [
+      'Event bookings, rentals, and setup logistics (e.g., tables, servers, décor) are handled by the client, unless otherwise agreed upon in advance.',
+    ],
+  },
+  {
+    title: '11. Photos & Marketing',
+    items: [
+      'Feast and Fete reserves the right to use photos of food, packaging, or setups for marketing and social media purposes, excluding any personal or private client details.',
+    ],
+  },
 ];
 
 function getGuestProfile(): { id: string; contactType: string; contactValue: string } | null {
@@ -42,8 +139,22 @@ function getGuestProfile(): { id: string; contactType: string; contactValue: str
     const contactType = localStorage.getItem('guestContactType');
     const contactValue = localStorage.getItem('guestContactValue');
     if (id && contactType && contactValue) return { id, contactType, contactValue };
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return null;
+}
+
+function parseSavedAddress(address: string) {
+  const parts = address.split(',').map((part) => part.trim());
+  if (parts.length < 4) {
+    return { street: address.trim(), barangay: '', city: '', region: 'NCR' };
+  }
+
+  const region = parts.pop() || 'NCR';
+  const city = parts.pop() || '';
+  const barangay = parts.pop() || '';
+  return { street: parts.join(', '), barangay, city, region };
 }
 
 export default function CustomerReviewPaymentContent() {
@@ -56,6 +167,7 @@ export default function CustomerReviewPaymentContent() {
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
   const [orderType, setOrderType] = useState<OrderType>('normal');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash_on_delivery');
+  const [paymentReference, setPaymentReference] = useState('');
   const [form, setForm] = useState<AddressForm>({
     fullName: '',
     phone: '',
@@ -71,15 +183,20 @@ export default function CustomerReviewPaymentContent() {
   const [errors, setErrors] = useState<Partial<AddressForm>>({});
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState('');
-  const [guestProfile, setGuestProfile] = useState<{ id: string; contactType: string; contactValue: string } | null>(null);
+  const [guestProfile, setGuestProfile] = useState<{
+    id: string;
+    contactType: string;
+    contactValue: string;
+  } | null>(null);
   const [savedAddress, setSavedAddress] = useState('');
   const [showQRModal, setShowQRModal] = useState(false);
-  
+  const [paymentReferenceError, setPaymentReferenceError] = useState('');
+
   // States para sa Terms & Conditions
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsError, setTermsError] = useState('');
-  const profileFieldsLocked = Boolean(user && savedAddress);
+  const profileContactFieldsLocked = Boolean(user && savedAddress);
 
   useEffect(() => {
     if (!showTermsModal) return;
@@ -95,17 +212,19 @@ export default function CustomerReviewPaymentContent() {
   const deliveryFee = deliveryMethod === 'delivery' ? 150 : 0;
   const priorityFee = orderType === 'priority' ? PRIORITY_FEE : 0;
   const total = totalAmount + deliveryFee + priorityFee;
+  const depositAmount = Number((total * 0.5).toFixed(2));
   const itemCount = state.items.reduce((s, i) => s + i.quantity, 0);
   const cashPaymentLabel = deliveryMethod === 'pickup' ? 'Cash On Pick Up' : 'Cash on Delivery';
-  const cashPaymentDescription = deliveryMethod === 'pickup'
-    ? 'Pay when you pick up your order'
-    : 'Pay when your order arrives';
+  const cashPaymentDescription =
+    deliveryMethod === 'pickup'
+      ? 'Pay 50% via GCash now; pay the balance when you pick up'
+      : 'Pay 50% via GCash now; pay the balance on delivery';
 
   useEffect(() => {
     const gp = getGuestProfile();
     setGuestProfile(gp);
     if (gp && !user) {
-      setForm(prev => ({
+      setForm((prev) => ({
         ...prev,
         email: gp.contactType === 'email' ? gp.contactValue : prev.email,
         phone: gp.contactType === 'phone' ? gp.contactValue : prev.phone,
@@ -116,37 +235,77 @@ export default function CustomerReviewPaymentContent() {
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
-    supabase
-      .from('user_profiles')
-      .select('full_name, email, phone, address')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          const addressParts = (data.address || '').split(',').map((part: string) => part.trim());
-          const profileAddress = data.address || '';
-          setSavedAddress(profileAddress);
-          setForm(prev => ({
-            ...prev,
-            fullName: data.full_name || prev.fullName,
-            email: data.email || user.email || prev.email,
-            phone: data.phone || prev.phone,
-            street: addressParts[0] || prev.street,
-            barangay: addressParts[1] || prev.barangay,
-            city: addressParts[2] || prev.city,
-            region: addressParts[3] || prev.region,
-          }));
-        } else {
-          setForm(prev => ({ ...prev, email: user.email || prev.email }));
+
+    async function loadCustomerProfile() {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('full_name, email, phone, address')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) {
+        console.error('Failed to load customer profile for checkout:', error.message);
+        setPlaceError('Could not load your saved delivery address. Please review it before ordering.');
+      }
+
+      const metadata = user.user_metadata || {};
+      const profileAddress = data?.address?.trim() || metadata.address?.trim() || '';
+      const profileFullName = data?.full_name || metadata.full_name || '';
+      const profilePhone = data?.phone || metadata.phone || '';
+      const profileEmail = data?.email || user.email || '';
+
+      if (
+        profileAddress &&
+        (!data || !data.address?.trim()) &&
+        profileEmail
+      ) {
+        const { error: backfillError } = await supabase.from('user_profiles').upsert(
+          {
+            id: user.id,
+            email: profileEmail,
+            full_name: profileFullName,
+            phone: profilePhone || null,
+            address: profileAddress,
+          },
+          { onConflict: 'id' }
+        );
+        if (backfillError) {
+          console.error('Failed to restore saved signup address:', backfillError.message);
+          setPlaceError(
+            'Your registered address could not be restored automatically. Please check and save it in your profile.'
+          );
         }
-      });
+      }
+
+      const addressParts = parseSavedAddress(profileAddress);
+      setSavedAddress(profileAddress);
+      setForm((prev) => ({
+        ...prev,
+        fullName: profileFullName || prev.fullName,
+        email: profileEmail || prev.email,
+        phone: profilePhone || prev.phone,
+        street: addressParts.street || prev.street,
+        barangay: addressParts.barangay || prev.barangay,
+        city: addressParts.city || prev.city,
+        region: addressParts.region || prev.region,
+      }));
+    }
+
+    void loadCustomerProfile();
   }, [user]);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
+  function restoreSavedAddress() {
+    const address = parseSavedAddress(savedAddress);
+    setForm((prev) => ({ ...prev, ...address }));
+    setErrors((prev) => ({ ...prev, street: '' }));
+  }
+
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
     if (errors[name as keyof AddressForm]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
   }
 
@@ -158,65 +317,530 @@ export default function CustomerReviewPaymentContent() {
 
   const REGION_CITY_MAP: Record<string, string[]> = {
     NCR: [
-      'Quezon City', 'Manila', 'Makati', 'Pasig', 'Taguig', 'Mandaluyong',
-      'Parañaque', 'Las Piñas', 'Muntinlupa', 'Marikina', 'Caloocan',
-      'Valenzuela', 'Malabon', 'Navotas', 'San Juan', 'Pasay'
+      'Quezon City',
+      'Manila',
+      'Makati',
+      'Pasig',
+      'Taguig',
+      'Mandaluyong',
+      'Parañaque',
+      'Las Piñas',
+      'Muntinlupa',
+      'Marikina',
+      'Caloocan',
+      'Valenzuela',
+      'Malabon',
+      'Navotas',
+      'San Juan',
+      'Pasay',
     ],
     CALABARZON: [
-      'San Mateo (Rizal)', 'Antipolo City', 'Taytay', 'Cainta', 'Rodriguez (Montalban)',
-      'Bacoor City', 'Imus City', 'Dasmariñas City', 'General Trias City',
-      'Calamba City', 'Santa Rosa City', 'Biñan City', 'Cabuyao City',
-      'San Pedro City', 'Lipa City', 'Batangas City'
+      'San Mateo (Rizal)',
+      'Antipolo City',
+      'Taytay',
+      'Cainta',
+      'Rodriguez (Montalban)',
+      'Bacoor City',
+      'Imus City',
+      'Dasmariñas City',
+      'General Trias City',
+      'Calamba City',
+      'Santa Rosa City',
+      'Biñan City',
+      'Cabuyao City',
+      'San Pedro City',
+      'Lipa City',
+      'Batangas City',
     ],
     CENTRAL_LUZON: [
-      'Angeles City', 'San Fernando City', 'Mabalacat City', 'Malolos City',
-      'Meycauayan City', 'San Jose del Monte City', 'Tarlac City',
-      'Olongapo City', 'Cabanatuan City'
+      'Angeles City',
+      'San Fernando City',
+      'Mabalacat City',
+      'Malolos City',
+      'Meycauayan City',
+      'San Jose del Monte City',
+      'Tarlac City',
+      'Olongapo City',
+      'Cabanatuan City',
     ],
   };
 
   const CITY_BARANGAY_MAP: Record<string, string[]> = {
-    'Quezon City': ['Barangay San Jose', 'Barangay Holy Spirit', 'Barangay Tatalon', 'Batasan Hills', 'Commonwealth', 'Cubao', 'Diliman', 'Kamuning', 'Loyola Heights', 'New Manila', 'Novaliches', 'Project 6', 'Teachers Village'],
-    'Manila': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Binondo', 'Ermita', 'Intramuros', 'Malate', 'Paco', 'Pandacan', 'Port Area', 'Quiapo', 'Sampaloc', 'San Miguel', 'San Nicolas', 'Santa Cruz', 'Santa Ana', 'Tondo'],
-    'Makati': ['Poblacion', 'San Antonio', 'Bel-Air', 'Dasmariñas', 'Forbes Park', 'Guadalupe Nuevo', 'Guadalupe Viejo', 'Magallanes', 'Pio del Pilar', 'San Lorenzo', 'Urdaneta'],
-    'Pasig': ['Bagong Ilog', 'Pinagbuhatan', 'Caniogan', 'Kapitolyo', 'Manggahan', 'Maybunga', 'Oranbo', 'Rosario', 'San Antonio', 'San Joaquin', 'Ugong'],
-    'Taguig': ['Central Bicutan', 'Ususan', 'Bambang', 'Fort Bonifacio (BGC)', 'Lower Bicutan', 'Napindan', 'Pinagsama', 'Signal Village', 'Tuktukan', 'Upper Bicutan'],
-    'Mandaluyong': ['Addition Hills', 'Barangka Drive', 'Highway Hills', 'Hulo', 'Malamig', 'Plainview', 'Pleasant Hills', 'Poblacion', 'San Jose', 'Wack-Wack Greenhills'],
-    'Parañaque': ['B F Homes', 'Don Bosco', 'Baclaran', 'Don Galo', 'La Huerta', 'Moonwalk', 'San Dionisio', 'San Isidro', 'Santo Niño', 'Sun Valley', 'Tambo'],
-    'Las Piñas': ['Alabang-Zapote', 'BF International', 'Daniel Fajardo', 'Pamplona Uno', 'Pamplona Tres', 'Pilar', 'Pulang Lupa Uno', 'Talon Uno', 'Talon Dos'],
-    'Muntinlupa': ['Alabang', 'Bayanan', 'Cupang', 'Poblacion', 'Putatan', 'Sucat', 'Tunasan'],
-    'Marikina': ['Barangka', 'Concepcion Uno', 'Concepcion Dos', 'Industrial Valley', 'Fortune', 'Malanday', 'Marikina Heights', 'Nangka', 'Parang', 'San Roque', 'Santa Elena'],
-    'Caloocan': ['Barangay 1 to 188 (North/South Caloocan)', 'Bagong Silang', 'Camarin', 'Deparo', 'Grace Park', 'Monumento', 'Tala'],
-    'Valenzuela': ['Arkong Bato', 'Gen. T. de Leon', 'Karuhatan', 'Lawang Bato', 'Malinta', 'Mapulang Lupa', 'Marulas', 'Paso de Blas', 'Poblacion', 'Punturin'],
-    'Malabon': ['Acacia', 'Catmon', 'Concepcion', 'Dampalit', 'Longos', 'Niugan', 'Potrero', 'San Agustin', 'Tañong', 'Tugatog'],
-    'Navotas': ['Bagumbayan North', 'Bagumbayan South', 'Bangkulasi', 'Daanghari', 'Navotas East', 'Navotas West', 'San Jose', 'San Roque', 'Tangos North', 'Tangos South'],
-    'San Juan': ['Addition Hills', 'Balong-Bato', 'Greenhills', 'Kabayanan', 'Little Baguio', 'Maytunas', 'Onse', 'Pasadena', 'Poblacion', 'Progreso', 'San Perfecta', 'Tibagan'],
-    'Pasay': ['Baclaran', 'Don Carlos Village', 'Malibay', 'Maricaban', 'Poblacion', 'San Jose', 'San Rafael', 'San Roque', 'Villamor Airbase'],
-    'San Mateo (Rizal)': ['Ampid I', 'Ampid II', 'Banaba', 'Dulumbayan', 'Guitnang Bayan I', 'Guitnang Bayan II', 'Gulod Malaya', 'Malanday', 'Maly', 'Pintong Bukawe', 'Santa Ana', 'Santo Niño', 'Silangan', 'Kambal'],
-    'Antipolo City': ['Bagong Nayon', 'Beverly Hills', 'Calawis', 'Cupang', 'Dalig', 'Inarawan', 'Mambugan', 'Mayamot', 'Muntingdilaw', 'San Cruz', 'San Isidro', 'San Jose', 'San Roque'],
-    'Taytay': ['Dolores (Poblacion)', 'Muzon', 'San Juan', 'San Isidro', 'Santa Ana'],
-    'Cainta': ['San Andres', 'San Juan', 'San Roque', 'Santa Rosa', 'Santo Domingo'],
-    'Rodriguez (Montalban)': ['Balite', 'Burgos', 'Geronimo', 'Macabud', 'Manggahan', 'Mascap', 'Rosario', 'San Jose', 'San Rafael'],
-    'Bacoor City': ['Bayanan', 'Habay I', 'Habay II', 'Mambog I', 'Mambog II', 'Molino I', 'Molino II', 'Molino III', 'Molino IV', 'Niog I', 'Niog II', 'Panapaan', 'Salawag', 'Talaba'],
-    'Imus City': ['Anabu I-A', 'Anabu II-A', 'Bucandala', 'Carsadang Bago', 'Malagasang I-A', 'Malagasang II-A', 'Medicion', 'Poblacion', 'Tanzang Luma'],
-    'Dasmariñas City': ['Burol', 'Dasmariñas Bagong Bayan', 'Langkaan I', 'Langkaan II', 'Paliparan I', 'Paliparan II', 'Paliparan III', 'Sabang', 'Salawag', 'Salitran I', 'Salitran II', 'Sampaloc I'],
-    'General Trias City': ['Arnaldo', 'Bacao', 'Manggahan', 'Navarro', 'Pasong Kawayan', 'San Francisco', 'Tejero'],
-    'Calamba City': ['Barandal', 'Bucal', 'Canlubang', 'Halang', 'Lawa', 'Makiling', 'Parian', 'Poblacion', 'Real', 'Saimsim', 'Turbina'],
-    'Santa Rosa City': ['Balibago', 'Dila', 'Dita', 'Don Jose', 'Ibaba', 'Macabling', 'Malitlit', 'Market Area', 'Sinalhan', 'Tagapo'],
-    'Biñan City': ['Caniogan', 'De La Paz', 'Ganado', 'Langkiwa', 'Loma', 'Malaban', 'Platero', 'Poblacion', 'San Antonio', 'San Francisco', 'Santo Tomas'],
-    'Cabuyao City': ['Banaybanay', 'Banlic', 'Bigaa', 'Casile', 'Diezmo', 'Gulod', 'Mamatid', 'Poblacion', 'Pulo', 'Sala'],
-    'San Pedro City': ['Chrysanthemum', 'Cuyab', 'Landayan', 'Langgam', 'Magsaysay', 'Pacita 1', 'Pacita 2', 'Poblacion', 'San Antonio', 'San Vicente', 'United Bayanihan'],
-    'Lipa City': ['Balintawak', 'Inosloban', 'Mataas na Lupa', 'Pangao', 'Poblacion', 'Sabang', 'San Carlos', 'Tambobong', 'Tibig'],
-    'Batangas City': ['Alangilan', 'Balagtas', 'Bolbok', 'Calicanto', 'Cuta', 'Gulod Labac', 'Kumintang Ibaba', 'Kumintang Ilaya', 'Poblacion', 'Soro-soro Karsada'],
-    'Angeles City': ['Balibago', 'Cutcut', 'Malabanias', 'Margardt', 'Pami', 'Pulung Maragul', 'Salapungan', 'Santo Rosario', 'Sapu Bato'],
-    'San Fernando City': ['Calulut', 'Dolores', 'Lacing', 'Magliman', 'Maimpis', 'Palawe', 'San Agustin', 'San Jose', 'Sindalan', 'Telabastagan'],
-    'Mabalacat City': ['Dau', 'Lakandula', 'Mabiga', 'Macapagal Village', 'Poblacion', 'San Francisco', 'Santa Ines', 'Tabun'],
-    'Malolos City': ['Bulihan', 'Cofradia', 'Guinhawa', 'Ligas', 'Longos', 'Lugam', 'Mojon', 'Panasahan', 'San Gabriel', 'San Vicente'],
-    'Meycauayan City': ['Banga', 'Bayugo', 'Calvario', 'Iba', 'Lawa', 'Libtong', 'Perez', 'Poblacion', 'Saluysoy', 'Zamora'],
-    'San Jose del Monte City': ['Fierce', 'Gumaoc', 'Muzon', 'Poblacion', 'Graceville', 'Kaypian', 'San Manuel', 'Santo Cristo', 'Tungkong Mangga'],
-    'Tarlac City': ['Binauganan', 'Central', 'Matatalaib', 'Poblacion', 'San Nicolas', 'San Rafael', 'San Vicente', 'Sepung Calzada', 'Suizo', 'Tibag'],
-    'Olongapo City': ['Barretto', 'East Bajac-Bajac', 'East Tapinac', 'Gordon Heights', 'Kalaklan', 'New Cabalan', 'Old Cabalan', 'Santa Rita', 'West Bajac-Bajac', 'West Tapinac'],
-    'Cabanatuan City': ['Bitas', 'Cabanatuan', 'Mabini Extension', 'Sangitan', 'San Josef', 'Supermarket', 'Aduas Norte', 'Aduas Sur', 'Barangay 1-10'],
+    'Quezon City': [
+      'Barangay San Jose',
+      'Barangay Holy Spirit',
+      'Barangay Tatalon',
+      'Batasan Hills',
+      'Commonwealth',
+      'Cubao',
+      'Diliman',
+      'Kamuning',
+      'Loyola Heights',
+      'New Manila',
+      'Novaliches',
+      'Project 6',
+      'Teachers Village',
+    ],
+    Manila: [
+      'Barangay 1',
+      'Barangay 2',
+      'Barangay 3',
+      'Binondo',
+      'Ermita',
+      'Intramuros',
+      'Malate',
+      'Paco',
+      'Pandacan',
+      'Port Area',
+      'Quiapo',
+      'Sampaloc',
+      'San Miguel',
+      'San Nicolas',
+      'Santa Cruz',
+      'Santa Ana',
+      'Tondo',
+    ],
+    Makati: [
+      'Poblacion',
+      'San Antonio',
+      'Bel-Air',
+      'Dasmariñas',
+      'Forbes Park',
+      'Guadalupe Nuevo',
+      'Guadalupe Viejo',
+      'Magallanes',
+      'Pio del Pilar',
+      'San Lorenzo',
+      'Urdaneta',
+    ],
+    Pasig: [
+      'Bagong Ilog',
+      'Pinagbuhatan',
+      'Caniogan',
+      'Kapitolyo',
+      'Manggahan',
+      'Maybunga',
+      'Oranbo',
+      'Rosario',
+      'San Antonio',
+      'San Joaquin',
+      'Ugong',
+    ],
+    Taguig: [
+      'Central Bicutan',
+      'Ususan',
+      'Bambang',
+      'Fort Bonifacio (BGC)',
+      'Lower Bicutan',
+      'Napindan',
+      'Pinagsama',
+      'Signal Village',
+      'Tuktukan',
+      'Upper Bicutan',
+    ],
+    Mandaluyong: [
+      'Addition Hills',
+      'Barangka Drive',
+      'Highway Hills',
+      'Hulo',
+      'Malamig',
+      'Plainview',
+      'Pleasant Hills',
+      'Poblacion',
+      'San Jose',
+      'Wack-Wack Greenhills',
+    ],
+    Parañaque: [
+      'B F Homes',
+      'Don Bosco',
+      'Baclaran',
+      'Don Galo',
+      'La Huerta',
+      'Moonwalk',
+      'San Dionisio',
+      'San Isidro',
+      'Santo Niño',
+      'Sun Valley',
+      'Tambo',
+    ],
+    'Las Piñas': [
+      'Alabang-Zapote',
+      'BF International',
+      'Daniel Fajardo',
+      'Pamplona Uno',
+      'Pamplona Tres',
+      'Pilar',
+      'Pulang Lupa Uno',
+      'Talon Uno',
+      'Talon Dos',
+    ],
+    Muntinlupa: ['Alabang', 'Bayanan', 'Cupang', 'Poblacion', 'Putatan', 'Sucat', 'Tunasan'],
+    Marikina: [
+      'Barangka',
+      'Concepcion Uno',
+      'Concepcion Dos',
+      'Industrial Valley',
+      'Fortune',
+      'Malanday',
+      'Marikina Heights',
+      'Nangka',
+      'Parang',
+      'San Roque',
+      'Santa Elena',
+    ],
+    Caloocan: [
+      'Barangay 1 to 188 (North/South Caloocan)',
+      'Bagong Silang',
+      'Camarin',
+      'Deparo',
+      'Grace Park',
+      'Monumento',
+      'Tala',
+    ],
+    Valenzuela: [
+      'Arkong Bato',
+      'Gen. T. de Leon',
+      'Karuhatan',
+      'Lawang Bato',
+      'Malinta',
+      'Mapulang Lupa',
+      'Marulas',
+      'Paso de Blas',
+      'Poblacion',
+      'Punturin',
+    ],
+    Malabon: [
+      'Acacia',
+      'Catmon',
+      'Concepcion',
+      'Dampalit',
+      'Longos',
+      'Niugan',
+      'Potrero',
+      'San Agustin',
+      'Tañong',
+      'Tugatog',
+    ],
+    Navotas: [
+      'Bagumbayan North',
+      'Bagumbayan South',
+      'Bangkulasi',
+      'Daanghari',
+      'Navotas East',
+      'Navotas West',
+      'San Jose',
+      'San Roque',
+      'Tangos North',
+      'Tangos South',
+    ],
+    'San Juan': [
+      'Addition Hills',
+      'Balong-Bato',
+      'Greenhills',
+      'Kabayanan',
+      'Little Baguio',
+      'Maytunas',
+      'Onse',
+      'Pasadena',
+      'Poblacion',
+      'Progreso',
+      'San Perfecta',
+      'Tibagan',
+    ],
+    Pasay: [
+      'Baclaran',
+      'Don Carlos Village',
+      'Malibay',
+      'Maricaban',
+      'Poblacion',
+      'San Jose',
+      'San Rafael',
+      'San Roque',
+      'Villamor Airbase',
+    ],
+    'San Mateo (Rizal)': [
+      'Ampid I',
+      'Ampid II',
+      'Banaba',
+      'Dulumbayan',
+      'Guitnang Bayan I',
+      'Guitnang Bayan II',
+      'Gulod Malaya',
+      'Malanday',
+      'Maly',
+      'Pintong Bukawe',
+      'Santa Ana',
+      'Santo Niño',
+      'Silangan',
+      'Kambal',
+    ],
+    'Antipolo City': [
+      'Bagong Nayon',
+      'Beverly Hills',
+      'Calawis',
+      'Cupang',
+      'Dalig',
+      'Inarawan',
+      'Mambugan',
+      'Mayamot',
+      'Muntingdilaw',
+      'San Cruz',
+      'San Isidro',
+      'San Jose',
+      'San Roque',
+    ],
+    Taytay: ['Dolores (Poblacion)', 'Muzon', 'San Juan', 'San Isidro', 'Santa Ana'],
+    Cainta: ['San Andres', 'San Juan', 'San Roque', 'Santa Rosa', 'Santo Domingo'],
+    'Rodriguez (Montalban)': [
+      'Balite',
+      'Burgos',
+      'Geronimo',
+      'Macabud',
+      'Manggahan',
+      'Mascap',
+      'Rosario',
+      'San Jose',
+      'San Rafael',
+    ],
+    'Bacoor City': [
+      'Bayanan',
+      'Habay I',
+      'Habay II',
+      'Mambog I',
+      'Mambog II',
+      'Molino I',
+      'Molino II',
+      'Molino III',
+      'Molino IV',
+      'Niog I',
+      'Niog II',
+      'Panapaan',
+      'Salawag',
+      'Talaba',
+    ],
+    'Imus City': [
+      'Anabu I-A',
+      'Anabu II-A',
+      'Bucandala',
+      'Carsadang Bago',
+      'Malagasang I-A',
+      'Malagasang II-A',
+      'Medicion',
+      'Poblacion',
+      'Tanzang Luma',
+    ],
+    'Dasmariñas City': [
+      'Burol',
+      'Dasmariñas Bagong Bayan',
+      'Langkaan I',
+      'Langkaan II',
+      'Paliparan I',
+      'Paliparan II',
+      'Paliparan III',
+      'Sabang',
+      'Salawag',
+      'Salitran I',
+      'Salitran II',
+      'Sampaloc I',
+    ],
+    'General Trias City': [
+      'Arnaldo',
+      'Bacao',
+      'Manggahan',
+      'Navarro',
+      'Pasong Kawayan',
+      'San Francisco',
+      'Tejero',
+    ],
+    'Calamba City': [
+      'Barandal',
+      'Bucal',
+      'Canlubang',
+      'Halang',
+      'Lawa',
+      'Makiling',
+      'Parian',
+      'Poblacion',
+      'Real',
+      'Saimsim',
+      'Turbina',
+    ],
+    'Santa Rosa City': [
+      'Balibago',
+      'Dila',
+      'Dita',
+      'Don Jose',
+      'Ibaba',
+      'Macabling',
+      'Malitlit',
+      'Market Area',
+      'Sinalhan',
+      'Tagapo',
+    ],
+    'Biñan City': [
+      'Caniogan',
+      'De La Paz',
+      'Ganado',
+      'Langkiwa',
+      'Loma',
+      'Malaban',
+      'Platero',
+      'Poblacion',
+      'San Antonio',
+      'San Francisco',
+      'Santo Tomas',
+    ],
+    'Cabuyao City': [
+      'Banaybanay',
+      'Banlic',
+      'Bigaa',
+      'Casile',
+      'Diezmo',
+      'Gulod',
+      'Mamatid',
+      'Poblacion',
+      'Pulo',
+      'Sala',
+    ],
+    'San Pedro City': [
+      'Chrysanthemum',
+      'Cuyab',
+      'Landayan',
+      'Langgam',
+      'Magsaysay',
+      'Pacita 1',
+      'Pacita 2',
+      'Poblacion',
+      'San Antonio',
+      'San Vicente',
+      'United Bayanihan',
+    ],
+    'Lipa City': [
+      'Balintawak',
+      'Inosloban',
+      'Mataas na Lupa',
+      'Pangao',
+      'Poblacion',
+      'Sabang',
+      'San Carlos',
+      'Tambobong',
+      'Tibig',
+    ],
+    'Batangas City': [
+      'Alangilan',
+      'Balagtas',
+      'Bolbok',
+      'Calicanto',
+      'Cuta',
+      'Gulod Labac',
+      'Kumintang Ibaba',
+      'Kumintang Ilaya',
+      'Poblacion',
+      'Soro-soro Karsada',
+    ],
+    'Angeles City': [
+      'Balibago',
+      'Cutcut',
+      'Malabanias',
+      'Margardt',
+      'Pami',
+      'Pulung Maragul',
+      'Salapungan',
+      'Santo Rosario',
+      'Sapu Bato',
+    ],
+    'San Fernando City': [
+      'Calulut',
+      'Dolores',
+      'Lacing',
+      'Magliman',
+      'Maimpis',
+      'Palawe',
+      'San Agustin',
+      'San Jose',
+      'Sindalan',
+      'Telabastagan',
+    ],
+    'Mabalacat City': [
+      'Dau',
+      'Lakandula',
+      'Mabiga',
+      'Macapagal Village',
+      'Poblacion',
+      'San Francisco',
+      'Santa Ines',
+      'Tabun',
+    ],
+    'Malolos City': [
+      'Bulihan',
+      'Cofradia',
+      'Guinhawa',
+      'Ligas',
+      'Longos',
+      'Lugam',
+      'Mojon',
+      'Panasahan',
+      'San Gabriel',
+      'San Vicente',
+    ],
+    'Meycauayan City': [
+      'Banga',
+      'Bayugo',
+      'Calvario',
+      'Iba',
+      'Lawa',
+      'Libtong',
+      'Perez',
+      'Poblacion',
+      'Saluysoy',
+      'Zamora',
+    ],
+    'San Jose del Monte City': [
+      'Fierce',
+      'Gumaoc',
+      'Muzon',
+      'Poblacion',
+      'Graceville',
+      'Kaypian',
+      'San Manuel',
+      'Santo Cristo',
+      'Tungkong Mangga',
+    ],
+    'Tarlac City': [
+      'Binauganan',
+      'Central',
+      'Matatalaib',
+      'Poblacion',
+      'San Nicolas',
+      'San Rafael',
+      'San Vicente',
+      'Sepung Calzada',
+      'Suizo',
+      'Tibag',
+    ],
+    'Olongapo City': [
+      'Barretto',
+      'East Bajac-Bajac',
+      'East Tapinac',
+      'Gordon Heights',
+      'Kalaklan',
+      'New Cabalan',
+      'Old Cabalan',
+      'Santa Rita',
+      'West Bajac-Bajac',
+      'West Tapinac',
+    ],
+    'Cabanatuan City': [
+      'Bitas',
+      'Cabanatuan',
+      'Mabini Extension',
+      'Sangitan',
+      'San Josef',
+      'Supermarket',
+      'Aduas Norte',
+      'Aduas Sur',
+      'Barangay 1-10',
+    ],
   };
 
   function validate(): boolean {
@@ -225,8 +849,13 @@ export default function CustomerReviewPaymentContent() {
     if (!form.phone.trim()) errs.phone = 'Phone number is required';
     if (!form.email.trim()) errs.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Enter a valid email';
-    if (deliveryMethod === 'delivery' && !form.street.trim()) errs.street = 'Street address is required';
-    
+    if (deliveryMethod === 'delivery') {
+      if (!form.region?.trim()) errs.region = 'Region is required';
+      if (!form.city.trim()) errs.city = 'City or municipality is required';
+      if (!form.barangay?.trim()) errs.barangay = 'Barangay is required';
+      if (!form.street.trim()) errs.street = 'Street address is required';
+    }
+
     if (!form.eventDate) {
       errs.eventDate = 'Event date is required';
     } else if (form.eventDate < today) {
@@ -235,9 +864,11 @@ export default function CustomerReviewPaymentContent() {
 
     if (!form.eventTime) errs.eventTime = 'Event time is required';
     setErrors(errs);
-    
+
     if (!agreedToTerms) {
-      setTermsError('You must read and agree to the Terms and Conditions inside the pop-up to proceed.');
+      setTermsError(
+        'You must read and agree to the Terms and Conditions inside the pop-up to proceed.'
+      );
       return false;
     } else {
       setTermsError('');
@@ -250,22 +881,29 @@ export default function CustomerReviewPaymentContent() {
     e.preventDefault();
     if (!validate()) return;
 
-    if (paymentMethod === 'gcash') {
-      setShowQRModal(true);
-    } else {
-      executeOrder();
-    }
+    setPlaceError('');
+    setShowQRModal(true);
   }
 
   async function executeOrder() {
+    const reference = paymentReference.trim();
+    if (!reference) {
+      setPaymentReferenceError('Enter the GCash reference number to continue.');
+      return;
+    }
+
+    setPaymentReferenceError('');
     setPlacing(true);
     setPlaceError('');
 
-    const deliveryAddress = deliveryMethod === 'delivery'
-      ? `${form.street}${form.barangay ? ', ' + form.barangay : ''}${form.city ? ', ' + form.city : ''}${form.region ? ', ' + form.region : ''}`
-      : 'Pickup at Feast & Fête Kitchen';
+    const deliveryAddress =
+      deliveryMethod === 'delivery'
+        ? `${form.street}${form.barangay ? ', ' + form.barangay : ''}${form.city ? ', ' + form.city : ''}${form.region ? ', ' + form.region : ''}`
+        : 'Pickup at Feast & Fête Kitchen';
 
-    const orderId = `FF-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+    const orderId = `FF-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 9999)
+      .toString()
+      .padStart(4, '0')}`;
 
     try {
       const supabase = createClient();
@@ -275,7 +913,7 @@ export default function CustomerReviewPaymentContent() {
         .insert({
           order_number: orderId,
           user_id: user?.id ?? null,
-          guest_profile_id: (!user && guestProfile) ? guestProfile.id : null,
+          guest_profile_id: !user && guestProfile ? guestProfile.id : null,
           customer_name: form.fullName,
           customer_email: form.email,
           customer_phone: form.phone,
@@ -284,6 +922,8 @@ export default function CustomerReviewPaymentContent() {
           event_date: form.eventDate,
           event_time: form.eventTime,
           payment_method: paymentMethod,
+          payment_reference: reference,
+          deposit_amount: depositAmount,
           is_priority: orderType === 'priority',
           priority_fee: priorityFee,
           notes: form.notes,
@@ -303,7 +943,7 @@ export default function CustomerReviewPaymentContent() {
       }
 
       if (orderData) {
-        const itemsToInsert = state.items.map(item => ({
+        const itemsToInsert = state.items.map((item) => ({
           order_id: orderData.id,
           menu_item_id: item.menuItem.id,
           menu_item_name: item.menuItem.name,
@@ -323,7 +963,7 @@ export default function CustomerReviewPaymentContent() {
         // --- FIXED API URL PATH TO MATCH /api/admin/send-order-email ---
         try {
           const itemsSummary = state.items
-            .map(i => `${i.quantity}x ${i.menuItem.name}`)
+            .map((i) => `${i.quantity}x ${i.menuItem.name}`)
             .join(', ');
 
           await fetch('/api/admin/send-order-email', {
@@ -384,9 +1024,16 @@ export default function CustomerReviewPaymentContent() {
           <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-5">
             <Icon name="ShoppingCartIcon" size={36} className="text-muted-foreground" />
           </div>
-          <h2 className="font-display text-xl font-semibold text-foreground mb-2">Your cart is empty</h2>
-          <p className="text-muted-foreground mb-6">Add items to your cart before reviewing your order.</p>
-          <Link href="/menu-browse-screen" className="px-6 py-3 gradient-brand text-primary-foreground font-semibold rounded-xl btn-3d">
+          <h2 className="font-display text-xl font-semibold text-foreground mb-2">
+            Your cart is empty
+          </h2>
+          <p className="text-muted-foreground mb-6">
+            Add items to your cart before reviewing your order.
+          </p>
+          <Link
+            href="/menu-browse-screen"
+            className="px-6 py-3 gradient-brand text-primary-foreground font-semibold rounded-xl btn-3d"
+          >
             Browse Menu
           </Link>
         </div>
@@ -401,37 +1048,50 @@ export default function CustomerReviewPaymentContent() {
 
       <div className="max-w-6xl mx-auto px-4 py-10 lg:px-8">
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8 flex-wrap">
-          <Link href="/menu-browse-screen" className="hover:text-primary transition-colors">Menu</Link>
+          <Link href="/menu-browse-screen" className="hover:text-primary transition-colors">
+            Menu
+          </Link>
           <Icon name="ChevronRightIcon" size={14} />
-          <Link href="/cart-review" className="hover:text-primary transition-colors">Cart</Link>
+          <Link href="/cart-review" className="hover:text-primary transition-colors">
+            Cart
+          </Link>
           <Icon name="ChevronRightIcon" size={14} />
           <span className="text-foreground font-medium">Review & Payment</span>
         </nav>
 
         <div className="mb-8">
           <h1 className="font-display text-3xl font-bold text-foreground mb-1">Review & Payment</h1>
-          <p className="text-muted-foreground">Confirm your items, enter delivery details, and place your order.</p>
+          <p className="text-muted-foreground">
+            Confirm your items, enter delivery details, and place your order.
+          </p>
         </div>
 
-        <form onSubmit={handleFormSubmit}>
+        <form onSubmit={handleFormSubmit} noValidate>
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
             <div className="lg:col-span-3 space-y-6">
-
               {/* Order Items */}
-              <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
+              <section
+                className="bg-card rounded-2xl border border-border p-6"
+                style={{ boxShadow: 'var(--shadow-3d)' }}
+              >
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">1</span>
+                    <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">
+                      1
+                    </span>
                     Confirm Items
                   </h2>
-                  <Link href="/cart-review" className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+                  <Link
+                    href="/cart-review"
+                    className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+                  >
                     <Icon name="PencilIcon" size={12} />
                     Edit Cart
                   </Link>
                 </div>
 
                 <div className="space-y-3">
-                  {state.items.map(item => (
+                  {state.items.map((item) => (
                     <div key={item.id} className="flex gap-3 items-center">
                       <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-muted">
                         <AppImage
@@ -443,19 +1103,28 @@ export default function CustomerReviewPaymentContent() {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{item.menuItem.name}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {item.menuItem.name}
+                        </p>
                         <p className="text-xs text-muted-foreground">{item.menuItem.servingSize}</p>
                         {item.customizations && Object.keys(item.customizations).length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {Object.entries(item.customizations).map(([k, v]) => (
-                              <span key={k} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{v}</span>
+                              <span
+                                key={k}
+                                className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium"
+                              >
+                                {v}
+                              </span>
                             ))}
                           </div>
                         )}
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="text-xs text-muted-foreground">×{item.quantity}</p>
-                        <p className="text-sm font-bold text-foreground tabular-nums">₱{(item.menuItem.price * item.quantity).toLocaleString()}</p>
+                        <p className="text-sm font-bold text-foreground tabular-nums">
+                          ₱{(item.menuItem.price * item.quantity).toLocaleString()}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -463,34 +1132,48 @@ export default function CustomerReviewPaymentContent() {
               </section>
 
               {/* Delivery Method */}
-              <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
+              <section
+                className="bg-card rounded-2xl border border-border p-6"
+                style={{ boxShadow: 'var(--shadow-3d)' }}
+              >
                 <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2 mb-5">
-                  <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">2</span>
+                  <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">
+                    2
+                  </span>
                   Delivery Method
                 </h2>
 
                 <div className="grid grid-cols-2 gap-3 mb-5">
-                  {(['delivery', 'pickup'] as DeliveryMethod[]).map(method => (
+                  {(['delivery', 'pickup'] as DeliveryMethod[]).map((method) => (
                     <button
                       key={method}
                       type="button"
                       onClick={() => setDeliveryMethod(method)}
                       className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
                         deliveryMethod === method
-                          ? 'border-primary bg-primary/5' :'border-border bg-background hover:border-primary/40'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-background hover:border-primary/40'
                       }`}
                     >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        deliveryMethod === method ? 'gradient-brand' : 'bg-muted'
-                      }`}>
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          deliveryMethod === method ? 'gradient-brand' : 'bg-muted'
+                        }`}
+                      >
                         <Icon
                           name={method === 'delivery' ? 'TruckIcon' : 'BuildingStorefrontIcon'}
                           size={18}
-                          className={deliveryMethod === method ? 'text-primary-foreground' : 'text-muted-foreground'}
+                          className={
+                            deliveryMethod === method
+                              ? 'text-primary-foreground'
+                              : 'text-muted-foreground'
+                          }
                         />
                       </div>
                       <div>
-                        <p className={`text-sm font-semibold capitalize ${deliveryMethod === method ? 'text-primary' : 'text-foreground'}`}>
+                        <p
+                          className={`text-sm font-semibold capitalize ${deliveryMethod === method ? 'text-primary' : 'text-foreground'}`}
+                        >
                           {method === 'delivery' ? 'Delivery' : 'Pickup'}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -504,41 +1187,52 @@ export default function CustomerReviewPaymentContent() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-foreground mb-1.5">Full Name <span className="text-error">*</span></label>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Full Name <span className="text-error">*</span>
+                      </label>
                       <input
                         name="fullName"
+                        required
                         value={form.fullName}
                         onChange={handleChange}
                         placeholder="Juan dela Cruz"
-                        readOnly={profileFieldsLocked}
-                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.fullName ? 'border-error' : 'border-border'}`}
+                        readOnly={profileContactFieldsLocked}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileContactFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.fullName ? 'border-error' : 'border-border'}`}
                       />
-                      {errors.fullName && <p className="text-xs text-error mt-1">{errors.fullName}</p>}
+                      {errors.fullName && (
+                        <p className="text-xs text-error mt-1">{errors.fullName}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-foreground mb-1.5">Phone Number <span className="text-error">*</span></label>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Phone Number <span className="text-error">*</span>
+                      </label>
                       <input
                         name="phone"
+                        required
                         value={form.phone}
                         onChange={handleChange}
                         placeholder="09XX XXX XXXX"
-                        readOnly={profileFieldsLocked}
-                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.phone ? 'border-error' : 'border-border'}`}
+                        readOnly={profileContactFieldsLocked}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileContactFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.phone ? 'border-error' : 'border-border'}`}
                       />
                       {errors.phone && <p className="text-xs text-error mt-1">{errors.phone}</p>}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1.5">Email Address <span className="text-error">*</span></label>
+                    <label className="block text-xs font-semibold text-foreground mb-1.5">
+                      Email Address <span className="text-error">*</span>
+                    </label>
                     <input
                       name="email"
                       type="email"
+                      required
                       value={form.email}
                       onChange={handleChange}
                       placeholder="juan@example.com"
-                      readOnly={profileFieldsLocked}
-                      className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.email ? 'border-error' : 'border-border'}`}
+                      readOnly={profileContactFieldsLocked}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileContactFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.email ? 'border-error' : 'border-border'}`}
                     />
                     {errors.email && <p className="text-xs text-error mt-1">{errors.email}</p>}
                   </div>
@@ -547,108 +1241,169 @@ export default function CustomerReviewPaymentContent() {
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-xs font-semibold text-foreground mb-1.5">Region</label>
+                          <label className="block text-xs font-semibold text-foreground mb-1.5">
+                            Region <span className="text-error">*</span>
+                          </label>
                           <select
                             name="region"
+                            required
                             value={form.region}
-                            onChange={e => setForm(prev => ({ ...prev, region: e.target.value, city: '', barangay: '' }))}
-                            disabled={profileFieldsLocked}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-muted/50 disabled:cursor-not-allowed"
+                            onChange={(e) => {
+                              setForm((prev) => ({
+                                ...prev,
+                                region: e.target.value,
+                                city: '',
+                                barangay: '',
+                              }));
+                              setErrors((prev) => ({
+                                ...prev,
+                                region: '',
+                                city: '',
+                                barangay: '',
+                              }));
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                           >
-                            {REGION_OPTIONS.map(r => (
-                              <option key={r.value} value={r.value}>{r.label}</option>
+                            {REGION_OPTIONS.map((r) => (
+                              <option key={r.value} value={r.value}>
+                                {r.label}
+                              </option>
                             ))}
                           </select>
+                          {errors.region && (
+                            <p className="text-xs text-error mt-1">{errors.region}</p>
+                          )}
                         </div>
 
                         <div>
-                          <label className="block text-xs font-semibold text-foreground mb-1.5">City / Municipality</label>
+                          <label className="block text-xs font-semibold text-foreground mb-1.5">
+                            City / Municipality <span className="text-error">*</span>
+                          </label>
                           <select
                             name="city"
+                            required
                             value={form.city}
-                            onChange={e => setForm(prev => ({ ...prev, city: e.target.value, barangay: '' }))}
-                            disabled={profileFieldsLocked}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-muted/50 disabled:cursor-not-allowed"
+                            onChange={(e) => {
+                              setForm((prev) => ({
+                                ...prev,
+                                city: e.target.value,
+                                barangay: '',
+                              }));
+                              setErrors((prev) => ({ ...prev, city: '', barangay: '' }));
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                           >
                             <option value="">Select city</option>
-                            {(REGION_CITY_MAP[form.region || 'NCR'] || []).map(city => (
-                              <option key={city} value={city}>{city}</option>
+                            {(REGION_CITY_MAP[form.region || 'NCR'] || []).map((city) => (
+                              <option key={city} value={city}>
+                                {city}
+                              </option>
                             ))}
                           </select>
+                          {errors.city && <p className="text-xs text-error mt-1">{errors.city}</p>}
                         </div>
 
                         <div>
-                          <label className="block text-xs font-semibold text-foreground mb-1.5">Barangay</label>
+                          <label className="block text-xs font-semibold text-foreground mb-1.5">
+                            Barangay <span className="text-error">*</span>
+                          </label>
                           <select
                             name="barangay"
+                            required
                             value={form.barangay}
-                            onChange={e => setForm(prev => ({ ...prev, barangay: e.target.value }))}
-                            disabled={profileFieldsLocked}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-muted/50 disabled:cursor-not-allowed"
+                            onChange={(e) => {
+                              setForm((prev) => ({ ...prev, barangay: e.target.value }));
+                              setErrors((prev) => ({ ...prev, barangay: '' }));
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                           >
                             <option value="">Select barangay</option>
-                            {((CITY_BARANGAY_MAP as Record<string, string[]>)[form.city] || []).map(b => (
-                              <option key={b} value={b}>{b}</option>
-                            ))}
+                            {((CITY_BARANGAY_MAP as Record<string, string[]>)[form.city] || []).map(
+                              (b) => (
+                                <option key={b} value={b}>
+                                  {b}
+                                </option>
+                              )
+                            )}
                           </select>
+                          {errors.barangay && (
+                            <p className="text-xs text-error mt-1">{errors.barangay}</p>
+                          )}
                         </div>
                       </div>
 
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
-                          <label className="block text-xs font-semibold text-foreground">Street Address <span className="text-error">*</span></label>
+                          <label className="block text-xs font-semibold text-foreground">
+                            Street Address <span className="text-error">*</span>
+                          </label>
                           {savedAddress && (
                             <button
                               type="button"
-                              onClick={() => setForm(prev => ({ ...prev, street: savedAddress }))}
+                              onClick={restoreSavedAddress}
                               className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
                             >
                               <Icon name="BookmarkIcon" size={11} />
-                              Use saved
+                              Restore registered address
                             </button>
                           )}
                         </div>
                         <input
                           name="street"
+                          required={deliveryMethod === 'delivery'}
                           value={form.street}
                           onChange={handleChange}
                           placeholder="123 Rizal St., House / Unit No."
-                          readOnly={profileFieldsLocked}
-                          className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${profileFieldsLocked ? 'bg-muted/50 cursor-not-allowed' : ''} ${errors.street ? 'border-error' : 'border-border'}`}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.street ? 'border-error' : 'border-border'}`}
                         />
-                        {errors.street && <p className="text-xs text-error mt-1">{errors.street}</p>}
+                        {errors.street && (
+                          <p className="text-xs text-error mt-1">{errors.street}</p>
+                        )}
                       </div>
                     </>
                   )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-foreground mb-1.5">Event Date <span className="text-error">*</span></label>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Event Date <span className="text-error">*</span>
+                      </label>
                       <input
                         name="eventDate"
                         type="date"
+                        required
                         min={today}
                         value={form.eventDate}
                         onChange={handleChange}
                         className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.eventDate ? 'border-error' : 'border-border'}`}
                       />
-                      {errors.eventDate && <p className="text-xs text-error mt-1">{errors.eventDate}</p>}
+                      {errors.eventDate && (
+                        <p className="text-xs text-error mt-1">{errors.eventDate}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-foreground mb-1.5">Event Time <span className="text-error">*</span></label>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Event Time <span className="text-error">*</span>
+                      </label>
                       <input
                         name="eventTime"
                         type="time"
+                        required
                         value={form.eventTime}
                         onChange={handleChange}
                         className={`w-full px-3.5 py-2.5 rounded-xl border text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.eventTime ? 'border-error' : 'border-border'}`}
                       />
-                      {errors.eventTime && <p className="text-xs text-error mt-1">{errors.eventTime}</p>}
+                      {errors.eventTime && (
+                        <p className="text-xs text-error mt-1">{errors.eventTime}</p>
+                      )}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1.5">Special Instructions <span className="text-muted-foreground font-normal">(optional)</span></label>
+                    <label className="block text-xs font-semibold text-foreground mb-1.5">
+                      Special Instructions{' '}
+                      <span className="text-muted-foreground font-normal">(optional)</span>
+                    </label>
                     <textarea
                       name="notes"
                       value={form.notes}
@@ -662,29 +1417,50 @@ export default function CustomerReviewPaymentContent() {
               </section>
 
               {/* Order Priority */}
-              <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
+              <section
+                className="bg-card rounded-2xl border border-border p-6"
+                style={{ boxShadow: 'var(--shadow-3d)' }}
+              >
                 <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2 mb-5">
-                  <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">3</span>
+                  <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">
+                    3
+                  </span>
                   Order Priority
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {([
-                    { value: 'normal' as const, label: 'Normal Order', description: 'Standard preparation queue', fee: 0 },
-                    { value: 'priority' as const, label: 'Priority Order', description: `Move to the front of the queue +₱${PRIORITY_FEE}`, fee: PRIORITY_FEE },
-                  ]).map(option => (
+                  {[
+                    {
+                      value: 'normal' as const,
+                      label: 'Normal Order',
+                      description: 'Standard preparation queue',
+                      fee: 0,
+                    },
+                    {
+                      value: 'priority' as const,
+                      label: 'Priority Order',
+                      description: `Move to the front of the queue +₱${PRIORITY_FEE}`,
+                      fee: PRIORITY_FEE,
+                    },
+                  ].map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       onClick={() => setOrderType(option.value)}
                       className={`p-4 rounded-xl border-2 text-left transition-all ${
-                        orderType === option.value ? 'border-primary bg-primary/5' : 'border-border bg-background hover:border-primary/40'
+                        orderType === option.value
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-background hover:border-primary/40'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <span className={`text-sm font-semibold ${orderType === option.value ? 'text-primary' : 'text-foreground'}`}>
+                        <span
+                          className={`text-sm font-semibold ${orderType === option.value ? 'text-primary' : 'text-foreground'}`}
+                        >
                           {option.label}
                         </span>
-                        {orderType === option.value && <Icon name="CheckCircleIcon" size={18} className="text-primary" />}
+                        {orderType === option.value && (
+                          <Icon name="CheckCircleIcon" size={18} className="text-primary" />
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
                     </button>
@@ -693,26 +1469,34 @@ export default function CustomerReviewPaymentContent() {
               </section>
 
               {/* Payment Method */}
-              <section className="bg-card rounded-2xl border border-border p-6" style={{ boxShadow: 'var(--shadow-3d)' }}>
+              <section
+                className="bg-card rounded-2xl border border-border p-6"
+                style={{ boxShadow: 'var(--shadow-3d)' }}
+              >
                 <h2 className="font-display text-base font-bold text-foreground flex items-center gap-2 mb-5">
-                  <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">4</span>
+                  <span className="w-6 h-6 rounded-full gradient-brand text-primary-foreground text-xs font-bold flex items-center justify-center">
+                    4
+                  </span>
                   Payment Method
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {PAYMENT_OPTIONS.map(opt => (
+                  {PAYMENT_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
                       onClick={() => setPaymentMethod(opt.value)}
                       className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
                         paymentMethod === opt.value
-                          ? 'border-primary bg-primary/5' :'border-border bg-background hover:border-primary/40'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-background hover:border-primary/40'
                       }`}
                     >
                       <span className="text-2xl flex-shrink-0">{opt.icon}</span>
                       <div className="min-w-0">
-                        <p className={`text-sm font-semibold truncate ${paymentMethod === opt.value ? 'text-primary' : 'text-foreground'}`}>
+                        <p
+                          className={`text-sm font-semibold truncate ${paymentMethod === opt.value ? 'text-primary' : 'text-foreground'}`}
+                        >
                           {opt.value === 'cash_on_delivery' ? cashPaymentLabel : opt.label}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
@@ -728,25 +1512,33 @@ export default function CustomerReviewPaymentContent() {
                   ))}
                 </div>
 
-                {paymentMethod === 'gcash' && (
-                  <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
-                    <p className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1.5">
-                      <Icon name="InformationCircleIcon" size={14} className="text-primary" />
-                      GCash Payment Info
-                    </p>
-                    <p className="text-xs text-muted-foreground">A QR code will appear after clicking "Place Order" to scan and pay via GCash.</p>
-                  </div>
-                )}
+                <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                  <p className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1.5">
+                    <Icon name="InformationCircleIcon" size={14} className="text-primary" />
+                    50% GCash Deposit Required
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Pay ₱{depositAmount.toLocaleString()} now using the GCash QR code, even if you
+                    selected {cashPaymentLabel} for the remaining balance. Enter the GCash reference
+                    number after payment. Your order stays Pending until an admin verifies the
+                    reference and deposit.
+                  </p>
+                </div>
               </section>
             </div>
 
             {/* Order Summary */}
             <div className="lg:col-span-2">
-              <div className="bg-card rounded-2xl border border-border p-6 sticky top-24" style={{ boxShadow: 'var(--shadow-3d)' }}>
-                <h2 className="font-display text-base font-bold text-foreground mb-5">Order Summary</h2>
+              <div
+                className="bg-card rounded-2xl border border-border p-6 sticky top-24"
+                style={{ boxShadow: 'var(--shadow-3d)' }}
+              >
+                <h2 className="font-display text-base font-bold text-foreground mb-5">
+                  Order Summary
+                </h2>
 
                 <div className="space-y-2 mb-5 max-h-48 overflow-y-auto pr-1">
-                  {state.items.map(item => (
+                  {state.items.map((item) => (
                     <div key={item.id} className="flex justify-between items-center text-sm">
                       <span className="text-foreground truncate mr-2">
                         {item.menuItem.name}
@@ -761,8 +1553,12 @@ export default function CustomerReviewPaymentContent() {
 
                 <div className="border-t border-border pt-4 space-y-2.5 mb-5">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})</span>
-                    <span className="text-foreground tabular-nums">₱{totalAmount.toLocaleString()}</span>
+                    <span className="text-muted-foreground">
+                      Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})
+                    </span>
+                    <span className="text-foreground tabular-nums">
+                      ₱{totalAmount.toLocaleString()}
+                    </span>
                   </div>
                   {priorityFee > 0 && (
                     <div className="flex justify-between text-sm text-amber-700">
@@ -773,32 +1569,44 @@ export default function CustomerReviewPaymentContent() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Delivery fee</span>
                     <span className="text-foreground tabular-nums">
-                      {deliveryFee === 0 ? <span className="text-green-600 font-medium">Free</span> : `₱${deliveryFee}`}
+                      {deliveryFee === 0 ? (
+                        <span className="text-green-600 font-medium">Free</span>
+                      ) : (
+                        `₱${deliveryFee}`
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between font-bold text-base pt-2 border-t border-border">
                     <span className="text-foreground">Total</span>
-                    <span className="text-primary tabular-nums text-lg">₱{total.toLocaleString()}</span>
+                    <span className="text-primary tabular-nums text-lg">
+                      ₱{total.toLocaleString()}
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted mb-5">
-                  <span className="text-lg">{PAYMENT_OPTIONS.find(p => p.value === paymentMethod)?.icon}</span>
+                  <span className="text-lg">
+                    {PAYMENT_OPTIONS.find((p) => p.value === paymentMethod)?.icon}
+                  </span>
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">Payment via</p>
                     <p className="text-sm font-semibold text-foreground truncate">
                       {paymentMethod === 'cash_on_delivery'
                         ? cashPaymentLabel
-                        : PAYMENT_OPTIONS.find(p => p.value === paymentMethod)?.label}
+                        : PAYMENT_OPTIONS.find((p) => p.value === paymentMethod)?.label}
                     </p>
                   </div>
                 </div>
 
                 {/* TERMS AND CONDITIONS LINK / STATUS */}
                 <div className="mb-4 pt-2">
-                  <div className={`p-3 rounded-xl border text-xs flex flex-col items-center justify-center gap-2 text-center ${agreedToTerms ? 'bg-primary/5 border-primary/30 text-primary font-medium' : 'bg-muted/40 border-border text-muted-foreground'}`}>
+                  <div
+                    className={`p-3 rounded-xl border text-xs flex flex-col items-center justify-center gap-2 text-center ${agreedToTerms ? 'bg-primary/5 border-primary/30 text-primary font-medium' : 'bg-muted/40 border-border text-muted-foreground'}`}
+                  >
                     <span>
-                      {agreedToTerms ? '✓ Terms and Conditions agreed.' : 'Please read and agree to our Terms.'}
+                      {agreedToTerms
+                        ? '✓ Terms and Conditions agreed.'
+                        : 'Please read and agree to our Terms.'}
                     </span>
                     <button
                       type="button"
@@ -813,7 +1621,11 @@ export default function CustomerReviewPaymentContent() {
 
                 {placeError && (
                   <div className="mb-4 flex items-start gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-200">
-                    <Icon name="ExclamationCircleIcon" size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                    <Icon
+                      name="ExclamationCircleIcon"
+                      size={16}
+                      className="text-red-500 mt-0.5 flex-shrink-0"
+                    />
                     <p className="text-sm text-red-700">{placeError}</p>
                   </div>
                 )}
@@ -826,8 +1638,19 @@ export default function CustomerReviewPaymentContent() {
                   {placing ? (
                     <>
                       <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
                       </svg>
                       Placing Order...
                     </>
@@ -844,18 +1667,19 @@ export default function CustomerReviewPaymentContent() {
                 </p>
               </div>
             </div>
-
           </div>
         </form>
       </div>
 
-      {/* GCash Payment QR Code Modal */}
+      {/* GCash Deposit QR Code Modal */}
       {showQRModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-bold text-foreground mb-1">Scan to Pay via GCash</h3>
+          <div className="bg-card border border-border rounded-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold text-foreground mb-1">Pay 50% Deposit via GCash</h3>
             <p className="text-xs text-muted-foreground mb-4">
-              Please scan the QR code using your GCash app to pay <span className="font-bold text-primary">₱{total.toLocaleString()}</span>
+              Scan the QR code using your GCash app and pay{' '}
+              <span className="font-bold text-primary">₱{depositAmount.toLocaleString()}</span>
+              of ₱{total.toLocaleString()} total.
             </p>
 
             <div className="bg-[#005ce6] p-4 rounded-xl mb-4 flex flex-col items-center justify-center">
@@ -868,9 +1692,39 @@ export default function CustomerReviewPaymentContent() {
               />
             </div>
 
-            <p className="text-xs text-muted-foreground mb-6">
-              After completing the transfer in GCash, click <strong>"I Have Paid"</strong> to proceed.
+            <label
+              htmlFor="payment-reference"
+              className="mb-1 block text-left text-xs font-semibold text-foreground"
+            >
+              GCash Reference Number
+            </label>
+            <input
+              id="payment-reference"
+              name="paymentReference"
+              type="text"
+              required
+              autoComplete="off"
+              value={paymentReference}
+              onChange={(event) => {
+                setPaymentReference(event.target.value);
+                setPaymentReferenceError('');
+                setPlaceError('');
+              }}
+              placeholder="Enter the reference number from GCash"
+              className="mb-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+              aria-invalid={Boolean(paymentReferenceError)}
+              aria-describedby={paymentReferenceError ? 'payment-reference-error' : undefined}
+            />
+            {paymentReferenceError && (
+              <p id="payment-reference-error" className="mb-3 text-left text-xs text-red-600">
+                {paymentReferenceError}
+              </p>
+            )}
+            <p className="mb-4 text-left text-xs text-muted-foreground">
+              The order will remain Pending until an admin confirms that the deposit and reference
+              number match.
             </p>
+            {placeError && <p className="mb-3 text-xs text-red-600">{placeError}</p>}
 
             <div className="flex gap-3">
               <button
@@ -884,14 +1738,25 @@ export default function CustomerReviewPaymentContent() {
               <button
                 type="button"
                 onClick={executeOrder}
-                disabled={placing}
+                disabled={placing || !paymentReference.trim()}
                 className="w-1/2 py-3 rounded-xl gradient-brand text-primary-foreground text-sm font-bold btn-3d transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {placing ? (
                   <>
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
                     </svg>
                     Processing...
                   </>
@@ -905,73 +1770,93 @@ export default function CustomerReviewPaymentContent() {
       )}
 
       {/* TERMS AND CONDITIONS MODAL */}
-      {showTermsModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-50 flex min-h-full items-center justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:p-4">
-          <div className="bg-card border border-border rounded-2xl flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden p-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 sm:max-h-[calc(100dvh-2rem)] sm:p-6">
-            <div className="flex shrink-0 items-center justify-between mb-3 sm:mb-4">
-              <h3 className="text-lg font-bold text-foreground">Terms and Conditions</h3>
-              <button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Icon name="XMarkIcon" size={18} />
-              </button>
-            </div>
+      {showTermsModal &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex min-h-full items-center justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:p-4">
+            <div className="bg-card border border-border rounded-2xl flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden p-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 sm:max-h-[calc(100dvh-2rem)] sm:p-6">
+              <div className="flex shrink-0 items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-lg font-bold text-foreground">Terms and Conditions</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowTermsModal(false)}
+                  className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Icon name="XMarkIcon" size={18} />
+                </button>
+              </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-muted/5 p-2 mb-3 sm:mb-4">
-              <AppImage
-                src="/assets/images/image2.jpg"
-                alt="Terms and Conditions"
-                width={500}
-                height={700}
-                className="w-full h-auto rounded-lg object-contain"
-              />
-            </div>
+              <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-muted/5 p-4 mb-3 sm:mb-4">
+                <article className="space-y-5 text-sm leading-relaxed text-foreground">
+                  <div>
+                    <h4 className="font-display text-xl font-bold">Feast &amp; Fête</h4>
+                    <p className="mt-1 font-semibold">Terms and Conditions</p>
+                    <p className="mt-2 text-muted-foreground">
+                      We take pride in preparing each dish with care and dedication, and we
+                      appreciate your understanding of these guidelines to ensure the best
+                      experience for all our clients.
+                    </p>
+                    <p className="mt-3 font-bold uppercase tracking-wide">
+                      By placing an order, you agree to the following:
+                    </p>
+                  </div>
+                  {TERMS_SECTIONS.map((section) => (
+                    <section key={section.title}>
+                      <h5 className="font-bold text-primary">{section.title}</h5>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 marker:text-primary">
+                        {section.items.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+                </article>
+              </div>
 
-            <div className="mb-3 shrink-0 rounded-xl border border-border bg-muted/30 p-3 sm:mb-5">
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agreedToTerms}
-                  onChange={(e) => {
-                    setAgreedToTerms(e.target.checked);
-                    if (e.target.checked) setTermsError('');
+              <div className="mb-3 shrink-0 rounded-xl border border-border bg-muted/30 p-3 sm:mb-5">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => {
+                      setAgreedToTerms(e.target.checked);
+                      if (e.target.checked) setTermsError('');
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  />
+                  <span className="text-xs text-foreground font-medium leading-relaxed">
+                    I have read, understood, and agreed to the Terms and Conditions and Privacy
+                    Policy of Feast & Fête.
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex shrink-0 justify-end gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowTermsModal(false)}
+                  className="px-5 py-2.5 rounded-xl border border-border text-foreground text-sm font-semibold hover:bg-muted transition-all"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!agreedToTerms) {
+                      setAgreedToTerms(true);
+                    }
+                    setTermsError('');
+                    setShowTermsModal(false);
                   }}
-                  className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
-                />
-                <span className="text-xs text-foreground font-medium leading-relaxed">
-                  I have read, understood, and agreed to the Terms and Conditions and Privacy Policy of Feast & Fête.
-                </span>
-              </label>
+                  className="px-6 py-2.5 rounded-xl gradient-brand text-primary-foreground text-sm font-bold btn-3d transition-all"
+                >
+                  Confirm & Proceed
+                </button>
+              </div>
             </div>
-
-            <div className="flex shrink-0 justify-end gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-border text-foreground text-sm font-semibold hover:bg-muted transition-all"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!agreedToTerms) {
-                    setAgreedToTerms(true);
-                  }
-                  setTermsError('');
-                  setShowTermsModal(false);
-                }}
-                className="px-6 py-2.5 rounded-xl gradient-brand text-primary-foreground text-sm font-bold btn-3d transition-all"
-              >
-                Confirm & Proceed
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

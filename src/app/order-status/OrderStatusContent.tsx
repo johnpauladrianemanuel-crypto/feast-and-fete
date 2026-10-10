@@ -605,131 +605,72 @@ export default function OrderStatusContent() {
             <span className="absolute inset-0 rounded-2xl animate-ping opacity-20 gradient-brand" />
             <Icon name="ClipboardDocumentListIcon" size={28} className="text-primary-foreground" />
           </div>
-          <h1 className="font-display text-3xl font-bold text-foreground mb-2">Track Your Orders</h1>
+          <h1 className="font-display text-3xl font-bold text-foreground mb-2">
+            Track Your Orders
+          </h1>
           <p className="text-muted-foreground text-sm">
             {user
-              ? 'All your orders are shown below with live status updates.'
+              ? 'Follow your current order and check your previous orders anytime.'
               : 'Please sign in to track your order and view status updates.'}
           </p>
+          {user && (
+            <button
+              type="button"
+              onClick={() => setShowHistory((current) => !current)}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl gradient-brand px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-transform hover:scale-[1.02]"
+            >
+              <Icon name={showHistory ? 'ArrowLeftIcon' : 'ClipboardDocumentListIcon'} size={17} />
+              {showHistory ? 'Back to Tracking' : 'See My Order'}
+            </button>
+          )}
         </div>
 
         {/* LOGGED-IN VIEW */}
         {user && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <div className="lg:col-span-4 xl:col-span-3">
-              <div
-                className="bg-card rounded-2xl border border-border overflow-hidden sticky top-6"
-                style={{ boxShadow: 'var(--shadow-3d)' }}
-              >
-                <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                  <h2 className="font-display text-base font-bold text-foreground">My Orders</h2>
-                  <button
-                    onClick={() => setShowHistory(!showHistory)}
-                    className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
-                  >
-                    <Icon name="ClockIcon" size={14} />
-                    {showHistory ? 'View Tracking' : 'View History'}
-                  </button>
-                </div>
-                {myOrdersLoading && (
-                  <div className="p-4 space-y-3 animate-pulse">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-16 bg-muted rounded-xl" />
-                    ))}
-                  </div>
-                )}
-                {!myOrdersLoading && myOrders.length === 0 && (
-                  <div className="text-center py-12 px-4">
-                    <Icon name="ClipboardDocumentListIcon" size={32} className="text-muted-foreground mx-auto mb-3 opacity-40" />
-                    <p className="text-sm text-muted-foreground">No orders yet.</p>
-                    <Link href="/menu-browse-screen" className="text-xs text-primary font-medium mt-1 inline-block hover:underline">
-                      Browse our menu →
-                    </Link>
-                  </div>
-                )}
-                {!myOrdersLoading && myOrders.length > 0 && (
-                  <div className="divide-y divide-border max-h-[calc(100vh-220px)] overflow-y-auto">
-                    {myOrders.map((o) => {
-                      const norm = normalizeStatus(o.status);
-                      const badge = STATUS_BADGE[norm] || STATUS_BADGE.pending;
-                      const isSelected = selectedOrder?.id === o.id;
-                      const isReviewed = reviewedOrders.has(o.id);
-
-                      return (
-                        <button
-                          key={o.id}
-                          onClick={() => {
-                            setSelectedOrder(o);
-                            if (norm === 'completed' && isReviewed) {
-                              setShowHistory(true);
-                            } else {
-                              setShowHistory(false);
-                            }
-                          }}
-                          className={`w-full text-left px-5 py-3.5 transition-all duration-200 hover:bg-muted/50 ${
-                            isSelected && !showHistory ? 'bg-primary/5 border-l-4 border-primary' : ''
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-mono text-xs sm:text-sm font-bold text-primary">{o.order_number}</span>
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text}`}>
-                              {badge.dot && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
-                              <span className="capitalize">{norm}</span>
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>
-                              {new Date(o.created_at).toLocaleDateString('en-PH', {
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                              {' · '}₱{Number(o.total_amount).toLocaleString()}
-                            </span>
-                            {isReviewed && (
-                              <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                Reviewed
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="lg:col-span-8 xl:col-span-9 min-w-0">
-              {showHistory ? (
-                <OrderHistoryView
-                  orders={myOrders}
-                  reviewedOrders={reviewedOrders}
-                  onSelectOrder={(order) => {
-                    setSelectedOrder(order);
-                    setShowHistory(false);
-                  }}
+          <div className="mx-auto w-full max-w-5xl">
+            {showHistory ? (
+              <OrderHistoryView
+                orders={myOrders}
+                reviewedOrders={reviewedOrders}
+                onSelectOrder={(order) => {
+                  setSelectedOrder(order);
+                  setShowHistory(false);
+                }}
+              />
+            ) : !selectedOrder && !myOrdersLoading ? (
+              <div className="text-center py-16 bg-card border border-border rounded-2xl p-8">
+                <Icon
+                  name="ClipboardDocumentListIcon"
+                  size={36}
+                  className="text-muted-foreground mx-auto mb-3 opacity-40"
                 />
-              ) : !selectedOrder && !myOrdersLoading ? (
-                <div className="text-center py-16 bg-card border border-border rounded-2xl p-8">
-                  <Icon name="CursorArrowRaysIcon" size={36} className="text-muted-foreground mx-auto mb-3 opacity-40" />
-                  <p className="text-sm text-muted-foreground">Select an order from the list to view details.</p>
-                </div>
-              ) : (
-                selectedOrder && (
-                  <OrderDetail
-                    order={selectedOrder}
-                    lastUpdated={lastUpdated}
-                    progressPercent={progressPercent}
-                    formattedEventDate={formattedEventDate}
-                    onOpenReview={() => openReviewModal(selectedOrder)}
-                    hasReviewed={isCurrentOrderReviewed}
-                    onHideOrder={() => setShowHistory(true)}
-                    onCancel={() => handleCancelOrder(selectedOrder)}
-                    isCancelling={cancellingOrderId === selectedOrder.id}
-                  />
-                )
-              )}
-            </div>
+                <p className="text-sm text-muted-foreground mb-4">You don’t have any orders yet.</p>
+                <Link
+                  href="/menu-browse-screen"
+                  className="inline-flex items-center gap-2 rounded-xl gradient-brand px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+                >
+                  Browse our menu
+                  <Icon name="ArrowRightIcon" size={16} />
+                </Link>
+              </div>
+            ) : selectedOrder ? (
+              <OrderDetail
+                order={selectedOrder}
+                lastUpdated={lastUpdated}
+                progressPercent={progressPercent}
+                formattedEventDate={formattedEventDate}
+                onOpenReview={() => openReviewModal(selectedOrder)}
+                hasReviewed={isCurrentOrderReviewed}
+                onHideOrder={() => setShowHistory(true)}
+                onCancel={() => handleCancelOrder(selectedOrder)}
+                isCancelling={cancellingOrderId === selectedOrder.id}
+              />
+            ) : (
+              <div className="animate-pulse rounded-2xl border border-border bg-card p-8">
+                <div className="mb-4 h-6 w-1/3 rounded bg-muted" />
+                <div className="h-32 rounded-xl bg-muted" />
+              </div>
+            )}
           </div>
         )}
 
@@ -1062,10 +1003,10 @@ function OrderHistoryView({
     <div className="bg-card rounded-2xl border border-border p-6 sm:p-8" style={{ boxShadow: 'var(--shadow-3d)' }}>
       <h2 className="font-display text-xl font-bold text-foreground mb-2 flex items-center gap-2">
         <Icon name="ClockIcon" size={22} className="text-primary" />
-        Order History
+        My Orders &amp; Order History
       </h2>
       <p className="text-sm text-muted-foreground mb-6">
-        All past completed and reviewed orders are stored here.
+        View your current orders and all past orders here.
       </p>
 
       {orders.length === 0 ? (

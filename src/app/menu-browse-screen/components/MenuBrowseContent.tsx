@@ -137,7 +137,6 @@ export default function MenuBrowseContent() {
     ingredients: item.ingredients,
     isActive: item.isActive,
     unavailableReason: item.unavailableReason,
-    stock: item.stock,
     soldCount: item.soldCount,
     featured: item.featured,
   }));
