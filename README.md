@@ -73,6 +73,18 @@ Build the application for production:
   npm run build
   ```
 
+### Order status emails
+
+Order update emails use Resend. Verify a sending domain in Resend, then set these server-side
+environment variables in Vercel for each deployment environment:
+
+- `RESEND_API_KEY` — the Resend API key.
+- `RESEND_FROM_EMAIL` — a sender on the verified domain, for example
+  `Feast & Fête <orders@your-verified-domain.com>`.
+
+The Resend test sender `onboarding@resend.dev` is restricted to verified test recipients and
+cannot be used for arbitrary customer addresses. Redeploy after changing the Vercel variables.
+
 ## 📚 Learn More
 
 To learn more about Next.js, take a look at the following resources:

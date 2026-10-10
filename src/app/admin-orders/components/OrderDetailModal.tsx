@@ -95,6 +95,7 @@ export default function OrderDetailModal({
   const [updating, setUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<string>('Pending');
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [emailError, setEmailError] = useState('');
   const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
   const [paymentVerified, setPaymentVerified] = useState(false);
 
@@ -130,6 +131,7 @@ export default function OrderDetailModal({
 
     setUpdating(true);
     setEmailStatus('idle');
+    setEmailError('');
 
     try {
       // 1. Update status in Supabase (avoiding RLS select blocks)
@@ -161,10 +163,12 @@ export default function OrderDetailModal({
         } else {
           const result = (await response.json()) as { error?: string };
           console.error('Failed to send order status email:', result.error);
+          setEmailError(result.error || 'The customer email could not be sent.');
           setEmailStatus('error');
         }
       } catch (emailError) {
         console.error('Failed to send order status email:', emailError);
+        setEmailError('Unable to contact the email service.');
         setEmailStatus('error');
       }
 
@@ -261,7 +265,7 @@ export default function OrderDetailModal({
             {emailStatus === 'error' && (
               <p className="text-xs text-red-600 mt-2 flex items-center gap-1.5 font-medium">
                 <Icon name="ExclamationCircleIcon" size={14} />
-                Status updated, but failed to send the customer email.
+                {emailError || 'Status updated, but failed to send the customer email.'}
               </p>
             )}
           </div>

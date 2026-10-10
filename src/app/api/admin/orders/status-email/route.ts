@@ -53,6 +53,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Admin access is required.' }, { status: 403 });
     }
 
+    const fromEmail = process.env.RESEND_FROM_EMAIL?.trim();
+    if (!fromEmail && process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        {
+          error:
+            'Order status was updated, but email is not configured. Verify a sending domain in Resend and set RESEND_FROM_EMAIL in the deployment environment.',
+        },
+        { status: 503 }
+      );
+    }
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('order_number, customer_name, customer_email, status, total_amount, notes')
@@ -88,7 +99,7 @@ export async function POST(request: Request) {
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { data, error } = await resend.emails.send({
-      from: 'Feast & Fête <onboarding@resend.dev>',
+      from: fromEmail || 'Feast & Fête <onboarding@resend.dev>',
       to: [order.customer_email],
       subject: `Order #${order.order_number} update: ${order.status}`,
       html: `
@@ -113,7 +124,9 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Resend failed to send order status email:', error);
       return NextResponse.json(
-        { error: 'The order was updated, but the customer email could not be sent.' },
+        {
+          error: `Order status was updated, but Resend could not send the email: ${error.message}`,
+        },
         { status: 502 }
       );
     }
