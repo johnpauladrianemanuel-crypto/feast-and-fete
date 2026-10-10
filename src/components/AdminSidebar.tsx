@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useAuth } from '@/contexts/AuthContext';
+import { createClient } from '@/lib/supabase/client';
 
 interface NavItem {
   id: string;
@@ -28,9 +29,10 @@ export default function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
 
   const applyTheme = (dark: boolean) => {
     const root = document.documentElement;
@@ -48,6 +50,45 @@ export default function AdminSidebar() {
     const isDark = saved ? saved === 'dark' : true;
     setIsDarkMode(isDark);
     applyTheme(isDark);
+  }, []);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function loadAdminIdentity() {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user: signedInUser },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) throw authError;
+        if (!signedInUser) {
+          if (isCurrent) setAdminEmail(null);
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', signedInUser.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+        if (isCurrent) {
+          setAdminEmail(profile?.role === 'admin' ? (signedInUser.email ?? null) : null);
+        }
+      } catch (error) {
+        console.error('Failed to verify admin sidebar identity:', error);
+        if (isCurrent) setAdminEmail(null);
+      }
+    }
+
+    void loadAdminIdentity();
+    return () => {
+      isCurrent = false;
+    };
   }, []);
 
   // Fetch pending/active orders count with auto-refresh
@@ -232,7 +273,7 @@ export default function AdminSidebar() {
             <div className="overflow-hidden">
               <p className="text-xs font-semibold text-secondary truncate">Admin</p>
               <p className="text-xs truncate" style={{ color: 'var(--admin-muted)' }}>
-                {user?.email || 'Not signed in'}
+                {adminEmail || 'Not signed in'}
               </p>
             </div>
           )}
