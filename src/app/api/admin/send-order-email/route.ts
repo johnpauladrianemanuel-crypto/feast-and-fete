@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const adminUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
     const data = await resend.emails.send({
-      from: 'Feast & Fête <onboarding@resend.dev>',
+      from: 'Feast & Fête <orders@feastandfete.shop>',
       to: ['johnpauladrianemanuel@gmail.com'],
       subject: `New Order Received! #${orderId}`,
       html: `

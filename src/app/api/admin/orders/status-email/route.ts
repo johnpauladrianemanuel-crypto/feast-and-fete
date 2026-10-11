@@ -102,7 +102,7 @@ export async function POST(request: Request) {
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { data, error } = await resend.emails.send({
-      from: fromEmail || 'Feast & Fête <onboarding@resend.dev>',
+      from: fromEmail || 'Feast & Fête <orders@feastandfete.shop>',
       to: [order.customer_email],
       subject: `Order #${order.order_number} update: ${order.status}`,
       html: `

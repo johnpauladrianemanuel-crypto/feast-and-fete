@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     // Send email via Resend
     const response = await resend.emails.send({
-      from: 'Feast & Fete <onboarding@resend.dev>',
+      from: 'Feast & Fête <orders@feastandfete.shop>',
       to: [order.customer_email],
       subject: `Official Receipt — Order #${order.order_number}`,
       html: `
