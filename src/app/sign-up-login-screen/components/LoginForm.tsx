@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import WelcomeSplash from '@/components/WelcomeSplash';
 import { createGuestProfile } from '@/lib/supabase/services';
 import { createClient } from '@/lib/supabase/client';
+import GuestDetailsForm, { GuestDetails } from './GuestDetailsForm';
 
 interface LoginFormData {
   email: string;
@@ -157,6 +158,7 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
   const [guestEmailError, setGuestEmailError] = useState('');
 
   const [otpStep, setOtpStep] = useState(false);
+  const [guestDetailsStep, setGuestDetailsStep] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [otpError, setOtpError] = useState('');
@@ -272,7 +274,9 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
           body: JSON.stringify({ phone: contact, otp }),
         });
         if (!resp.ok) {
-          toast.warning('SMS delivery issue.');
+          const data = await resp.json().catch(() => null);
+          const detail = data?.details ? JSON.stringify(data.details) : data?.error;
+          toast.warning(`SMS delivery issue${detail ? `: ${detail}` : '.'}`);
         } else {
           toast.success(`SMS code sent to ${contact}`);
         }
@@ -324,12 +328,20 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
       return;
     }
     setOtpError('');
+    setOtpStep(false);
+    setGuestDetailsStep(true);
+  }
 
+  async function handleGuestDetailsSubmit(details: GuestDetails) {
     const contactType = guestMethod === 'phone' ? 'phone' : 'email';
     setIsLoading(true);
 
     try {
-      const profile = await createGuestProfile(contactType, otpContact);
+      const profile = await createGuestProfile(contactType, otpContact, {
+        fullName: details.fullName,
+        phone: details.phone,
+        address: details.address,
+      });
       try {
         localStorage.setItem('guestProfileId', profile.id);
         localStorage.setItem('guestContactType', profile.contactType);
@@ -352,10 +364,15 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
         });
       }
     } finally {
+      try {
+        localStorage.setItem('guestFullName', details.fullName);
+        localStorage.setItem('guestPhone', details.phone);
+        localStorage.setItem('guestAddress', details.address);
+      } catch {}
       setIsLoading(false);
-      toast.success('Verification successful — continuing as guest');
-      setOtpStep(false);
-      setWelcomeUser('Guest');
+      toast.success('Details saved — continuing as guest');
+      setGuestDetailsStep(false);
+      setWelcomeUser(details.fullName.split(' ')[0] || 'Guest');
       if (onSuccess) onSuccess('Guest');
     }
   }
@@ -377,8 +394,8 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
     );
   }
 
-  const showPhonePanel = guestMethod === 'phone' && !otpStep;
-  const showGmailPanel = guestMethod === 'gmail' && !otpStep;
+  const showPhonePanel = guestMethod === 'phone' && !otpStep && !guestDetailsStep;
+  const showGmailPanel = guestMethod === 'gmail' && !otpStep && !guestDetailsStep;
   const showChoicePanel = showGuestOptions && !guestMethod && !otpStep;
   const showOtpPanel = otpStep;
 
@@ -523,6 +540,15 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
           <div className="grid grid-cols-1 gap-3">
             <button
               type="button"
+              onClick={() => { setShowGuestOptions(false); setGuestMethod('phone'); }}
+              aria-label="Continue as guest with phone number"
+              className="flex items-center justify-center gap-3 py-4 px-3 rounded-xl border border-border bg-card hover:border-primary"
+            >
+              <Icon name="PhoneIcon" size={24} />
+              <span className="text-sm font-semibold text-foreground">Continue with Phone Number</span>
+            </button>
+            <button
+              type="button"
               onClick={() => { setShowGuestOptions(false); setGuestMethod('gmail'); }}
               aria-label="Continue as guest with Gmail"
               className="flex items-center justify-center gap-3 py-4 px-3 rounded-xl border border-border bg-card hover:border-primary"
@@ -556,7 +582,7 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
               type="tel"
               value={guestPhoneRaw}
               onChange={e => setGuestPhoneRaw(e.target.value.replace(/\D/g, '').slice(0, 10))}
-              className="input-field pl-16"
+              className="input-field !pl-24"
               placeholder="9171234567"
             />
           </div>
@@ -620,6 +646,15 @@ export default function LoginForm({ onSwitchToRegister, onSuccess, onOpenGuestPh
           </button>
         </div>
       </AnimatedPanel>
+
+      {guestDetailsStep && (
+        <GuestDetailsForm
+          contactType={guestMethod === 'phone' ? 'phone' : 'email'}
+          contactValue={otpContact}
+          loading={isLoading}
+          onSubmit={handleGuestDetailsSubmit}
+        />
+      )}
 
       <p className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account yet?{' '}

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { assertLoginAllowed, recordLoginFailure, resetLoginAttempts } from '@/lib/loginAttempts';
 
 export default function AdminSignInPage() {
   const router = useRouter();
@@ -20,12 +21,17 @@ export default function AdminSignInPage() {
       const supabase = createClient();
       const cleanInput = inputVal.trim().toLowerCase();
       const targetEmail = cleanInput.includes('@') ? cleanInput : `${cleanInput}@feastandfete.com`;
+      assertLoginAllowed('admin');
       const { data, error } = await supabase.auth.signInWithPassword({
         email: targetEmail,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        recordLoginFailure('admin');
+        throw error;
+      }
+      resetLoginAttempts('admin');
       if (!data.user) throw new Error('Supabase did not return a signed-in user.');
 
       const { data: profile, error: profileError } = await supabase

@@ -196,7 +196,7 @@ export default function CustomerReviewPaymentContent() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsError, setTermsError] = useState('');
-  const profileContactFieldsLocked = Boolean(user && savedAddress);
+  const profileContactFieldsLocked = Boolean(user && !user.is_guest && savedAddress);
 
   useEffect(() => {
     if (!showTermsModal) return;
@@ -223,17 +223,34 @@ export default function CustomerReviewPaymentContent() {
   useEffect(() => {
     const gp = getGuestProfile();
     setGuestProfile(gp);
-    if (gp && !user) {
+    if (gp && (!user || user.is_guest)) {
+      let fullName = '';
+      let phone = '';
+      let address = '';
+      try {
+        fullName = localStorage.getItem('guestFullName') || '';
+        phone = localStorage.getItem('guestPhone') || '';
+        address = localStorage.getItem('guestAddress') || '';
+      } catch {
+        /* ignore */
+      }
+      const parts = parseSavedAddress(address);
+      setSavedAddress(address);
       setForm((prev) => ({
         ...prev,
+        fullName: fullName || prev.fullName,
         email: gp.contactType === 'email' ? gp.contactValue : prev.email,
-        phone: gp.contactType === 'phone' ? gp.contactValue : prev.phone,
+        phone: phone || (gp.contactType === 'phone' ? gp.contactValue : prev.phone),
+        street: parts.street || prev.street,
+        barangay: parts.barangay || prev.barangay,
+        city: parts.city || prev.city,
+        region: parts.region || prev.region,
       }));
     }
   }, [user]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.is_guest) return;
     const supabase = createClient();
 
     async function loadCustomerProfile() {
@@ -912,8 +929,8 @@ export default function CustomerReviewPaymentContent() {
         .from('orders')
         .insert({
           order_number: orderId,
-          user_id: user?.id ?? null,
-          guest_profile_id: !user && guestProfile ? guestProfile.id : null,
+          user_id: user && !user.is_guest ? user.id : null,
+          guest_profile_id: (!user || user.is_guest) && guestProfile ? guestProfile.id : null,
           customer_name: form.fullName,
           customer_email: form.email,
           customer_phone: form.phone,
@@ -1006,7 +1023,7 @@ export default function CustomerReviewPaymentContent() {
       orderType,
       priorityFee,
       total,
-      isGuest: !user && !!guestProfile,
+      isGuest: (!user || user.is_guest) && !!guestProfile,
       guestProfileId: guestProfile?.id ?? null,
     };
     sessionStorage.setItem('feastfete_order', JSON.stringify(orderPayload));

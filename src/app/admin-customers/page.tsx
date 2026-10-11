@@ -23,6 +23,7 @@ export default function AdminCustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
   const [sortBy, setSortBy] = useState<'totalSpent' | 'totalOrders' | 'joinDate'>('totalSpent');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'user' | 'guest'>('all');
 
   const loadCustomers = useCallback(async () => {
     setLoading(true);
@@ -41,12 +42,12 @@ export default function AdminCustomersPage() {
     loadCustomers();
   }, [loadCustomers]);
 
-  const loadCustomerOrders = useCallback(async (customerId: string) => {
+  const loadCustomerOrders = useCallback(async (customer: CustomerRow) => {
     const supabase = createClient();
     const { data } = await supabase
       .from('orders')
       .select('id, order_number, total_amount, status, created_at')
-      .eq('user_id', customerId)
+      .eq(customer.customerType === 'guest' ? 'guest_profile_id' : 'user_id', customer.id)
       .order('created_at', { ascending: false })
       .limit(5);
     setCustomerOrders((data as CustomerOrder[]) || []);
@@ -54,14 +55,17 @@ export default function AdminCustomersPage() {
 
   const handleSelectCustomer = (customer: CustomerRow) => {
     setSelectedCustomer(customer);
-    loadCustomerOrders(customer.id);
+    loadCustomerOrders(customer);
   };
 
   const filtered = customers
+    .filter(c => typeFilter === 'all' || c.customerType === typeFilter)
     .filter(c => {
-      const nameMatch = (c.name || '').toLowerCase().includes(search.toLowerCase());
-      const emailMatch = (c.email || '').toLowerCase().includes(search.toLowerCase());
-      return nameMatch || emailMatch;
+      const q = search.toLowerCase();
+      const nameMatch = (c.name || '').toLowerCase().includes(q);
+      const emailMatch = (c.email || '').toLowerCase().includes(q);
+      const phoneMatch = (c.phone || '').toLowerCase().includes(q);
+      return nameMatch || emailMatch || phoneMatch;
     })
     .sort((a, b) => {
       if (sortBy === 'joinDate') {
@@ -82,7 +86,7 @@ export default function AdminCustomersPage() {
           <div>
             <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--admin-text)' }}>Customers</h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--admin-muted)' }}>
-              {loading ? 'Loading…' : `${customers.length} registered customers`}
+              {loading ? 'Loading…' : `${customers.filter(c => c.customerType === 'user').length} registered • ${customers.filter(c => c.customerType === 'guest').length} guests`}
             </p>
           </div>
 
@@ -120,6 +124,26 @@ export default function AdminCustomersPage() {
               />
             </div>
             <div className="flex items-center gap-2">
+              {[
+                { key: 'all' as const, label: 'All' },
+                { key: 'user' as const, label: 'Registered' },
+                { key: 'guest' as const, label: 'Guests' },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setTypeFilter(t.key)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                  style={{
+                    background: typeFilter === t.key ? '#D4A017' : 'var(--admin-surface)',
+                    color: typeFilter === t.key ? '#1A0F0A' : 'var(--admin-muted)',
+                    border: '1px solid var(--admin-border)'
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
               <span className="text-xs" style={{ color: 'var(--admin-muted)' }}>Sort by:</span>
               {[
                 { key: 'totalSpent' as const, label: 'Highest Spend' },
@@ -153,7 +177,7 @@ export default function AdminCustomersPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--admin-border)' }}>
-                      {['Customer', 'Contact', 'Orders', 'Total Spent', 'Member Since'].map(h => (
+                      {['Customer', 'Type', 'Contact', 'Orders', 'Total Spent', 'Member Since'].map(h => (
                         <th key={h} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--admin-muted)' }}>{h}</th>
                       ))}
                     </tr>
@@ -182,6 +206,16 @@ export default function AdminCustomersPage() {
                             </div>
                           </td>
                           <td className="px-5 py-3.5">
+                            <span
+                              className="px-2 py-0.5 rounded-full text-xs font-semibold"
+                              style={customer.customerType === 'guest'
+                                ? { background: 'rgba(96,165,250,0.15)', color: '#60A5FA' }
+                                : { background: 'rgba(52,211,153,0.15)', color: '#34D399' }}
+                            >
+                              {customer.customerType === 'guest' ? 'Guest' : 'Registered'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5">
                             <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>{customer.email || '—'}</p>
                             <p className="text-xs" style={{ color: 'var(--admin-muted)' }}>{customer.phone || '—'}</p>
                           </td>
@@ -194,7 +228,7 @@ export default function AdminCustomersPage() {
                       );
                     })}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--admin-muted)' }}>No customers found.</td></tr>
+                      <tr><td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--admin-muted)' }}>No customers found.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -224,6 +258,7 @@ export default function AdminCustomersPage() {
                   </div>
                   <div className="space-y-2 pt-2" style={{ borderTop: '1px solid var(--admin-border)' }}>
                     {[
+                      { label: 'Type', value: selectedCustomer.customerType === 'guest' ? 'Guest' : 'Registered user' },
                       { label: 'Email', value: selectedCustomer.email },
                       { label: 'Phone', value: selectedCustomer.phone || '—' },
                       { label: 'Address', value: selectedCustomer.address || '—' },

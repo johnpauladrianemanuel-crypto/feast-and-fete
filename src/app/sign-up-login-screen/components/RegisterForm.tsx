@@ -24,13 +24,13 @@ interface Props {
   onSuccess?: (userName: string) => void;
 }
 
-const REGION_OPTIONS = [
+export const REGION_OPTIONS = [
   { value: 'NCR', label: 'National Capital Region (NCR)' },
   { value: 'CALABARZON', label: 'Calabarzon (Region IV-A)' },
   { value: 'CENTRAL_LUZON', label: 'Central Luzon (Region III)' },
 ];
 
-const REGION_CITY_MAP: Record<string, string[]> = {
+export const REGION_CITY_MAP: Record<string, string[]> = {
   NCR: [
     'Quezon City', 'Manila', 'Makati', 'Pasig', 'Taguig', 'Mandaluyong',
     'Parañaque', 'Las Piñas', 'Muntinlupa', 'Marikina', 'Caloocan',
@@ -49,7 +49,7 @@ const REGION_CITY_MAP: Record<string, string[]> = {
   ],
 };
 
-const CITY_BARANGAY_MAP: Record<string, string[]> = {
+export const CITY_BARANGAY_MAP: Record<string, string[]> = {
   'Quezon City': ['Barangay San Jose', 'Barangay Holy Spirit', 'Barangay Tatalon', 'Batasan Hills', 'Commonwealth', 'Cubao', 'Diliman', 'Kamuning', 'Loyola Heights', 'New Manila', 'Novaliches', 'Project 6', 'Teachers Village'],
   'Manila': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Binondo', 'Ermita', 'Intramuros', 'Malate', 'Paco', 'Pandacan', 'Port Area', 'Quiapo', 'Sampaloc', 'San Miguel', 'San Nicolas', 'Santa Cruz', 'Santa Ana', 'Tondo'],
   'Makati': ['Poblacion', 'San Antonio', 'Bel-Air', 'Dasmariñas', 'Forbes Park', 'Guadalupe Nuevo', 'Guadalupe Viejo', 'Magallanes', 'Pio del Pilar', 'San Lorenzo', 'Urdaneta'],

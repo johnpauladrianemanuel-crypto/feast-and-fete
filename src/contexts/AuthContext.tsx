@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { assertLoginAllowed, recordLoginFailure, resetLoginAttempts } from '@/lib/loginAttempts';
 
 const SIGN_UP_EMAIL_REDIRECT =
   'https://feast-and-fete-two.vercel.app/auth/callback?next=%2Fsign-up-login-screen';
@@ -154,8 +155,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
+    assertLoginAllowed('user');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (error) {
+      recordLoginFailure('user');
+      throw error;
+    }
+    resetLoginAttempts('user');
 
     if (!data.user) {
       throw new Error('Supabase did not return a signed-in user.');
@@ -185,6 +191,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         localStorage.removeItem('guestProfileId');
         localStorage.removeItem('guestContactType');
         localStorage.removeItem('guestContactValue');
+        localStorage.removeItem('guestFullName');
+        localStorage.removeItem('guestPhone');
+        localStorage.removeItem('guestAddress');
       } catch {}
       setUser(null);
       setSession(null);

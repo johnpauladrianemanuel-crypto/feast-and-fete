@@ -483,13 +483,17 @@ export interface GuestProfile {
   id: string;
   contactType: 'phone' | 'email';
   contactValue: string;
+  fullName?: string | null;
+  phone?: string | null;
+  address?: string | null;
   verifiedAt: string;
   createdAt: string;
 }
 
 export async function createGuestProfile(
   contactType: 'phone' | 'email',
-  contactValue: string
+  contactValue: string,
+  details?: { fullName: string; phone: string; address: string }
 ): Promise<GuestProfile> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -498,6 +502,9 @@ export async function createGuestProfile(
       contact_type: contactType,
       contact_value: contactValue.trim(),
       verified_at: new Date().toISOString(),
+      ...(details
+        ? { full_name: details.fullName, phone: details.phone, address: details.address }
+        : {}),
     })
     .select()
     .single();
@@ -507,6 +514,9 @@ export async function createGuestProfile(
     id: row.id as string,
     contactType: row.contact_type as 'phone' | 'email',
     contactValue: row.contact_value as string,
+    fullName: (row.full_name as string | null) ?? null,
+    phone: (row.phone as string | null) ?? null,
+    address: (row.address as string | null) ?? null,
     verifiedAt: row.verified_at as string,
     createdAt: row.created_at as string,
   };
@@ -637,6 +647,7 @@ export interface CustomerRow {
   totalOrders: number;
   totalSpent: number;
   joinDate: string;
+  customerType: 'user' | 'guest';
 }
 
 export async function fetchCustomers(): Promise<CustomerRow[]> {
@@ -660,7 +671,14 @@ export async function fetchCustomers(): Promise<CustomerRow[]> {
   }
 
   if (error) throw new Error(error.message);
-  if (!profiles || profiles.length === 0) return [];
+
+  const { data: guestRows } = await supabase
+    .from('guest_profiles')
+    .select('id, contact_type, contact_value, full_name, phone, address, created_at')
+    .order('created_at', { ascending: false });
+
+  if ((!profiles || profiles.length === 0) && (!guestRows || guestRows.length === 0)) return [];
+  profiles = profiles || [];
 
   const customerProfiles = profiles.filter(
     (p: any) => !p.role || p.role === 'customer' || p.role !== 'admin'
@@ -668,12 +686,12 @@ export async function fetchCustomers(): Promise<CustomerRow[]> {
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('user_id, total_amount, status');
+    .select('user_id, guest_profile_id, total_amount, status');
 
   const orderMap: Record<string, { count: number; spent: number }> = {};
   (orders || []).forEach((o: Record<string, unknown>) => {
-    if (!o.user_id) return;
-    const uid = o.user_id as string;
+    const uid = (o.user_id || o.guest_profile_id) as string | null;
+    if (!uid) return;
     if (!orderMap[uid]) orderMap[uid] = { count: 0, spent: 0 };
     orderMap[uid].count += 1;
     const statusStr = String(o.status || '').toLowerCase();
@@ -682,7 +700,25 @@ export async function fetchCustomers(): Promise<CustomerRow[]> {
     }
   });
 
-  return customerProfiles.map((p: Record<string, unknown>) => {
+  const guests: CustomerRow[] = (guestRows || []).map((g: Record<string, unknown>) => {
+    const isEmail = g.contact_type === 'email';
+    const contact = (g.contact_value as string) || '';
+    const createdAt = (g.created_at as string) || '';
+    const gid = String(g.id || '');
+    return {
+      id: gid,
+      name: ((g.full_name as string) || '').trim() || (isEmail ? contact.split('@')[0] : contact) || 'Guest',
+      email: isEmail ? contact : '',
+      phone: (g.phone as string) || (isEmail ? '' : contact),
+      address: (g.address as string) || '',
+      totalOrders: orderMap[gid]?.count || 0,
+      totalSpent: orderMap[gid]?.spent || 0,
+      joinDate: createdAt ? createdAt.split('T')[0] : 'N/A',
+      customerType: 'guest' as const,
+    };
+  });
+
+  const users: CustomerRow[] = customerProfiles.map((p: Record<string, unknown>) => {
     const email = (p.email as string) || '';
     const rawName = (p.full_name as string) || '';
     const name = rawName.trim() ? rawName : (email ? email.split('@')[0] : 'Customer');
@@ -698,8 +734,11 @@ export async function fetchCustomers(): Promise<CustomerRow[]> {
       totalOrders: orderMap[p.id as string]?.count || 0,
       totalSpent: orderMap[p.id as string]?.spent || 0,
       joinDate,
+      customerType: 'user' as const,
     };
   });
+
+  return [...users, ...guests];
 }
 
 // ─── Item Reviews ─────────────────────────────────────────────────────────────
