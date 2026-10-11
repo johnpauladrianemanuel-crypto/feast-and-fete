@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
 
 interface AuthCardProps {
   onSuccess?: (userName: string) => void;
@@ -21,6 +23,7 @@ export default function AuthCard({ onSuccess }: AuthCardProps) {
 
   const animTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
+  const supabase = createClient();
 
   // Cleanup active timeouts on unmount
   useEffect(() => {
@@ -51,16 +54,41 @@ export default function AuthCard({ onSuccess }: AuthCardProps) {
   }
 
   // Handle password reset submit
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail) return;
-    
+    const email = resetEmail.trim();
+
+    if (!email) {
+      toast.error('Please enter your email address first.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+
     setResetLoading(true);
-    // Simulate sending password reset link
-    setTimeout(() => {
-      setResetLoading(false);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
       setResetSent(true);
-    }, 1000);
+      toast.success(`Password reset link sent to ${email}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send reset link.';
+      toast.error(message);
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   // Common successful auth handler

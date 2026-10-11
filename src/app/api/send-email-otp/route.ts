@@ -14,25 +14,27 @@ export async function POST(req: Request) {
       );
     }
 
+    const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'Feast & Fête <orders@feastandfete.shop>';
+
     if (!process.env.RESEND_API_KEY) {
       console.log('--------------------------------------------------');
       console.log(`[MOCK EMAIL SERVICE] Sending OTP to ${email}`);
       console.log(`[MOCK EMAIL SERVICE] Verification Code: ${otp}`);
+      console.log(`[MOCK EMAIL SERVICE] From: ${fromEmail}`);
       console.log('--------------------------------------------------');
 
       return NextResponse.json({
         success: true,
         message: 'Mock OTP sent (check terminal console)',
         debugOtp: otp,
+        from: fromEmail,
       });
     }
 
     const resend = new Resend(process.env.RESEND_API_KEY);
 
-    // PAALALA: Palitan ang "updates.yourdomain.com" o "feastandfete.com" kapag na-verify mo na ang domain mo sa Resend dashboard.
-    // Kapag 'onboarding@resend.dev', sa sarili mong Resend account email lang ito makakapag-send.
     const { data, error } = await resend.emails.send({
-      from: 'Feast & Fête <onboarding@resend.dev>', // Palitan ng verified domain halimbawa: 'Feast & Fête <noreply@yourdomain.com>'
+      from: fromEmail,
       to: [email],
       subject: 'Your Verification Code — Feast & Fête',
       html: `
@@ -45,11 +47,15 @@ export async function POST(req: Request) {
       `,
     });
 
-    // Sinusuri kung nag-return ng error ang Resend (e.g. Domain restrictions)
     if (error) {
       console.error('[RESEND ERROR]:', error);
       return NextResponse.json(
-        { success: false, error: error.message },
+        {
+          success: false,
+          error: error.message,
+          hint:
+            'Verify the sender domain in Resend and set RESEND_FROM_EMAIL to a verified address.',
+        },
         { status: 400 }
       );
     }
