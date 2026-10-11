@@ -6,7 +6,6 @@ import KPIBentoGrid from './KPIBentoGrid';
 import SalesChartSection from './SalesChartSection';
 import TopItemsChartSection from './TopItemsChartSection';
 import RecentOrdersTable from './RecentOrdersTable';
-import QuickActions from './QuickActions';
 import { fetchInventoryItems, InventoryItem } from '@/lib/supabase/services';
 
 export default function AdminDashboardContent() {
@@ -57,7 +56,6 @@ export default function AdminDashboardContent() {
               Here is what needs your attention today.
             </p>
           </div>
-          <QuickActions />
         </div>
 
         {/* KPI Cards */}

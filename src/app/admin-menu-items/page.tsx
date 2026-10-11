@@ -6,6 +6,8 @@ import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
 import { fetchAdminMenuItems, updateMenuItem, MenuItem } from '@/lib/supabase/services';
 import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
+import { toast } from 'sonner';
+import TablePagination, { usePagination, useFilterLoading } from '@/components/admin/TablePagination';
 import AppImage from '@/components/ui/AppImage';
 
 const CATEGORIES = [
@@ -180,6 +182,9 @@ export default function AdminMenuItemsPage() {
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+  const filterKey = `${filterCategory}|${search}`;
+  const filtering = useFilterLoading(filterKey);
+  const pager = usePagination(filtered, 12, filterKey);
 
   const handleToggleClick = (item: MenuItem) => {
     const isActive = getItemActiveStatus(item);
@@ -210,8 +215,9 @@ export default function AdminMenuItemsPage() {
             : i
         )
       );
+      toast.success('Item activated');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to activate item');
+      toast.error(err instanceof Error ? err.message : 'Failed to activate item');
     }
   };
 
@@ -220,7 +226,7 @@ export default function AdminMenuItemsPage() {
     const finalReason = deactivationReason === 'Other' ? customReason.trim() : deactivationReason;
 
     if (!finalReason) {
-      alert('Please provide or select a reason for deactivation.');
+      toast.error('Please provide or select a reason for deactivation.');
       return;
     }
 
@@ -242,8 +248,9 @@ export default function AdminMenuItemsPage() {
         )
       );
       setDeactivateModalItem(null);
+      toast.success('Item deactivated');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to deactivate item');
+      toast.error(err instanceof Error ? err.message : 'Failed to deactivate item');
     }
   };
 
@@ -259,8 +266,9 @@ export default function AdminMenuItemsPage() {
       if (error) throw error;
 
       setItems((prev) => prev.filter((menuItem) => menuItem.id !== item.id));
+      toast.success('Menu item deleted');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete menu item.');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete menu item.');
     } finally {
       setDeletingItemId(null);
     }
@@ -272,8 +280,9 @@ export default function AdminMenuItemsPage() {
       setItems((prev) =>
         prev.map((i) => (i.id === id ? ({ ...i, featured: !current } as MenuItem) : i))
       );
+      toast.success(current ? 'Removed from featured' : 'Marked as featured');
     } catch {
-      // silently fail
+      toast.error('Failed to update featured status');
     }
   };
 
@@ -301,8 +310,9 @@ export default function AdminMenuItemsPage() {
       });
       setItems((prev) => prev.map((i) => (i.id === updatedItem.id ? updatedItem : i)));
       setEditItem(null);
+      toast.success('Menu item updated successfully');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Save failed');
+      toast.error(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -346,8 +356,9 @@ export default function AdminMenuItemsPage() {
       const publicUrl = data.publicUrl;
       setNewItem((prev) => ({ ...prev, image: publicUrl }));
       setPhotoPreview(publicUrl);
+      toast.success('Photo uploaded');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Photo upload failed.');
+      toast.error(err instanceof Error ? err.message : 'Photo upload failed.');
     } finally {
       setUploadingPhoto(false);
     }
@@ -355,11 +366,11 @@ export default function AdminMenuItemsPage() {
 
   const handleCreateMenuItem = async () => {
     if (!newItem.name.trim()) {
-      alert('Please enter an item name.');
+      toast.error('Please enter an item name.');
       return;
     }
     if (newItem.price === '' || Number(newItem.price) < 0) {
-      alert('Please enter a valid price.');
+      toast.error('Please enter a valid price.');
       return;
     }
 
@@ -409,6 +420,7 @@ export default function AdminMenuItemsPage() {
       setIsAddModalOpen(false);
       setNewItem(INITIAL_NEW_ITEM);
       setPhotoPreview('');
+      toast.success('Menu item added successfully');
     } catch (err) {
       const message =
         err instanceof Error
@@ -416,7 +428,7 @@ export default function AdminMenuItemsPage() {
           : typeof err === 'object' && err !== null && 'message' in err
             ? String(err.message)
             : 'Failed to add menu item';
-      alert(`Failed to add menu item: ${message}`);
+      toast.error(`Failed to add menu item: ${message}`);
     } finally {
       setAdding(false);
     }
@@ -524,7 +536,7 @@ export default function AdminMenuItemsPage() {
           </div>
 
           {/* Loading skeleton */}
-          {loading && (
+          {(loading || filtering) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-pulse">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                 <div
@@ -537,9 +549,10 @@ export default function AdminMenuItemsPage() {
           )}
 
           {/* Grid */}
-          {!loading && (
+          {!loading && !filtering && (
+            <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filtered.map((item) => {
+              {pager.pageItems.map((item) => {
                 const isActive = getItemActiveStatus(item);
                 const reason = getItemReason(item);
 
@@ -676,6 +689,13 @@ export default function AdminMenuItemsPage() {
                 );
               })}
             </div>
+            {filtered.length === 0 && (
+              <p className="text-center text-sm py-10" style={{ color: 'var(--admin-muted)' }}>No menu items found.</p>
+            )}
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}>
+              <TablePagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.pageSize} onPageChange={pager.setPage} />
+            </div>
+            </>
           )}
         </div>
       </main>

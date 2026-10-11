@@ -6,6 +6,7 @@ import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
 import { fetchCustomers, CustomerRow } from '@/lib/supabase/services';
 import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
+import TablePagination, { usePagination, useFilterLoading, TableLoadingRows } from '@/components/admin/TablePagination';
 
 interface CustomerOrder {
   id: string;
@@ -73,6 +74,10 @@ export default function AdminCustomersPage() {
       }
       return (b[sortBy] || 0) - (a[sortBy] || 0);
     });
+
+  const filterKey = `${search}|${typeFilter}|${sortBy}`;
+  const filtering = useFilterLoading(filterKey);
+  const pager = usePagination(filtered, 10, filterKey);
 
   const totalRevenue = customers.reduce((s, c) => s + (c.totalSpent || 0), 0);
   const totalOrdersAll = customers.reduce((s, c) => s + (c.totalOrders || 0), 0);
@@ -183,7 +188,9 @@ export default function AdminCustomersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((customer, i) => {
+                    {filtering ? (
+                      <tr><td colSpan={6} className="p-0"><TableLoadingRows /></td></tr>
+                    ) : pager.pageItems.map((customer, i) => {
                       const displayName = customer.name || customer.email || 'User';
                       const initial = displayName.charAt(0).toUpperCase();
 
@@ -192,7 +199,7 @@ export default function AdminCustomersPage() {
                           key={customer.id}
                           className="cursor-pointer transition-colors hover:bg-white/5"
                           style={{
-                            borderBottom: i < filtered.length - 1 ? '1px solid var(--admin-border)' : 'none',
+                            borderBottom: i < pager.pageItems.length - 1 ? '1px solid var(--admin-border)' : 'none',
                             background: selectedCustomer?.id === customer.id ? 'rgba(212,160,23,0.06)' : 'transparent'
                           }}
                           onClick={() => handleSelectCustomer(customer)}
@@ -227,11 +234,12 @@ export default function AdminCustomersPage() {
                         </tr>
                       );
                     })}
-                    {filtered.length === 0 && (
+                    {!filtering && filtered.length === 0 && (
                       <tr><td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--admin-muted)' }}>No customers found.</td></tr>
                     )}
                   </tbody>
                 </table>
+                <TablePagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.pageSize} onPageChange={pager.setPage} />
               </div>
 
               {/* Customer Detail Drawer */}

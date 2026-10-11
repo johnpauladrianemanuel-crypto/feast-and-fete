@@ -19,7 +19,10 @@ export async function POST(request: Request) {
 
     const data = await resend.emails.send({
       from: 'Feast & F?te <orders@feastandfete.shop>',
-      to: ['johnpauladrianemanuel@gmail.com'],
+      to: (process.env.ADMIN_NOTIFICATION_EMAILS || 'johnpauladrianemanuel@gmail.com')
+        .split(',')
+        .map((e) => e.trim())
+        .filter(Boolean),
       subject: `New Order Received! #${orderId}`,
       html: darkEmailLayout({
         siteUrl,

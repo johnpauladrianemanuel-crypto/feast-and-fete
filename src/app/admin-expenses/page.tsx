@@ -5,6 +5,8 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
 import { fetchExpenses, addExpense, deleteExpense, Expense } from '@/lib/supabase/services';
 import Icon from '@/components/ui/AppIcon';
+import { toast } from 'sonner';
+import TablePagination, { usePagination, useFilterLoading, TableLoadingRows } from '@/components/admin/TablePagination';
 
 const CATEGORIES = ['Ingredients', 'Packaging', 'Utilities', 'Labor', 'Other'];
 const CATEGORY_COLORS: Record<string, string> = {
@@ -21,6 +23,7 @@ export default function AdminExpensesPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [filterCat, setFilterCat] = useState('All');
+  const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ date: '', category: 'Ingredients', description: '', amount: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +45,20 @@ export default function AdminExpensesPage() {
     loadExpenses();
   }, [loadExpenses]);
 
-  const filtered = expenses.filter(e => filterCat === 'All' || e.category === filterCat);
+  const filtered = expenses.filter(e => {
+    if (filterCat !== 'All' && e.category !== filterCat) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (e.description || '').toLowerCase().includes(q) ||
+      (e.category || '').toLowerCase().includes(q) ||
+      String(e.date || '').toLowerCase().includes(q) ||
+      String(e.amount ?? '').includes(q)
+    );
+  });
+  const filterKey = `${filterCat}|${search}`;
+  const filtering = useFilterLoading(filterKey);
+  const pager = usePagination(filtered, 10, filterKey);
   const total = filtered.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const categoryTotals = CATEGORIES.map(cat => ({
@@ -64,8 +80,10 @@ export default function AdminExpensesPage() {
       setExpenses(prev => [newExp, ...prev]);
       setForm({ date: '', category: 'Ingredients', description: '', amount: '' });
       setShowForm(false);
+      toast.success('Expense added successfully');
     } catch (err) {
       setModalError(err instanceof Error ? err.message : 'Failed to add expense');
+      toast.error('Failed to add expense');
     } finally {
       setSubmitting(false);
     }
@@ -75,8 +93,10 @@ export default function AdminExpensesPage() {
     try {
       await deleteExpense(id);
       setExpenses(prev => prev.filter(e => e.id !== id));
+      toast.success('Expense deleted');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete expense');
+      toast.error('Failed to delete expense');
     }
   };
 
@@ -151,6 +171,17 @@ export default function AdminExpensesPage() {
             </div>
           </div>
 
+          <div className="relative w-full sm:w-72">
+            <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-admin-muted" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search expenses..."
+              className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
+              style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: 'var(--admin-text)' }}
+            />
+          </div>
+
           {/* Table */}
           {loading ? (
             <div className="space-y-2 animate-pulse">
@@ -167,8 +198,10 @@ export default function AdminExpensesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((exp, i) => (
-                    <tr key={exp.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--admin-border)' : 'none' }}>
+                  {filtering ? (
+                    <tr><td colSpan={5} className="p-0"><TableLoadingRows /></td></tr>
+                  ) : pager.pageItems.map((exp, i) => (
+                    <tr key={exp.id} style={{ borderBottom: i < pager.pageItems.length - 1 ? '1px solid var(--admin-border)' : 'none' }}>
                       <td className="px-5 py-3.5 text-xs font-mono" style={{ color: 'var(--admin-muted)' }}>{exp.date}</td>
                       <td className="px-5 py-3.5">
                         <span className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: `${CATEGORY_COLORS[exp.category] || '#94A3B8'}20`, color: CATEGORY_COLORS[exp.category] || '#94A3B8' }}>
@@ -184,11 +217,12 @@ export default function AdminExpensesPage() {
                       </td>
                     </tr>
                   ))}
-                  {filtered.length === 0 && (
+                  {!filtering && filtered.length === 0 && (
                     <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--admin-muted)' }}>No expenses found.</td></tr>
                   )}
                 </tbody>
               </table>
+              <TablePagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.pageSize} onPageChange={pager.setPage} />
             </div>
           )}
         </div>

@@ -215,15 +215,6 @@ export default function AdminTopbar() {
           )}
         </div>
 
-        {/* Customer site */}
-        <Link
-          href="/menu-browse-screen"
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl transition-colors"
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--admin-border)', color: 'var(--admin-muted)' }}
-        >
-          <Icon name="ArrowTopRightOnSquareIcon" size={13} />
-          Customer Site
-        </Link>
       </div>
     </header>
   );

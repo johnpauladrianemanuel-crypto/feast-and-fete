@@ -10,9 +10,27 @@ export interface ReportOrder {
   status: string;
 }
 
+export interface ReportInventoryItem {
+  name: string;
+  unit: string;
+  currentStock: number;
+  reorderLevel: number;
+  status: string;
+  lastUpdated?: string;
+}
+
+export interface ReportExpense {
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+}
+
 interface ReportOptions {
   dateRangeLabel?: string;
   generatedBy?: string;
+  inventory?: ReportInventoryItem[];
+  expenses?: ReportExpense[];
 }
 
 async function loadLogo(): Promise<string | null> {
@@ -32,6 +50,14 @@ async function loadLogo(): Promise<string | null> {
   }
 }
 
+const fmtDate = (value?: string) => {
+  if (!value) return '';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 export function generateSalesReportPDF(
   orders: ReportOrder[],
   options: ReportOptions = {}
@@ -50,12 +76,12 @@ export function generateSalesReportPDF(
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
-    doc.setTextColor(82, 82, 82);
+    doc.setTextColor(43, 26, 18);
     doc.text('PRINTABLE SALES REPORT', margin, 19);
     doc.text(dateRangeLabel.toUpperCase(), margin, 28);
 
-    doc.setDrawColor(60, 60, 60);
-    doc.setLineWidth(0.5);
+    doc.setDrawColor(212, 160, 23);
+    doc.setLineWidth(0.8);
     doc.line(margin, 33, pageWidth - margin, 33);
 
     const generatedDate = new Date().toLocaleDateString('en-US', {
@@ -70,8 +96,9 @@ export function generateSalesReportPDF(
       head: [['REPORT RANGE', 'ASSOCIATE NAME', 'SIGNATURE', 'REPORT COMPLETION DATE']],
       body: [[dateRangeLabel, generatedBy, '', generatedDate]],
       theme: 'grid',
-      styles: { font: 'helvetica', fontSize: 8, textColor: [30, 30, 30], cellPadding: 2.5, lineColor: [0, 0, 0], lineWidth: 0.25 },
-      headStyles: { fillColor: [203, 212, 222], textColor: [20, 20, 20], fontStyle: 'bold', halign: 'center' },
+      alternateRowStyles: { fillColor: [250, 244, 232] },
+      styles: { font: 'helvetica', fontSize: 8, textColor: [43, 26, 18], cellPadding: 2.5, lineColor: [200, 169, 154], lineWidth: 0.25 },
+      headStyles: { fillColor: [43, 26, 18], textColor: [212, 160, 23], fontStyle: 'bold', halign: 'center' },
       columnStyles: { 0: { cellWidth: 39 }, 1: { cellWidth: 39 }, 2: { cellWidth: 39 }, 3: { cellWidth: 45 } },
     });
 
@@ -84,27 +111,91 @@ export function generateSalesReportPDF(
       const amount = `PHP ${Number(order.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
       if (dayIndex >= 0) dayCells[dayIndex] = amount;
       const customerAndItems = `${order.customer_name || 'Guest'} - ${order.items_summary || 'Food Items'}`;
-      return [customerAndItems, ...dayCells, amount];
+      return [fmtDate(order.created_at), customerAndItems, ...dayCells, amount];
     });
 
-    const filledRows = weeklyRows.length > 0 ? weeklyRows : [['', '', '', '', '', '', '', '', '']];
-    while (filledRows.length < 19) filledRows.push(['', '', '', '', '', '', '', '', '']);
+    const filledRows = weeklyRows.length > 0 ? weeklyRows : [['', '', '', '', '', '', '', '', '', '']];
+    while (filledRows.length < 19) filledRows.push(['', '', '', '', '', '', '', '', '', '']);
 
     autoTable(doc, {
       startY: (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable!.finalY + 10,
       margin: { left: margin, right: margin },
-      head: [['CUSTOMER / ORDER ITEMS', ...dayHeaders, 'TOTAL']],
+      head: [['DATE', 'CUSTOMER / ORDER ITEMS', ...dayHeaders, 'TOTAL']],
       body: filledRows,
       theme: 'grid',
-      styles: { font: 'helvetica', fontSize: 7, textColor: [25, 25, 25], cellPadding: 1.8, lineColor: [0, 0, 0], lineWidth: 0.25, minCellHeight: 6.5 },
-      headStyles: { fillColor: [203, 212, 222], textColor: [20, 20, 20], fontStyle: 'bold', halign: 'center', minCellHeight: 9 },
-      columnStyles: { 0: { cellWidth: 47 }, 1: { cellWidth: 15 }, 2: { cellWidth: 15 }, 3: { cellWidth: 15 }, 4: { cellWidth: 15 }, 5: { cellWidth: 15 }, 6: { cellWidth: 15 }, 7: { cellWidth: 15 }, 8: { cellWidth: 28 } },
+      alternateRowStyles: { fillColor: [250, 244, 232] },
+      styles: { font: 'helvetica', fontSize: 7, textColor: [43, 26, 18], cellPadding: 1.8, lineColor: [200, 169, 154], lineWidth: 0.25, minCellHeight: 6.5 },
+      headStyles: { fillColor: [43, 26, 18], textColor: [212, 160, 23], fontStyle: 'bold', halign: 'center', minCellHeight: 9 },
+      columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 36 }, 2: { cellWidth: 14 }, 3: { cellWidth: 14 }, 4: { cellWidth: 14 }, 5: { cellWidth: 14 }, 6: { cellWidth: 14 }, 7: { cellWidth: 14 }, 8: { cellWidth: 14 }, 9: { cellWidth: 24 } },
     });
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(70, 70, 70);
-    doc.text(`TOTAL PERIOD SALES: PHP ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, margin, 272);
+    type DocWithTable = jsPDF & { lastAutoTable?: { finalY: number } };
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const money = (n: number) => `PHP ${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    const sectionStart = (needed: number) => {
+      let y = ((doc as DocWithTable).lastAutoTable?.finalY ?? 20) + 8;
+      if (y + needed > pageHeight - 15) {
+        doc.addPage();
+        y = 20;
+      }
+      return y;
+    };
+    const sectionTitle = (text: string, y: number) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(43, 26, 18);
+      doc.text(text, margin, y);
+    };
+
+    let y = sectionStart(10);
+    sectionTitle(`TOTAL PERIOD SALES: ${money(totalRevenue)}`, y);
+    (doc as DocWithTable).lastAutoTable = { finalY: y };
+
+    const tableStyles = {
+      theme: 'grid' as const,
+      alternateRowStyles: { fillColor: [250, 244, 232] as [number, number, number] },
+      styles: { font: 'helvetica', fontSize: 8, textColor: [43, 26, 18] as [number, number, number], cellPadding: 2, lineColor: [200, 169, 154] as [number, number, number], lineWidth: 0.25 },
+      headStyles: { fillColor: [203, 212, 222] as [number, number, number], textColor: [20, 20, 20] as [number, number, number], fontStyle: 'bold' as const, halign: 'center' as const },
+      margin: { left: margin, right: margin },
+    };
+
+    if (options.inventory) {
+      y = sectionStart(30);
+      sectionTitle('INVENTORY', y);
+      autoTable(doc, {
+        ...tableStyles,
+        startY: y + 3,
+        head: [['LAST UPDATED', 'ITEM', 'UNIT', 'CURRENT STOCK', 'REORDER LEVEL', 'STATUS']],
+        body: options.inventory.length
+          ? options.inventory.map((i) => [fmtDate(i.lastUpdated), i.name, i.unit, String(i.currentStock), String(i.reorderLevel), i.status])
+          : [['', 'No inventory records', '', '', '', '']],
+      });
+    }
+
+    if (options.expenses) {
+      y = sectionStart(30);
+      sectionTitle('EXPENSES', y);
+      const totalExpenses = options.expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      autoTable(doc, {
+        ...tableStyles,
+        startY: y + 3,
+        head: [['DATE', 'CATEGORY', 'DESCRIPTION', 'AMOUNT']],
+        body: options.expenses.length
+          ? options.expenses.map((e) => [
+              e.date ? new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+              e.category,
+              e.description,
+              money(Number(e.amount || 0)),
+            ])
+          : [['No expenses in this period', '', '', '']],
+        columnStyles: { 3: { halign: 'right' } },
+      });
+      y = sectionStart(10);
+      sectionTitle(`TOTAL EXPENSES: ${money(totalExpenses)}`, y);
+      (doc as DocWithTable).lastAutoTable = { finalY: y };
+      y = sectionStart(10);
+      sectionTitle(`NET (SALES - EXPENSES): ${money(totalRevenue - totalExpenses)}`, y);
+    }
 
     const safeLabel = dateRangeLabel.replace(/\s+/g, '_');
     doc.save(`Sales_Report_${safeLabel}.pdf`);

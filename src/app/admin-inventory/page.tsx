@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import TablePagination, { usePagination, useFilterLoading, TableLoadingRows } from '@/components/admin/TablePagination';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
 import Icon from '@/components/ui/AppIcon';
@@ -48,6 +50,7 @@ export default function AdminInventoryPage() {
   const [editStock, setEditStock] = useState('');
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState<StockStatus | 'All'>('All');
+  const [search, setSearch] = useState('');
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [draft, setDraft] = useState<IngredientDraft>(EMPTY_DRAFT);
 
@@ -88,8 +91,10 @@ export default function AdminInventoryPage() {
       await updateInventoryItem(id, currentStock, item.reorderLevel, item.unit);
       setEditId(null);
       await loadItems();
+      toast.success('Ingredient updated successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update ingredient.');
+      toast.error('Failed to update ingredient');
     } finally {
       setSaving(false);
     }
@@ -125,14 +130,23 @@ export default function AdminInventoryPage() {
       setItems((prev) => [...prev, createdItem].sort((a, b) => a.name.localeCompare(b.name)));
       setDraft(EMPTY_DRAFT);
       setIsAddFormOpen(false);
+      toast.success('Ingredient added successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add ingredient.');
+      toast.error('Failed to add ingredient');
     } finally {
       setSaving(false);
     }
   };
 
-  const filtered = items.filter((item) => filterStatus === 'All' || item.status === filterStatus);
+  const filtered = items.filter((item) => {
+    if (filterStatus !== 'All' && item.status !== filterStatus) return false;
+    const q = search.trim().toLowerCase();
+    return !q || item.name.toLowerCase().includes(q) || (item.unit || '').toLowerCase().includes(q);
+  });
+  const filterKey = `${filterStatus}|${search}`;
+  const filtering = useFilterLoading(filterKey);
+  const pager = usePagination(filtered, 10, filterKey);
   const counts = {
     All: items.length,
     OK: items.filter((item) => item.status === 'OK').length,
@@ -383,6 +397,17 @@ export default function AdminInventoryPage() {
             ))}
           </div>
 
+          <div className="relative w-full sm:w-72">
+            <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-admin-muted" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search ingredients..."
+              className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
+              style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', color: 'var(--admin-text)' }}
+            />
+          </div>
+
           {loading ? (
             <div className="space-y-2 animate-pulse">
               {[1, 2, 3, 4, 5].map((index) => (
@@ -424,12 +449,14 @@ export default function AdminInventoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((item, index) => (
+                  {filtering ? (
+                    <tr><td colSpan={7} className="p-0"><TableLoadingRows /></td></tr>
+                  ) : pager.pageItems.map((item, index) => (
                     <tr
                       key={item.id}
                       style={{
                         borderBottom:
-                          index < filtered.length - 1 ? '1px solid var(--admin-border)' : 'none',
+                          index < pager.pageItems.length - 1 ? '1px solid var(--admin-border)' : 'none',
                       }}
                     >
                       <td className="px-5 py-3.5">
@@ -535,7 +562,7 @@ export default function AdminInventoryPage() {
                       </td>
                     </tr>
                   ))}
-                  {filtered.length === 0 && (
+                  {!filtering && filtered.length === 0 && (
                     <tr>
                       <td
                         colSpan={8}
@@ -548,6 +575,7 @@ export default function AdminInventoryPage() {
                   )}
                 </tbody>
               </table>
+              <TablePagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.pageSize} onPageChange={pager.setPage} />
             </div>
           )}
         </div>

@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'nav-menu', label: 'Menu Items', href: '/admin-menu-items', icon: 'BookOpenIcon' },
   { id: 'nav-inventory', label: 'Inventory', href: '/admin-inventory', icon: 'ArchiveBoxIcon' },
   { id: 'nav-expenses', label: 'Expenses', href: '/admin-expenses', icon: 'BanknotesIcon' },
+  { id: 'nav-reports', label: 'Reports', href: '/admin-reports', icon: 'DocumentChartBarIcon' },
   { id: 'nav-customers', label: 'Customers', href: '/admin-customers', icon: 'UsersIcon' },
   { id: 'nav-notifications', label: 'Notifications', href: '/admin-notifications', icon: 'BellIcon' },
   { id: 'nav-settings', label: 'Settings', href: '/admin-settings', icon: 'Cog6ToothIcon' },

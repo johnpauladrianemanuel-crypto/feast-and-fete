@@ -11,6 +11,8 @@ import {
 } from '@/lib/supabase/services';
 import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
+import { toast } from 'sonner';
+import TablePagination, { usePagination, useFilterLoading } from '@/components/admin/TablePagination';
 
 const TYPE_STYLES: Record<AdminNotification['type'], { icon: string; color: string; bg: string }> = {
   order: { icon: 'ClipboardDocumentListIcon', color: '#60A5FA', bg: 'rgba(96,165,250,0.12)' },
@@ -109,8 +111,9 @@ export default function AdminNotificationsPage() {
       notifications.forEach((notification) => locallyRead.add(notification.id));
       saveLocallyReadNotificationIds(locallyRead);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      toast.success('All notifications marked as read');
     } catch {
-      // silently fail
+      toast.error('Failed to mark notifications as read');
     }
   };
 
@@ -118,12 +121,15 @@ export default function AdminNotificationsPage() {
     try {
       await deleteAdminNotification(id);
       setNotifications(prev => prev.filter(n => n.id !== id));
+      toast.success('Notification deleted');
     } catch {
-      // silently fail
+      toast.error('Failed to delete notification');
     }
   };
 
   const filtered = notifications.filter(n => filter === 'All' || n.type === filter);
+  const filtering = useFilterLoading(filter);
+  const pager = usePagination(filtered, 10, filter);
 
   const filterCounts: Record<FilterType, number> = {
     All: notifications.length,
@@ -170,16 +176,16 @@ export default function AdminNotificationsPage() {
           </div>
 
           {/* Loading */}
-          {loading && (
+          {(loading || filtering) && (
             <div className="space-y-2 animate-pulse">
               {[1, 2, 3, 4].map(i => <div key={i} className="h-20 rounded-2xl" style={{ background: 'var(--admin-surface)' }} />)}
             </div>
           )}
 
           {/* Notifications List */}
-          {!loading && (
+          {!loading && !filtering && (
             <div className="space-y-2">
-              {filtered.map(notif => {
+              {pager.pageItems.map(notif => {
                 const style = TYPE_STYLES[notif.type];
                 return (
                   <div
@@ -215,6 +221,9 @@ export default function AdminNotificationsPage() {
                   <p className="text-sm">No notifications in this category.</p>
                 </div>
               )}
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)' }}>
+                <TablePagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.pageSize} onPageChange={pager.setPage} />
+              </div>
             </div>
           )}
         </div>

@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopbar from '@/app/admin-dashboard/components/AdminTopbar';
 import Icon from '@/components/ui/AppIcon';
+import { toast } from 'sonner';
+import TablePagination, { usePagination, useFilterLoading, TableLoadingRows } from '@/components/admin/TablePagination';
 import { createClient } from '@/lib/supabase/client';
 import {
   getAvailableOrderStatuses,
@@ -179,8 +181,10 @@ export default function AdminOrdersPage() {
           if (original) setSelectedOrder(original);
         }
         setError('Failed to update order status. Please try again.');
+        toast.error('Failed to update order status');
         return;
       }
+      toast.success(`Order status updated to ${newStatus}`);
 
       try {
         const {
@@ -199,6 +203,7 @@ export default function AdminOrdersPage() {
           setError(
             result.error || 'Order status updated, but the customer email could not be sent.'
           );
+          toast.warning('Status updated, but the customer email could not be sent');
         }
       } catch (emailError) {
         console.error('Failed to send order status email:', emailError);
@@ -208,6 +213,7 @@ export default function AdminOrdersPage() {
       console.error('Status update failed:', err);
       setOrders(previousOrders);
       setError('Failed to update order status. Please try again.');
+      toast.error('Failed to update order status');
     } finally {
       setUpdatingId(null);
     }
@@ -284,6 +290,13 @@ export default function AdminOrdersPage() {
       o.customer_name.toLowerCase().includes(archiveSearch.toLowerCase());
     return matchStatus && matchSearch;
   });
+
+  const activeKey = `${filterStatus}|${search}`;
+  const activeFiltering = useFilterLoading(activeKey);
+  const activePager = usePagination(filteredActive, 10, activeKey);
+  const archiveKey = `${archiveFilterStatus}|${archiveSearch}`;
+  const archiveFiltering = useFilterLoading(archiveKey);
+  const archivePager = usePagination(filteredArchive, 10, archiveKey);
 
   const activeStatuses: OrderStatus[] = ['Pending', 'Confirmed', 'Preparing', 'Ready', 'Shipped'];
 
@@ -505,13 +518,15 @@ export default function AdminOrdersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredActive.map((order, i) => (
+                  {activeFiltering ? (
+                    <tr><td colSpan={8} className="p-0"><TableLoadingRows /></td></tr>
+                  ) : activePager.pageItems.map((order, i) => (
                     <tr
                       key={order.id}
                       className="transition-colors hover:bg-white/5"
                       style={{
                         borderBottom:
-                          i < filteredActive.length - 1 ? '1px solid var(--admin-border)' : 'none',
+                          i < activePager.pageItems.length - 1 ? '1px solid var(--admin-border)' : 'none',
                       }}
                     >
                       <td
@@ -632,7 +647,7 @@ export default function AdminOrdersPage() {
                       </td>
                     </tr>
                   ))}
-                  {filteredActive.length === 0 && (
+                  {!activeFiltering && filteredActive.length === 0 && (
                     <tr>
                       <td
                         colSpan={8}
@@ -647,6 +662,7 @@ export default function AdminOrdersPage() {
                   )}
                 </tbody>
               </table>
+              <TablePagination page={activePager.page} totalPages={activePager.totalPages} total={activePager.total} pageSize={activePager.pageSize} onPageChange={activePager.setPage} />
             </div>
           )}
         </div>
@@ -788,13 +804,15 @@ export default function AdminOrdersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredArchive.map((order, i) => (
+                    {archiveFiltering ? (
+                      <tr><td colSpan={8} className="p-0"><TableLoadingRows /></td></tr>
+                    ) : archivePager.pageItems.map((order, i) => (
                       <tr
                         key={order.id}
                         className="transition-colors hover:bg-white/5"
                         style={{
                           borderBottom:
-                            i < filteredArchive.length - 1
+                            i < archivePager.pageItems.length - 1
                               ? '1px solid var(--admin-border)'
                               : 'none',
                         }}
@@ -890,7 +908,7 @@ export default function AdminOrdersPage() {
                         </td>
                       </tr>
                     ))}
-                    {filteredArchive.length === 0 && (
+                    {!archiveFiltering && filteredArchive.length === 0 && (
                       <tr>
                         <td
                           colSpan={8}
@@ -903,6 +921,7 @@ export default function AdminOrdersPage() {
                     )}
                   </tbody>
                 </table>
+                <TablePagination page={archivePager.page} totalPages={archivePager.totalPages} total={archivePager.total} pageSize={archivePager.pageSize} onPageChange={archivePager.setPage} />
               </div>
             </div>
 
