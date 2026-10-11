@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { darkButton, darkEmailLayout, escapeHtml, getSiteUrl } from '@/lib/emailTemplates';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -7,72 +8,37 @@ export async function POST(request: Request) {
   try {
     const { orderId, customerName, total, items } = await request.json();
 
-    // Palitan ito ng iyong tamang production domain kapag naka-deploy na (hal. https://yourdomain.com)
-    const adminUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const siteUrl = getSiteUrl(new URL(request.url).origin);
+    const adminUrl = `${siteUrl}/admin-signin?next=/admin-orders`;
+
+    const row = (label: string, value: string, valueStyle = '') => `
+      <tr>
+        <td style="padding:8px 0;color:#c8a99a;width:130px;vertical-align:top;">${label}</td>
+        <td style="padding:8px 0;color:#f5ede0;${valueStyle}">${value}</td>
+      </tr>`;
 
     const data = await resend.emails.send({
-      from: 'Feast & Fête <orders@feastandfete.shop>',
+      from: 'Feast & F?te <orders@feastandfete.shop>',
       to: ['johnpauladrianemanuel@gmail.com'],
       subject: `New Order Received! #${orderId}`,
-      html: `
-        <div style="font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb; padding: 30px; color: #1f2937;">
-          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-            
-            <!-- Header -->
-            <div style="background: linear-gradient(135deg, #e11d48, #be123c); padding: 24px 30px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px;">Feast & Fête</h1>
-              <p style="color: #fecdd3; margin: 5px 0 0 0; font-size: 13px;">New Order Notification</p>
-            </div>
-
-            <!-- Body Content -->
-            <div style="padding: 30px;">
-              <h2 style="color: #111827; font-size: 18px; margin-top: 0; margin-bottom: 20px; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px;">
-                🎉 May Bagong Order!
-              </h2>
-
-              <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 140px;"><strong>Order ID:</strong></td>
-                  <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600;">${orderId}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px;"><strong>Customer:</strong></td>
-                  <td style="padding: 8px 0; color: #111827; font-size: 14px;">${customerName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px; vertical-align: top;"><strong>Mga Inorder:</strong></td>
-                  <td style="padding: 8px 0; color: #111827; font-size: 14px; line-height: 1.5;">${items}</td>
-                </tr>
-              </table>
-
-              <!-- Total Box -->
-              <div style="background-color: #fdf2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                <span style="color: #991b1b; font-size: 14px; font-weight: 600;">Kabuuang Bayarin:</span>
-                <span style="color: #e11d48; font-size: 20px; font-weight: 700;">₱${total}</span>
-              </div>
-
-              <!-- Action Button -->
-              <div style="text-align: center; margin-bottom: 25px;">
-                <a href="${adminUrl}/admin" target="_blank" style="background-color: #e11d48; color: #ffffff; padding: 12px 28px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-block; box-shadow: 0 2px 4px rgba(225, 29, 72, 0.3);">
-                  Tignan sa Admin Panel
-                </a>
-              </div>
-
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-              
-              <p style="font-size: 12px; color: #6b7280; line-height: 1.5; margin: 0; text-align: center;">
-                Pakitingnan ang iyong Supabase dashboard para sa kumpletong detalye ng delivery at customer.
-              </p>
-            </div>
-
-            <!-- Footer -->
-            <div style="background-color: #f9fafb; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb;">
-              <p style="font-size: 11px; color: #9ca3af; margin: 0;">Automated notification from Feast & Fête System</p>
-            </div>
-
+      html: darkEmailLayout({
+        siteUrl,
+        subtitle: 'New Order Notification',
+        content: `
+          <h2 style="margin:0 0 16px;font-size:18px;color:#f59e0b;">You have a new order!</h2>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+            ${row('Order ID:', escapeHtml(orderId), 'font-weight:bold;')}
+            ${row('Customer:', escapeHtml(customerName))}
+            ${row('Items:', escapeHtml(items))}
+          </table>
+          <div style="background:#1b110e;border:1px solid #5a3a22;border-radius:12px;padding:14px 18px;margin-bottom:24px;">
+            <span style="color:#c8a99a;">Total Amount:</span>
+            <span style="float:right;color:#f59e0b;font-size:20px;font-weight:bold;">PHP ${escapeHtml(total)}</span>
           </div>
-        </div>
-      `,
+          <p style="text-align:center;margin:0 0 8px;">${darkButton(adminUrl, 'View in Admin Panel')}</p>
+          <p style="color:#8a7266;font-size:11px;text-align:center;margin:12px 0 0;">You will be asked to sign in as an admin first.</p>
+        `,
+      }),
     });
 
     return NextResponse.json({ success: true, data });

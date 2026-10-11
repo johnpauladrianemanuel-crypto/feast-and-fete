@@ -196,11 +196,13 @@ export default function CustomerReviewPaymentContent() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsError, setTermsError] = useState('');
+  const [termsScrolledToEnd, setTermsScrolledToEnd] = useState(false);
   const profileContactFieldsLocked = Boolean(user && !user.is_guest && savedAddress);
 
   useEffect(() => {
     if (!showTermsModal) return;
 
+    setTermsScrolledToEnd(agreedToTerms);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
@@ -904,8 +906,8 @@ export default function CustomerReviewPaymentContent() {
 
   async function executeOrder() {
     const reference = paymentReference.trim();
-    if (!reference) {
-      setPaymentReferenceError('Enter the GCash reference number to continue.');
+    if (!/^\d{13}$/.test(reference)) {
+      setPaymentReferenceError('The GCash reference number must be exactly 13 digits.');
       return;
     }
 
@@ -1689,23 +1691,25 @@ export default function CustomerReviewPaymentContent() {
       </div>
 
       {/* GCash Deposit QR Code Modal */}
-      {showQRModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto p-6 text-center shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-bold text-foreground mb-1">Pay 50% Deposit via GCash</h3>
-            <p className="text-xs text-muted-foreground mb-4">
+      {showQRModal &&
+        typeof document !== 'undefined' &&
+        createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2">
+          <div className="bg-card border border-border rounded-2xl max-w-sm w-full max-h-[calc(100dvh-1rem)] overflow-y-auto p-3 sm:p-4 text-center shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-foreground mb-1">Pay 50% Deposit via GCash</h3>
+            <p className="text-xs text-muted-foreground mb-2">
               Scan the QR code using your GCash app and pay{' '}
               <span className="font-bold text-primary">₱{depositAmount.toLocaleString()}</span>
               of ₱{total.toLocaleString()} total.
             </p>
 
-            <div className="bg-[#005ce6] p-4 rounded-xl mb-4 flex flex-col items-center justify-center">
+            <div className="bg-[#005ce6] p-2 rounded-xl mb-3 flex flex-col items-center justify-center">
               <AppImage
                 src="/assets/images/image15.jpg"
                 alt="GCash QR Code"
                 width={240}
                 height={320}
-                className="w-full max-w-[220px] rounded-lg bg-white p-1 object-contain"
+                className="w-auto max-w-[220px] max-h-[30dvh] rounded-lg bg-white p-1 object-contain"
               />
             </div>
 
@@ -1719,15 +1723,18 @@ export default function CustomerReviewPaymentContent() {
               id="payment-reference"
               name="paymentReference"
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]{13}"
+              maxLength={13}
               required
               autoComplete="off"
               value={paymentReference}
               onChange={(event) => {
-                setPaymentReference(event.target.value);
+                setPaymentReference(event.target.value.replace(/\D/g, '').slice(0, 13));
                 setPaymentReferenceError('');
                 setPlaceError('');
               }}
-              placeholder="Enter the reference number from GCash"
+              placeholder="13-digit reference number"
               className="mb-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"
               aria-invalid={Boolean(paymentReferenceError)}
               aria-describedby={paymentReferenceError ? 'payment-reference-error' : undefined}
@@ -1755,7 +1762,7 @@ export default function CustomerReviewPaymentContent() {
               <button
                 type="button"
                 onClick={executeOrder}
-                disabled={placing || !paymentReference.trim()}
+                disabled={placing || !/^\d{13}$/.test(paymentReference)}
                 className="w-1/2 py-3 rounded-xl gradient-brand text-primary-foreground text-sm font-bold btn-3d transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {placing ? (
@@ -1783,7 +1790,8 @@ export default function CustomerReviewPaymentContent() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* TERMS AND CONDITIONS MODAL */}
@@ -1803,7 +1811,15 @@ export default function CustomerReviewPaymentContent() {
                 </button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-muted/5 p-4 mb-3 sm:mb-4">
+              <div
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 8) {
+                    setTermsScrolledToEnd(true);
+                  }
+                }}
+                className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-muted/5 p-4 mb-3 sm:mb-4"
+              >
                 <article className="space-y-5 text-sm leading-relaxed text-foreground">
                   <div>
                     <h4 className="font-display text-xl font-bold">Feast &amp; Fête</h4>
@@ -1831,9 +1847,12 @@ export default function CustomerReviewPaymentContent() {
               </div>
 
               <div className="mb-3 shrink-0 rounded-xl border border-border bg-muted/30 p-3 sm:mb-5">
-                <label className="flex items-start gap-2.5 cursor-pointer">
+                <label
+                  className={`flex items-start gap-2.5 ${termsScrolledToEnd ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                >
                   <input
                     type="checkbox"
+                    disabled={!termsScrolledToEnd}
                     checked={agreedToTerms}
                     onChange={(e) => {
                       setAgreedToTerms(e.target.checked);
@@ -1846,6 +1865,11 @@ export default function CustomerReviewPaymentContent() {
                     Policy of Feast & Fête.
                   </span>
                 </label>
+                {!termsScrolledToEnd && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Scroll down and read the whole Terms and Conditions to enable this checkbox.
+                  </p>
+                )}
               </div>
 
               <div className="flex shrink-0 justify-end gap-2 sm:gap-3">
@@ -1858,14 +1882,12 @@ export default function CustomerReviewPaymentContent() {
                 </button>
                 <button
                   type="button"
+                  disabled={!agreedToTerms}
                   onClick={() => {
-                    if (!agreedToTerms) {
-                      setAgreedToTerms(true);
-                    }
                     setTermsError('');
                     setShowTermsModal(false);
                   }}
-                  className="px-6 py-2.5 rounded-xl gradient-brand text-primary-foreground text-sm font-bold btn-3d transition-all"
+                  className="px-6 py-2.5 rounded-xl gradient-brand disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground text-sm font-bold btn-3d transition-all"
                 >
                   Confirm & Proceed
                 </button>

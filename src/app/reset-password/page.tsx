@@ -6,6 +6,39 @@ import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
 import { toast } from 'sonner';
 
+const BG_IMAGES = [
+  'https://img.rocket.new/generatedImages/rocket_gen_img_15b5bd873-1765211057457.png',
+  'https://img.rocket.new/generatedImages/rocket_gen_img_14a51a9d3-1772868034765.png',
+  'https://img.rocket.new/generatedImages/rocket_gen_img_1c8439ecd-1771179335894.png',
+];
+
+function GlassBackdrop({ children }: { children: React.ReactNode }) {
+  const [bgIndex, setBgIndex] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setBgIndex((i) => (i + 1) % BG_IMAGES.length), 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="relative min-h-screen flex flex-col items-center justify-center bg-[#1b110e] p-4 overflow-hidden">
+      {BG_IMAGES.map((src, i) => (
+        <div
+          key={src}
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center transition-opacity duration-[1500ms] ease-in-out"
+          style={{ backgroundImage: `url(${src})`, opacity: i === bgIndex ? 1 : 0 }}
+        />
+      ))}
+      <div className="absolute inset-0 bg-black/55" aria-hidden="true" />
+      <div className="relative w-full max-w-md flex flex-col items-center gap-4">
+        <img src="/assets/images/Logo123.png" alt="Feast & F?te logo" className="w-20 h-20 object-contain" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -114,11 +147,11 @@ function ResetPasswordForm() {
 
   if (!isSessionValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md text-center space-y-4 shadow-xl">
+      <GlassBackdrop>
+        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 w-full max-w-md text-center space-y-4 shadow-2xl text-white">
           <Icon name="ExclamationCircleIcon" size={40} className="text-error mx-auto" />
-          <h2 className="text-xl font-bold text-foreground">Invalid or Expired Link</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-bold text-white">Invalid or Expired Link</h2>
+          <p className="text-sm text-white/70">
             The password reset link is invalid or has expired. Please request a new link.
           </p>
           {verificationError && (
@@ -133,23 +166,23 @@ function ResetPasswordForm() {
             Back to Sign In
           </button>
         </div>
-      </div>
+      </GlassBackdrop>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
+    <GlassBackdrop>
+      <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl text-white">
         <div className="text-center space-y-1">
-          <h2 className="text-2xl font-bold text-foreground">Set New Password</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="text-2xl font-bold text-white">Set New Password</h2>
+          <p className="text-xs text-white/70">
             Your email is verified. Enter your new password below.
           </p>
         </div>
 
         <form onSubmit={handleUpdatePassword} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-foreground">New Password</label>
+            <label className="block text-xs font-semibold text-white">New Password</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -163,7 +196,7 @@ function ResetPasswordForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70"
               >
                 <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
               </button>
@@ -171,7 +204,7 @@ function ResetPasswordForm() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-foreground">
+            <label className="block text-xs font-semibold text-white">
               Confirm New Password
             </label>
             <input
@@ -198,7 +231,7 @@ function ResetPasswordForm() {
           </button>
         </form>
       </div>
-    </div>
+    </GlassBackdrop>
   );
 }
 

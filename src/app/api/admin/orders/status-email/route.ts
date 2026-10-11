@@ -4,19 +4,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { getOrderStatusLabel } from '@/lib/orderWorkflow';
 import { createGuestLinkToken } from '@/lib/guestLink';
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => {
-    const entities: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    };
-    return entities[character];
-  });
-}
+import { darkButton, darkEmailLayout, escapeHtml, formatPeso, orderSlipHtml } from '@/lib/emailTemplates';
 
 export async function POST(request: Request) {
   try {
@@ -82,7 +70,7 @@ export async function POST(request: Request) {
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(
-        'order_number, customer_name, customer_email, customer_phone, guest_profile_id, status, delivery_method, payment_method, subtotal, delivery_fee, total_amount, notes, order_items(menu_item_name, quantity, unit_price, subtotal)'
+        'order_number, created_at, event_date, delivery_address, customer_name, customer_email, customer_phone, guest_profile_id, status, delivery_method, payment_method, subtotal, delivery_fee, total_amount, notes, order_items(menu_item_name, quantity, unit_price, subtotal)'
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -161,75 +149,41 @@ export async function POST(request: Request) {
     const status = escapeHtml(getOrderStatusLabel(order.delivery_method, order.status));
     const cancellationNote =
       order.status === 'Cancelled' && order.notes
-        ? `<p style="margin:16px 0;color:#6b7280;"><strong>Note:</strong> ${escapeHtml(order.notes)}</p>`
-        : '';
-
-    const formatPeso = (value: unknown) =>
-      `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
-
-    const orderItems = Array.isArray(order.order_items) ? order.order_items : [];
-    const receiptSection =
-      order.status === 'Confirmed'
-        ? `
-          <h3 style="margin:28px 0 8px;color:#29211d;">Order List &amp; Receipt</h3>
-          <table style="width:100%;border-collapse:collapse;font-size:14px;">
-            <thead>
-              <tr style="background:#f9f5f3;text-align:left;">
-                <th style="padding:8px;border-bottom:1px solid #e5e7eb;">Item</th>
-                <th style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">Qty</th>
-                <th style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">Price</th>
-                <th style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${orderItems
-                .map(
-                  (item) => `
-              <tr>
-                <td style="padding:8px;border-bottom:1px solid #f3f4f6;">${escapeHtml(String(item.menu_item_name))}</td>
-                <td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:center;">${Number(item.quantity)}</td>
-                <td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatPeso(item.unit_price)}</td>
-                <td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatPeso(item.subtotal)}</td>
-              </tr>`
-                )
-                .join('')}
-            </tbody>
-          </table>
-          <table style="width:100%;margin-top:12px;font-size:14px;">
-            <tr><td style="text-align:right;color:#6b7280;">Subtotal</td><td style="text-align:right;width:120px;">${formatPeso(order.subtotal)}</td></tr>
-            <tr><td style="text-align:right;color:#6b7280;">Delivery Fee</td><td style="text-align:right;">${formatPeso(order.delivery_fee)}</td></tr>
-            <tr><td style="text-align:right;font-weight:bold;">Total</td><td style="text-align:right;font-weight:bold;color:#8B1E2D;">${formatPeso(order.total_amount)}</td></tr>
-          </table>
-          <p style="color:#6b7280;font-size:13px;">Payment method: ${escapeHtml(String(order.payment_method || 'N/A'))} &bull; ${escapeHtml(String(order.delivery_method || ''))}</p>`
+        ? `<p style="margin:16px 0;color:#c8a99a;"><strong>Note:</strong> ${escapeHtml(order.notes)}</p>`
         : '';
 
     const resend = new Resend(process.env.RESEND_API_KEY);
+    const sender = fromEmail || 'Feast & F?te <orders@feastandfete.shop>';
     const { data, error } = await resend.emails.send({
-      from: fromEmail || 'Feast & Fête <orders@feastandfete.shop>',
+      from: sender,
       to: [order.customer_email],
-      subject:
-        order.status === 'Confirmed'
-          ? `Order #${order.order_number} confirmed — your receipt`
-          : `Order #${order.order_number} update: ${order.status}`,
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:28px;color:#29211d;">
-          <h1 style="color:#8B1E2D;">Feast &amp; Fête</h1>
-          <p>Hi ${customerName},</p>
-          <p>The status of your order <strong>#${orderNumber}</strong> has been updated to:</p>
-          <p style="font-size:22px;font-weight:bold;color:#8B1E2D;">${status}</p>
+      subject: `Order #${order.order_number} update: ${order.status}`,
+      html: darkEmailLayout({
+        siteUrl: baseUrl,
+        subtitle: 'Order Status Update',
+        content: `
+          <p style="margin:0 0 12px;">Hi ${customerName},</p>
+          <p style="margin:0 0 8px;">The status of your order <strong>#${orderNumber}</strong> has been updated to:</p>
+          <p style="font-size:24px;font-weight:bold;color:#f59e0b;margin:8px 0 16px;">${status}</p>
           ${cancellationNote}
-          ${receiptSection}
-          <p>You can open the button below to view your latest order status:</p>
-          <p style="margin:28px 0;">
-            <a href="${trackingUrl}" style="background:#8B1E2D;color:#fff;padding:13px 22px;border-radius:8px;text-decoration:none;font-weight:bold;">
-              View Order Status
-            </a>
-          </p>
-          <p style="color:#6b7280;font-size:13px;">Order total: ₱${Number(order.total_amount || 0).toLocaleString('en-PH')}</p>
-          <p style="color:#9ca3af;font-size:12px;">If the button does not work, copy this link into your browser: ${trackingUrl}</p>
-        </div>
-      `,
+          <p style="margin:0 0 20px;">Tap the button below to view your latest order status.</p>
+          <p style="margin:0 0 24px;text-align:center;">${darkButton(trackingUrl, 'View Order Status')}</p>
+          <p style="color:#c8a99a;font-size:13px;margin:0;">Order total: ${formatPeso(order.total_amount)}</p>
+          <p style="color:#8a7266;font-size:11px;margin:12px 0 0;word-break:break-all;">If the button does not work, copy this link into your browser: ${trackingUrl}</p>
+        `,
+      }),
     });
+
+    // The receipt is sent as its own email once the order is confirmed.
+    if (!error && order.status === 'Confirmed') {
+      const { error: receiptError } = await resend.emails.send({
+        from: sender,
+        to: [order.customer_email],
+        subject: `Order Slip ? Order #${order.order_number}`,
+        html: orderSlipHtml(order, baseUrl),
+      });
+      if (receiptError) console.error('Resend failed to send order slip:', receiptError);
+    }
 
     if (error) {
       console.error('Resend failed to send order status email:', error);
