@@ -151,6 +151,24 @@ function CustomerProfileContent() {
     if (!user) return;
     const fetchProfile = async () => {
       setProfileLoading(true);
+      if (user.is_guest) {
+        const gAddress = localStorage.getItem('guestAddress') || '';
+        const parts = gAddress.split(',').map((s: string) => s.trim());
+        setForm((current) => ({
+          ...current,
+          full_name: localStorage.getItem('guestFullName') || '',
+          phone:
+            localStorage.getItem('guestPhone') ||
+            (user.guestContactType === 'phone' ? user.guestContactValue || '' : ''),
+          street: parts[0] || '',
+          barangay: parts[1] || '',
+          city: parts[2] || '',
+          region: parts[3] || 'NCR',
+        }));
+        if (gAddress) setSavedAddresses([gAddress]);
+        setProfileLoading(false);
+        return;
+      }
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -235,10 +253,16 @@ function CustomerProfileContent() {
     if (!user) return;
     const fetchOrders = async () => {
       setOrdersLoading(true);
+      const ownerColumn = user.is_guest ? 'guest_profile_id' : 'user_id';
+      const ownerId = user.is_guest ? user.guestProfileId : user.id;
+      if (!ownerId) {
+        setOrdersLoading(false);
+        return;
+      }
       const { data } = await supabase
         .from('orders')
         .select('id, order_number, status, total_amount, created_at, delivery_method')
-        .eq('user_id', user.id)
+        .eq(ownerColumn, ownerId)
         .order('created_at', { ascending: false })
         .limit(3);
       if (data) {
@@ -247,7 +271,7 @@ function CustomerProfileContent() {
       const { data: allOrders } = await supabase
         .from('orders')
         .select('status, total_amount')
-        .eq('user_id', user.id);
+        .eq(ownerColumn, ownerId);
       if (allOrders) {
         const completed = allOrders.filter(o => o.status === 'Completed').length;
         const pending = allOrders.filter(o => !['Completed', 'Cancelled'].includes(o.status)).length;
@@ -336,7 +360,7 @@ function CustomerProfileContent() {
     }
 
     const email = user.email || user.user_metadata?.email || profile?.email;
-    if (!email) {
+    if (!email && !user.is_guest) {
       setUploadError('Your account email is missing. Please sign in again and retry.');
       return;
     }
@@ -344,6 +368,17 @@ function CustomerProfileContent() {
     setSaving(true);
     setUploadError(null);
     const fullAddress = `${street}, ${form.barangay}, ${form.city}, ${form.region}`;
+
+    if (user.is_guest) {
+      localStorage.setItem('guestFullName', fullName);
+      localStorage.setItem('guestPhone', phone);
+      localStorage.setItem('guestAddress', fullAddress);
+      setSavedAddresses([fullAddress]);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      setSaving(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -405,6 +440,12 @@ function CustomerProfileContent() {
     const newAddr = `${newAddressForm.street}, ${newAddressForm.barangay}, ${newAddressForm.city}, ${newAddressForm.region}`;
     const updatedAddresses = [...savedAddresses, newAddr];
     setSavedAddresses(updatedAddresses);
+
+    if (user.is_guest) {
+      setShowAddAddressModal(false);
+      setNewAddressForm({ region: 'NCR', city: '', barangay: '', street: '' });
+      return;
+    }
 
     await supabase
       .from('user_profiles')
@@ -473,10 +514,11 @@ function CustomerProfileContent() {
 
           <div className="flex-1 text-center sm:text-left">
             <h2 className="text-xl font-bold text-foreground mb-1">{form.full_name || 'Your Name'}</h2>
-            <p className="text-sm text-muted-foreground mb-2">{user?.email}</p>
+            <p className="text-sm text-muted-foreground mb-2">{user?.email || (user?.is_guest ? 'Guest account' : '')}</p>
           </div>
         </div>
 
+        {!user.is_guest && (
         <section className="bg-card border border-border rounded-2xl p-6 mb-6">
           <h3 className="text-base font-bold text-foreground mb-2">Change Password</h3>
           <p className="text-sm text-muted-foreground mb-4">
@@ -497,6 +539,7 @@ function CustomerProfileContent() {
             {sendingPasswordLink ? 'Sending verification email…' : 'Email Me a Password Change Link'}
           </button>
         </section>
+        )}
 
         {/* Profile Form */}
         <div className="bg-card border border-border rounded-2xl p-6 mb-6">
