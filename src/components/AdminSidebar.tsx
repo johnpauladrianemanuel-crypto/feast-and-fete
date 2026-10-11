@@ -63,7 +63,13 @@ export default function AdminSidebar() {
           error: authError,
         } = await supabase.auth.getUser();
 
-        if (authError) throw authError;
+        if (authError) {
+          if (authError.name === 'AuthSessionMissingError') {
+            if (isCurrent) setAdminEmail(null);
+            return;
+          }
+          throw authError;
+        }
         if (!signedInUser) {
           if (isCurrent) setAdminEmail(null);
           return;

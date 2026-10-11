@@ -6,6 +6,7 @@ import { MenuItem } from '@/lib/supabase/services';
 import { useCart } from '@/lib/cartContext';
 import { toast } from 'sonner';
 import { MenuItemRatingSummary } from '@/lib/supabase/services';
+import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { getMenuItemUnitLabel } from '@/lib/menuItemUnit';
 
@@ -64,6 +65,7 @@ function StarDisplay({ rating, count }: { rating: number; count: number }) {
 
 export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail }: Props) {
   const { addItem, openCart } = useCart();
+  const { user: authUser } = useAuth();
   const [addedPulse, setAddedPulse] = useState(false);
   const [visible, setVisible] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -106,10 +108,14 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
       return;
     }
 
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    let hasSession = !!authUser;
+    if (!hasSession) {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      hasSession = !!user;
+    }
 
-    if (!user) {
+    if (!hasSession) {
       toast.error('Login Required', {
         description: 'Please log in first to add items to your cart.',
       });

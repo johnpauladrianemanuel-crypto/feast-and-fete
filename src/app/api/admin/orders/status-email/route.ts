@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { getOrderStatusLabel } from '@/lib/orderWorkflow';
+import { createGuestLinkToken } from '@/lib/guestLink';
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => {
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(
-        'order_number, customer_name, customer_email, status, delivery_method, payment_method, subtotal, delivery_fee, total_amount, notes, order_items(menu_item_name, quantity, unit_price, subtotal)'
+        'order_number, customer_name, customer_email, customer_phone, guest_profile_id, status, delivery_method, payment_method, subtotal, delivery_fee, total_amount, notes, order_items(menu_item_name, quantity, unit_price, subtotal)'
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -93,18 +94,68 @@ export async function POST(request: Request) {
     if (!order) {
       return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
     }
-    if (!order.customer_email) {
-      return NextResponse.json(
-        { error: 'The order has no customer email address.' },
-        { status: 400 }
-      );
-    }
 
     const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin).replace(
       /\/+$/,
       ''
     );
-    const trackingUrl = `${baseUrl}/order-status?order=${encodeURIComponent(order.order_number)}`;
+    const baseTrackingUrl = `${baseUrl}/order-status?order=${encodeURIComponent(order.order_number)}`;
+    const guestToken = order.guest_profile_id ? createGuestLinkToken(order.guest_profile_id) : null;
+    const trackingUrl = guestToken ? `${baseTrackingUrl}&g=${guestToken}` : baseTrackingUrl;
+    const smsTrackingUrl = trackingUrl;
+
+    // Guests who signed in with a phone number get the update by SMS.
+    let smsSent = false;
+    let smsError: string | null = null;
+    if (order.guest_profile_id && process.env.SEMAPHORE_API_KEY) {
+      const { data: guest } = await supabase
+        .from('guest_profiles')
+        .select('contact_type, contact_value')
+        .eq('id', order.guest_profile_id)
+        .maybeSingle();
+      if (guest?.contact_type === 'phone') {
+        let number = String(guest.contact_value || order.customer_phone || '').replace(/\D/g, '');
+        if (number.startsWith('63')) number = `0${number.slice(2)}`;
+        else if (number.length === 10 && number.startsWith('9')) number = `0${number}`;
+        if (number) {
+          const label = getOrderStatusLabel(order.delivery_method, order.status);
+          const body = new URLSearchParams({
+            apikey: process.env.SEMAPHORE_API_KEY,
+            number,
+            message: `Feast & Fete: Order #${order.order_number} is now ${label}. Track your order: ${smsTrackingUrl}`,
+          });
+          if (process.env.SEMAPHORE_SENDER_NAME) {
+            body.set('sendername', process.env.SEMAPHORE_SENDER_NAME);
+          }
+          try {
+            const smsResp = await fetch('https://api.semaphore.co/api/v4/messages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body,
+            });
+            const smsResult = await smsResp.json().catch(() => null);
+            if (smsResp.ok && Array.isArray(smsResult)) {
+              smsSent = true;
+            } else {
+              smsError = `SMS could not be sent: ${JSON.stringify(smsResult)}`;
+              console.error('Semaphore order SMS failed:', smsResp.status, smsResult);
+            }
+          } catch (smsErr) {
+            smsError = 'SMS service could not be reached.';
+            console.error('Semaphore order SMS error:', smsErr);
+          }
+        }
+      }
+    }
+
+    if (!order.customer_email) {
+      if (smsSent) return NextResponse.json({ success: true, sms: true });
+      return NextResponse.json(
+        { error: smsError || 'The order has no customer email address.' },
+        { status: smsError ? 502 : 400 }
+      );
+    }
+
     const customerName = escapeHtml(order.customer_name || 'Customer');
     const orderNumber = escapeHtml(order.order_number);
     const status = escapeHtml(getOrderStatusLabel(order.delivery_method, order.status));
@@ -190,7 +241,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, emailId: data?.id });
+    return NextResponse.json({ success: true, emailId: data?.id, sms: smsSent });
   } catch (error) {
     console.error('Unexpected order status email error:', error);
     return NextResponse.json(

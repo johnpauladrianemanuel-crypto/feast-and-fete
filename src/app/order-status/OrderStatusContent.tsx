@@ -399,9 +399,40 @@ function StageCard({ order }: { order: Order }) {
 }
 
 export default function OrderStatusContent() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signInAsGuest } = useAuth();
   const supabase = createClient();
 
+  // Auto sign-in for guests who open the tracking link from their SMS.
+  useEffect(() => {
+    if (authLoading || user) return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('g');
+    if (!token) return;
+    fetch('/api/guest-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((guest) => {
+        if (!guest) return;
+        if (guest.fullName) localStorage.setItem('guestFullName', guest.fullName);
+        if (guest.phone) localStorage.setItem('guestPhone', guest.phone);
+        if (guest.address) {
+          localStorage.setItem(
+            'guestAddress',
+            typeof guest.address === 'string' ? guest.address : JSON.stringify(guest.address)
+          );
+        }
+        signInAsGuest({
+          id: guest.id,
+          contactType: guest.contactType,
+          contactValue: guest.contactValue,
+        });
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [myOrdersLoading, setMyOrdersLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -442,10 +473,14 @@ export default function OrderStatusContent() {
     if (!user) return;
     setMyOrdersLoading(true);
     try {
+      const isGuestUser = !!user.is_guest;
+      const guestProfileId = isGuestUser
+        ? user.id.replace(/^guest:/, '') || localStorage.getItem('guestProfileId') || ''
+        : '';
       const { data, error } = await supabase
         .from('orders')
         .select('*, order_items(*)')
-        .eq('user_id', user.id)
+        .eq(isGuestUser ? 'guest_profile_id' : 'user_id', isGuestUser ? guestProfileId : user.id)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
