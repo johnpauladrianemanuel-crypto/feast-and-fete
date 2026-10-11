@@ -158,9 +158,15 @@ export default function OrderDetailModal({
 
       setEmailStatus('sending');
       try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         const response = await fetch('/api/admin/orders/status-email', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
           body: JSON.stringify({ orderId: order.id }),
         });
         if (response.ok) {

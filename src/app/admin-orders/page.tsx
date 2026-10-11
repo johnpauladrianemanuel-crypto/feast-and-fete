@@ -183,9 +183,15 @@ export default function AdminOrdersPage() {
       }
 
       try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         const emailResponse = await fetch('/api/admin/orders/status-email', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
           body: JSON.stringify({ orderId }),
         });
         if (!emailResponse.ok) {
