@@ -6,8 +6,14 @@ import CustomerNavbar from '@/components/CustomerNavbar';
 import CartDrawer from '@/components/CartDrawer';
 import Icon from '@/components/ui/AppIcon';
 import { useCart } from '@/lib/cartContext';
+import { useDeliveryFee } from '@/lib/deliveryFee';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  PICKUP_ADDRESS,
+  PICKUP_GOOGLE_MAPS_URL,
+  PICKUP_WAZE_URL,
+} from '@/lib/pickupLocation';
 
 type DeliveryMethod = 'delivery' | 'pickup';
 type PaymentMethod = 'cash_on_delivery' | 'card' | 'bank_transfer';
@@ -98,7 +104,12 @@ export default function CheckoutContent() {
   const [paymentReview, setPaymentReview] = useState<PaymentReviewData | null>(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
 
-  const deliveryFee = deliveryMethod === 'delivery' ? 150 : 0;
+  const quote = useDeliveryFee(
+    deliveryMethod === 'delivery' && Boolean(form.address.trim() && form.city.trim()),
+    [form.address, form.city].filter(Boolean).join(', ')
+  );
+  const deliveryFee = deliveryMethod === 'delivery' ? (quote.fee ?? 0) : 0;
+  const deliveryFeePending = deliveryMethod === 'delivery' && quote.fee === null;
   const total = totalAmount + deliveryFee;
 
   // Load guest profile from localStorage
@@ -178,12 +189,13 @@ export default function CheckoutContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
+    if (deliveryFeePending) return;
     setSubmitError('');
 
     // Show payment review before creating the order
     const deliveryAddress = deliveryMethod === 'delivery'
       ? `${form.address}${form.city ? ', ' + form.city : ''}`
-      : 'Pickup at Feast & Fête Kitchen';
+      : PICKUP_ADDRESS;
 
     setPaymentReview({
       form,
@@ -483,7 +495,20 @@ export default function CheckoutContent() {
               {paymentReview.deliveryMethod === 'pickup' && (
                 <div className="flex items-start gap-2.5">
                   <Icon name="BuildingStorefrontIcon" size={15} className="text-primary mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-foreground">Pickup at Feast & Fête Kitchen</span>
+                  <div className="text-sm text-foreground">
+                    <p>Pickup at {PICKUP_ADDRESS}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      You can search or pin this address in Google Maps or Waze.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs font-semibold text-primary">
+                      <a href={PICKUP_GOOGLE_MAPS_URL} target="_blank" rel="noopener noreferrer">
+                        Google Maps
+                      </a>
+                      <a href={PICKUP_WAZE_URL} target="_blank" rel="noopener noreferrer">
+                        Waze
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
               {formattedDate && (
@@ -772,7 +797,7 @@ export default function CheckoutContent() {
                   >
                     <Icon name="TruckIcon" size={24} className={deliveryMethod === 'delivery' ? 'text-primary' : 'text-muted-foreground'} />
                     <span className={`text-sm font-semibold ${deliveryMethod === 'delivery' ? 'text-primary' : 'text-foreground'}`}>Delivery</span>
-                    <span className="text-xs text-muted-foreground">+₱150 fee</span>
+                    <span className="text-xs text-muted-foreground">Fee based on distance</span>
                   </button>
                   <button
                     type="button"
@@ -787,8 +812,30 @@ export default function CheckoutContent() {
                   </button>
                 </div>
                 {deliveryMethod === 'pickup' && (
-                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-                    <strong>Pickup address:</strong> 12 Mariposa St., Quezon City, Metro Manila. Please bring your order ID.
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p className="font-semibold">Pickup location</p>
+                    <p className="mt-1">{PICKUP_ADDRESS}</p>
+                    <p className="mt-1 text-xs">
+                      You can search or pin this address in Google Maps or Waze. Please bring your order ID.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={PICKUP_GOOGLE_MAPS_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                      >
+                        Open in Google Maps
+                      </a>
+                      <a
+                        href={PICKUP_WAZE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                      >
+                        Open in Waze
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1005,7 +1052,7 @@ export default function CheckoutContent() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Delivery fee</span>
-                    <span className="font-medium text-foreground tabular-nums">{deliveryFee === 0 ? 'Free' : `₱${deliveryFee}`}</span>
+                    <span className="font-medium text-foreground tabular-nums">{deliveryFeePending ? (quote.loading ? 'Calculating…' : 'Enter address') : deliveryFee === 0 ? 'Free' : `₱${deliveryFee}`}</span>
                   </div>
                   <div className="border-t border-border pt-2 flex justify-between">
                     <span className="font-semibold text-foreground">Total</span>

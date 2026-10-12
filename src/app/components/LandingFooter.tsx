@@ -6,6 +6,7 @@ import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { PICKUP_ADDRESS, PICKUP_GOOGLE_MAPS_URL, PICKUP_WAZE_URL } from '@/lib/pickupLocation';
 
 export default function LandingFooter() {
   const { user, loading } = useAuth();
@@ -145,6 +146,30 @@ export default function LandingFooter() {
                 <li className="flex items-start gap-2">
                   <Icon name="MapPinIcon" size={13} className="text-secondary mt-0.5 flex-shrink-0" />
                   <span className="text-sm text-white/40">Pick-up: 9 AM – 5 PM</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Icon name="MapPinIcon" size={13} className="text-secondary mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-white/40">
+                    {PICKUP_ADDRESS}
+                    <span className="mt-1 flex gap-3">
+                      <a
+                        href={PICKUP_GOOGLE_MAPS_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-secondary hover:text-white transition-colors"
+                      >
+                        Google Maps
+                      </a>
+                      <a
+                        href={PICKUP_WAZE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-secondary hover:text-white transition-colors"
+                      >
+                        Waze
+                      </a>
+                    </span>
+                  </span>
                 </li>
               </ul>
             </div>

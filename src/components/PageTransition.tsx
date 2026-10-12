@@ -4,15 +4,9 @@ import { usePathname } from 'next/navigation';
 
 export default function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [phase, setPhase] = useState<'enter' | 'exit' | 'idle'>('enter');
+  const [phase, setPhase] = useState<'enter' | 'exit' | 'idle'>('idle');
   const [displayChildren, setDisplayChildren] = useState(children);
   const prevPathname = useRef(pathname);
-
-  // First mount — slide in from below
-  useEffect(() => {
-    const t = setTimeout(() => setPhase('idle'), 420);
-    return () => clearTimeout(t);
-  }, []);
 
   // Route change — exit → swap → enter
   useEffect(() => {

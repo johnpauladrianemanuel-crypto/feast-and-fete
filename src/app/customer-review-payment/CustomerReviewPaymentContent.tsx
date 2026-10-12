@@ -8,14 +8,20 @@ import CartDrawer from '@/components/CartDrawer';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
 import { useCart } from '@/lib/cartContext';
+import { useDeliveryFee } from '@/lib/deliveryFee';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import {
+  PICKUP_ADDRESS,
+  PICKUP_GOOGLE_MAPS_URL,
+  PICKUP_WAZE_URL,
+} from '@/lib/pickupLocation';
 
 type PaymentMethod = 'cash_on_delivery' | 'gcash';
 type DeliveryMethod = 'delivery' | 'pickup';
 type OrderType = 'normal' | 'priority';
 
-const PRIORITY_FEE = 500;
+const PRIORITY_FEE = 250;
 
 interface AddressForm {
   fullName: string;
@@ -211,7 +217,13 @@ export default function CustomerReviewPaymentContent() {
     };
   }, [showTermsModal]);
 
-  const deliveryFee = deliveryMethod === 'delivery' ? 150 : 0;
+  const quote = useDeliveryFee(
+    deliveryMethod === 'delivery' &&
+      Boolean(form.street.trim() && form.barangay?.trim() && form.city.trim() && form.region?.trim()),
+    [form.street, form.barangay, form.city, form.region].filter(Boolean).join(', ')
+  );
+  const deliveryFee = deliveryMethod === 'delivery' ? (quote.fee ?? 0) : 0;
+  const deliveryFeePending = deliveryMethod === 'delivery' && quote.fee === null;
   const priorityFee = orderType === 'priority' ? PRIORITY_FEE : 0;
   const total = totalAmount + deliveryFee + priorityFee;
   const depositAmount = Number((total * 0.5).toFixed(2));
@@ -899,6 +911,10 @@ export default function CustomerReviewPaymentContent() {
   function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
+    if (deliveryFeePending) {
+      setPlaceError('Please wait for the delivery fee to be calculated from your address.');
+      return;
+    }
 
     setPlaceError('');
     setShowQRModal(true);
@@ -918,7 +934,7 @@ export default function CustomerReviewPaymentContent() {
     const deliveryAddress =
       deliveryMethod === 'delivery'
         ? `${form.street}${form.barangay ? ', ' + form.barangay : ''}${form.city ? ', ' + form.city : ''}${form.region ? ', ' + form.region : ''}`
-        : 'Pickup at Feast & Fête Kitchen';
+        : PICKUP_ADDRESS;
 
     const orderId = `FF-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 9999)
       .toString()
@@ -1196,12 +1212,40 @@ export default function CustomerReviewPaymentContent() {
                           {method === 'delivery' ? 'Delivery' : 'Pickup'}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {method === 'delivery' ? '+₱150 fee' : 'Free · At our kitchen'}
+                          {method === 'delivery' ? 'Fee based on distance' : 'Free · At our kitchen'}
                         </p>
                       </div>
                     </button>
                   ))}
                 </div>
+
+                {deliveryMethod === 'pickup' && (
+                  <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p className="font-semibold">Pickup location</p>
+                    <p className="mt-1">{PICKUP_ADDRESS}</p>
+                    <p className="mt-1 text-xs">
+                      You can search or pin this address in Google Maps or Waze.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={PICKUP_GOOGLE_MAPS_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                      >
+                        Open in Google Maps
+                      </a>
+                      <a
+                        href={PICKUP_WAZE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                      >
+                        Open in Waze
+                      </a>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1586,9 +1630,24 @@ export default function CustomerReviewPaymentContent() {
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Delivery fee</span>
+                    <span className="text-muted-foreground">
+                      Delivery fee
+                      {deliveryMethod === 'delivery' && (
+                        <span className="block text-xs">
+                          {quote.loading
+                            ? 'Calculating distance…'
+                            : quote.distanceKm !== null
+                              ? `≈ ${quote.distanceKm.toFixed(1)} km from our kitchen`
+                              : 'Enter your full address for an exact fee'}
+                        </span>
+                      )}
+                    </span>
                     <span className="text-foreground tabular-nums">
-                      {deliveryFee === 0 ? (
+                      {deliveryFeePending ? (
+                        <span className="text-muted-foreground">
+                          {quote.loading ? 'Calculating…' : 'Enter address'}
+                        </span>
+                      ) : deliveryFee === 0 ? (
                         <span className="text-green-600 font-medium">Free</span>
                       ) : (
                         `₱${deliveryFee}`

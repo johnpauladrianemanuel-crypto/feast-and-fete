@@ -417,10 +417,59 @@ export default function AdminMenuItemsPage() {
         setItems((prev) => [createdItem, ...prev]);
       }
 
+      let announcementWarning: string | null = null;
+      let announcementEmailCount: number | null = null;
+      if (data) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.access_token) {
+          announcementWarning = 'The item was saved, but notifications could not be sent because the admin session is missing.';
+        } else {
+          try {
+            const response = await fetch('/api/admin/menu-announcements', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ menuItemId: data.id }),
+            });
+            const result = (await response.json()) as {
+              warning?: string;
+              error?: string;
+              emailSent?: number;
+              emailFailed?: number;
+            };
+            announcementEmailCount = result.emailSent ?? null;
+
+            if (!response.ok) {
+              announcementWarning = result.error || 'The item was saved, but the announcement could not be sent.';
+            } else if (result.warning) {
+              announcementWarning = result.warning;
+            } else if (result.emailFailed) {
+              announcementWarning = `The in-app notice is live, but email could not be delivered to ${result.emailFailed} customer(s).`;
+            }
+          } catch (error) {
+            console.error('Menu item saved but announcement request failed:', error);
+            announcementWarning = 'The item was saved, but notifications could not be sent. Please check the server configuration.';
+          }
+        }
+      }
+
       setIsAddModalOpen(false);
       setNewItem(INITIAL_NEW_ITEM);
       setPhotoPreview('');
-      toast.success('Menu item added successfully');
+      if (announcementWarning) {
+        toast.warning(`Menu item added. ${announcementWarning}`);
+      } else {
+        toast.success(
+          announcementEmailCount === null
+            ? 'Menu item added and the in-app announcement is live.'
+            : `Menu item added, in-app announcement published, and email sent to ${announcementEmailCount} customer(s).`
+        );
+      }
     } catch (err) {
       const message =
         err instanceof Error

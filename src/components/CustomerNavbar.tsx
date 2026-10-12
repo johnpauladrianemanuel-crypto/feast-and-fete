@@ -14,13 +14,14 @@ type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Completed'
 
 interface CustomerNotification {
   id: string;
-  order_id: string;
-  order_number: string;
-  type: 'status_update' | 'order_placed' | 'order_ready' | 'order_completed' | 'order_cancelled';
+  order_id?: string;
+  order_number?: string;
+  type: 'status_update' | 'order_placed' | 'order_ready' | 'order_completed' | 'order_cancelled' | 'new_menu';
   title: string;
   message: string;
   read: boolean;
   created_at: string;
+  href?: string;
 }
 
 interface Order {
@@ -261,17 +262,48 @@ export default function CustomerNavbar() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('orders')
-      .select('id, order_number, status, total_amount, created_at, updated_at, notes')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    const [ordersResult, announcementsResult] = await Promise.all([
+      supabase
+        .from('orders')
+        .select('id, order_number, status, total_amount, created_at, updated_at, notes')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('menu_announcements')
+        .select('id, menu_item_name, message, created_at')
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ]);
 
-    if (!error && data) {
-      const built = buildNotificationsFromOrders(data as Order[]);
-      setNotifications(built);
-      setReadIds(getReadNotificationIds(user.id));
+    if (ordersResult.error) {
+      console.error('Unable to load customer order notifications:', ordersResult.error.message);
     }
+    if (announcementsResult.error) {
+      console.warn('Unable to load menu announcements:', announcementsResult.error.message);
+    }
+
+    const orderNotifications = ordersResult.data
+      ? buildNotificationsFromOrders(ordersResult.data as Order[])
+      : [];
+    const menuNotifications: CustomerNotification[] = (announcementsResult.data || []).map(
+      (announcement) => ({
+        id: `menu-${announcement.id}`,
+        type: 'new_menu',
+        title: 'New menu item added!',
+        message: announcement.message || `${announcement.menu_item_name} is now on the menu. Come and see!`,
+        read: false,
+        created_at: announcement.created_at,
+        href: '/menu-browse-screen',
+      })
+    );
+
+    setNotifications(
+      [...orderNotifications, ...menuNotifications].sort(
+        (first, second) =>
+          new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
+      )
+    );
+    setReadIds(getReadNotificationIds(user.id));
   }, [user, supabase]);
 
   useEffect(() => {
@@ -286,6 +318,13 @@ export default function CustomerNavbar() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
+        () => {
+          fetchOrdersAndNotifications();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'menu_announcements' },
         () => {
           fetchOrdersAndNotifications();
         }
@@ -443,7 +482,9 @@ export default function CustomerNavbar() {
                             (k) => STATUS_MESSAGES[k as OrderStatus].title === notif.title
                           ) as OrderStatus | undefined
                         );
-                        const style = statusKey
+                        const style = notif.type === 'new_menu'
+                          ? { icon: 'SparklesIcon', color: '#A94725', bg: 'rgba(169,71,37,0.12)' }
+                          : statusKey
                           ? STATUS_MESSAGES[statusKey]
                           : { icon: 'BellIcon', color: '#6B7280', bg: 'rgba(107,114,128,0.12)' };
 
@@ -482,14 +523,14 @@ export default function CustomerNavbar() {
                                   {timeAgo(notif.created_at)}
                                 </span>
                                 <Link
-                                  href="/order-status"
+                                  href={notif.href || '/order-status'}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setNotificationsOpen(false);
                                   }}
                                   className="text-[11px] text-primary font-medium hover:underline"
                                 >
-                                  View order →
+                                  {notif.type === 'new_menu' ? 'Explore menu →' : 'View order →'}
                                 </Link>
                               </div>
                             </div>

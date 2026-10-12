@@ -2,6 +2,11 @@ import React from 'react';
 import Link from 'next/link';
 import InfoPageLayout from '@/app/components/InfoPageLayout';
 import Icon from '@/components/ui/AppIcon';
+import {
+  PICKUP_ADDRESS,
+  PICKUP_GOOGLE_MAPS_URL,
+  PICKUP_WAZE_URL,
+} from '@/lib/pickupLocation';
 
 export default function ContactPage() {
   return (
@@ -37,9 +42,28 @@ export default function ContactPage() {
             <div>
               <h2 className="font-display text-lg font-bold text-foreground">Pickup information</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Pickup is at 12 Mariposa St., Quezon City, Metro Manila. Please bring your order ID.
+                Pickup is at {PICKUP_ADDRESS}. You can search or pin this address in Google Maps or Waze.
+                Please bring your order ID.
                 Your selected pickup or delivery details will also appear during checkout.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a
+                  href={PICKUP_GOOGLE_MAPS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/5"
+                >
+                  Open in Google Maps
+                </a>
+                <a
+                  href={PICKUP_WAZE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/5"
+                >
+                  Open in Waze
+                </a>
+              </div>
             </div>
           </div>
         </div>

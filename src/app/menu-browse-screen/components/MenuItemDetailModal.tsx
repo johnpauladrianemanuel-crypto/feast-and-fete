@@ -101,9 +101,16 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
     for (let i = 0; i < quantity; i++) addItem(item, customizationsToSave, orderNote);
     setAddedPulse(true);
     setTimeout(() => setAddedPulse(false), 800);
-    toast.success(`${quantity}× ${item.name} added!`, {
+    const toastId = toast.success(`${quantity}× ${item.name} added!`, {
       description: `₱${(item.price * quantity).toLocaleString()} total`,
-      action: { label: 'View Cart', onClick: openCart },
+      action: {
+        label: 'View Cart',
+        onClick: () => {
+          toast.dismiss(toastId);
+          onClose();
+          openCart();
+        },
+      },
     });
   }
 

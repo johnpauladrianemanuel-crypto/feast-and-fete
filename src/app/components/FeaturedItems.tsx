@@ -34,9 +34,15 @@ export default function FeaturedItems() {
     }
 
     addItem(item);
-    toast.success(`${item.name} added to cart!`, {
+    const toastId = toast.success(`${item.name} added to cart!`, {
       description: `₱${item.price.toLocaleString()} — ${item.servingSize}`,
-      action: { label: 'View Cart', onClick: openCart },
+      action: {
+        label: 'View Cart',
+        onClick: () => {
+          toast.dismiss(toastId);
+          openCart();
+        },
+      },
     });
   }
 

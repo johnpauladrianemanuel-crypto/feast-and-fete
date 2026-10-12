@@ -125,9 +125,15 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
     addItem(item);
     setAddedPulse(true);
     setTimeout(() => setAddedPulse(false), 700);
-    toast.success(`${item.name} added!`, {
+    const toastId = toast.success(`${item.name} added!`, {
       description: `₱${item.price.toLocaleString()} — ${item.servingSize}`,
-      action: { label: 'View Cart', onClick: openCart },
+      action: {
+        label: 'View Cart',
+        onClick: () => {
+          toast.dismiss(toastId);
+          openCart();
+        },
+      },
     });
   }
 

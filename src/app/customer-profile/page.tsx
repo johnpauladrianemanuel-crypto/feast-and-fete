@@ -403,8 +403,11 @@ function CustomerProfileContent() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
-      console.error('Failed to save customer profile:', error);
-      setUploadError('Unable to save your profile and default delivery address. Please try again.');
+      const detail = (error as { message?: string })?.message;
+      console.warn('Failed to save customer profile:', detail ?? error);
+      setUploadError(
+        `Unable to save your profile and default delivery address.${detail ? ` (${detail})` : ' Please try again.'}`
+      );
     } finally {
       setSaving(false);
     }
