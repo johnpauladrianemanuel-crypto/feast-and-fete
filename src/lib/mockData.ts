@@ -413,7 +413,7 @@ export const MENU_ITEMS: MenuItem[] = [
   description: 'Elbow macaroni in a sweet Filipino-style Bolognese topped with creamy béchamel sauce and baked until golden. Kids and adults love it equally. Ingredients: elbow macaroni, ground beef, tomato sauce, banana ketchup, cheddar cheese, milk, butter, flour, and onions.',
   price: 580,
   servingSize: 'Good for 10–12 persons',
-  image: '/assets/images/baked-macaroni.jpg',
+  image: '/assets/images/Food/Baked%20Macaroni%20Filipino-Style.jpg',
   imageAlt: 'Filipino-style baked macaroni with sweet meat sauce and golden creamy topping',
   isActive: true,
   stock: 18,

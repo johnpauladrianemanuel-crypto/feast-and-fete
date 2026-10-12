@@ -10,5 +10,5 @@ owner.
 - Salabat: Yvette Tan, [source](https://commons.wikimedia.org/wiki/File:Pampanga_Prado_Farm_-_Ginger_Tea,_Salabat.jpg), [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/).
 - Chopsuey: Ralff Nestor Nacor, [source](https://commons.wikimedia.org/wiki/File:Chopsuey_from_the_Philippines.jpg), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - Chicken Afritada: Image supplied by the project owner.
-- Baked Macaroni Filipino-Style: Roderick Suñaz Sumalinog, [source](https://commons.wikimedia.org/wiki/File:Bake_mac.jpg), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- Baked Macaroni Filipino-Style: Image supplied by the project owner.
 - Seafood Kare-Kare: author unidentified, [source](https://commons.wikimedia.org/wiki/File:Seafood_Kare_-_Kare.jpg), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

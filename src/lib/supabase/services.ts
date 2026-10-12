@@ -114,8 +114,8 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
       row.id === 'item-010' ||
       (row.id === 'item-024' &&
         (!databaseImage || databaseImage.includes('rocket.new/generatedImages'))) ||
-      ((row.id === 'item-015' || row.id === 'item-017') &&
-        !databaseImage?.startsWith('/assets/images/'))
+      row.id === 'item-017' ||
+      (row.id === 'item-015' && !databaseImage?.startsWith('/assets/images/'))
     );
   const useLocalServingSize =
     (row.id === 'item-025' && databaseServingSize === 'Per Bottle') ||
