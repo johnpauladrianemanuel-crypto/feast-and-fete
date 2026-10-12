@@ -7,6 +7,7 @@ import { useCart } from '@/lib/cartContext';
 import Icon from '@/components/ui/AppIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import { getCancellationReason } from '@/lib/orderWorkflow';
 
 type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled';
 
@@ -28,6 +29,7 @@ interface Order {
   total_amount: number;
   created_at: string;
   updated_at: string;
+  notes: string | null;
 }
 
 const STATUS_MESSAGES: Record<OrderStatus, { title: string; message: (orderNum: string) => string; icon: string; color: string; bg: string }> = {
@@ -95,14 +97,18 @@ function buildNotificationsFromOrders(orders: Order[]): CustomerNotification[] {
     const statusesToNotify: OrderStatus[] = ['Confirmed', 'Preparing', 'Ready', 'Completed', 'Cancelled'];
     if (statusesToNotify.includes(order.status)) {
       const info = STATUS_MESSAGES[order.status];
+      const cancellationReason =
+        order.status === 'Cancelled' ? getCancellationReason(order.notes) : undefined;
       notifications.push({
         id: `status-${order.id}-${order.status}`,
         order_id: order.id,
         order_number: order.order_number,
         type: 'status_update',
         title: info.title,
-        message: info.message(order.order_number),
-        read: ['Completed', 'Cancelled'].includes(order.status),
+        message: `${info.message(order.order_number)}${
+          cancellationReason ? ` Cancellation reason: ${cancellationReason}` : ''
+        }`,
+        read: order.status === 'Completed',
         created_at: order.updated_at,
       });
     }
@@ -242,7 +248,7 @@ export default function CustomerNavbar() {
 
     const { data, error } = await supabase
       .from('orders')
-      .select('id, order_number, status, total_amount, created_at, updated_at')
+      .select('id, order_number, status, total_amount, created_at, updated_at, notes')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 

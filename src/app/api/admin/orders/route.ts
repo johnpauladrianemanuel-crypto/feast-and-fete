@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { appendCancellationReason, getAvailableOrderStatuses } from '@/lib/orderWorkflow';
 
 export const revalidate = 0; // Disable caching for live badge updates
+
+const ORDER_STATUSES = [
+  'Pending',
+  'Confirmed',
+  'Preparing',
+  'Ready',
+  'Shipped',
+  'Completed',
+  'Cancelled',
+];
 
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -47,8 +58,40 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const { orderId, status, reason } = body;
 
-    if (!orderId || !status) {
+    if (!orderId || typeof status !== 'string' || !status) {
       return NextResponse.json({ error: 'Missing orderId or status' }, { status: 400 });
+    }
+
+    const { data: currentOrder, error: currentOrderError } = await supabase
+      .from('orders')
+      .select('status, delivery_method, notes')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (currentOrderError) {
+      console.error('Supabase order lookup error:', currentOrderError);
+      return NextResponse.json({ error: currentOrderError.message }, { status: 500 });
+    }
+    if (!currentOrder) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    const allowedStatuses = getAvailableOrderStatuses(
+      currentOrder.delivery_method,
+      currentOrder.status,
+      ORDER_STATUSES
+    );
+    if (!allowedStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: `Cannot change order status from ${currentOrder.status} to ${status}` },
+        { status: 409 }
+      );
+    }
+    if (status === 'Cancelled' && (typeof reason !== 'string' || !reason.trim())) {
+      return NextResponse.json(
+        { error: 'A cancellation reason is required' },
+        { status: 400 }
+      );
     }
 
     const updatePayload: Record<string, any> = {
@@ -56,8 +99,8 @@ export async function PATCH(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    if (status === 'Cancelled' && reason) {
-      updatePayload.notes = `[Cancellation Reason]: ${reason}`;
+    if (status === 'Cancelled' && typeof reason === 'string' && reason.trim()) {
+      updatePayload.notes = appendCancellationReason(currentOrder.notes, reason);
     }
 
     const { data, error } = await supabase

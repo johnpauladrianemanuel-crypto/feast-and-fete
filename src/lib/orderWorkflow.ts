@@ -2,6 +2,30 @@ export type DeliveryMethod = 'delivery' | 'pickup';
 
 export const PICKUP_ORDER_STATUSES: string[] = ['Pending', 'Confirmed', 'Preparing', 'Ready'];
 
+const DELIVERY_ORDER_STATUSES = [
+  'Pending',
+  'Confirmed',
+  'Preparing',
+  'Ready',
+  'Shipped',
+  'Completed',
+];
+
+const TERMINAL_ORDER_STATUSES = ['Completed', 'Cancelled'];
+
+export function appendCancellationReason(notes: string | null, reason: string): string {
+  const existingNotes = notes?.trim();
+  const cancellationNote = `[Cancellation Reason]: ${reason.trim()}`;
+  return existingNotes ? `${existingNotes}\n\n${cancellationNote}` : cancellationNote;
+}
+
+export function getCancellationReason(notes: string | null): string | undefined {
+  if (!notes) return undefined;
+
+  const match = notes.match(/(?:^|\n)(?:\[Cancellation Reason\]:|Cancelled:)\s*([\s\S]*)$/i);
+  return match?.[1].trim() || undefined;
+}
+
 const NEXT_ORDER_STATUS: Record<string, string> = {
   Pending: 'Confirmed',
   Confirmed: 'Preparing',
@@ -40,16 +64,29 @@ export function getAvailableOrderStatuses(
   currentStatus: string,
   allStatuses: readonly string[]
 ): string[] {
-  if (deliveryMethod !== 'pickup') return [...allStatuses];
+  if (TERMINAL_ORDER_STATUSES.includes(currentStatus)) return [currentStatus];
 
-  const nextStatus = getNextOrderStatus(deliveryMethod, currentStatus);
-  const correctedLegacyStatus = currentStatus.toLowerCase() === 'shipped' ? ['Ready'] : [];
-  return Array.from(
-    new Set([
-      currentStatus,
-      ...correctedLegacyStatus,
-      ...(nextStatus ? [nextStatus] : []),
-      'Cancelled',
-    ])
-  );
+  if (deliveryMethod === 'pickup') {
+    const nextStatus = getNextOrderStatus(deliveryMethod, currentStatus);
+    const correctedLegacyStatus = currentStatus.toLowerCase() === 'shipped' ? ['Ready'] : [];
+    return Array.from(
+      new Set([
+        currentStatus,
+        ...correctedLegacyStatus,
+        ...(nextStatus ? [nextStatus] : []),
+        'Cancelled',
+      ])
+    );
+  }
+
+  const currentIndex = DELIVERY_ORDER_STATUSES.indexOf(currentStatus);
+  if (currentIndex === -1) return [currentStatus, 'Cancelled'];
+
+  return [
+    ...allStatuses.filter((status) => {
+      const statusIndex = DELIVERY_ORDER_STATUSES.indexOf(status);
+      return statusIndex >= currentIndex;
+    }),
+    'Cancelled',
+  ];
 }

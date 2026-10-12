@@ -7,6 +7,7 @@ import Icon from '@/components/ui/AppIcon';
 import { toast } from 'sonner';
 import TablePagination, { usePagination, useFilterLoading, TableLoadingRows } from '@/components/admin/TablePagination';
 import { createClient } from '@/lib/supabase/client';
+import { appendCancellationReason } from '@/lib/orderWorkflow';
 import {
   getAvailableOrderStatuses,
   getNextOrderStatus,
@@ -140,7 +141,7 @@ export default function AdminOrdersPage() {
           ? {
               ...o,
               status: newStatus,
-              notes: reason ? `Cancelled: ${reason}` : o.notes,
+              notes: reason ? appendCancellationReason(o.notes, reason) : o.notes,
             }
           : o
       )
@@ -165,7 +166,8 @@ export default function AdminOrdersPage() {
       };
 
       if (reason) {
-        updatePayload.notes = `Cancelled: ${reason}`;
+        const order = previousOrders.find((item) => item.id === orderId);
+        updatePayload.notes = appendCancellationReason(order?.notes ?? null, reason);
       }
 
       const { error: updateError } = await supabase
@@ -226,7 +228,7 @@ export default function AdminOrdersPage() {
           ? {
               ...order,
               status: newStatus,
-              notes: reason ? `Cancelled: ${reason}` : order.notes,
+              notes: reason ? appendCancellationReason(order.notes, reason) : order.notes,
             }
           : order
       )
@@ -236,7 +238,7 @@ export default function AdminOrdersPage() {
         ? {
             ...prev,
             status: newStatus,
-            notes: reason ? `Cancelled: ${reason}` : prev.notes,
+            notes: reason ? appendCancellationReason(prev.notes, reason) : prev.notes,
           }
         : prev
     );
@@ -244,7 +246,7 @@ export default function AdminOrdersPage() {
 
   const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
     const order = orders.find((item) => item.id === orderId);
-    if (order?.status === newStatus) return;
+    if (!order || !getAvailableStatuses(order).includes(newStatus)) return;
 
     if (newStatus === 'Confirmed') {
       setPaymentVerified(false);
@@ -894,7 +896,7 @@ export default function AdminOrdersPage() {
                                 background: 'var(--admin-surface)',
                               }}
                             >
-                              {ALL_STATUSES.map((status) => (
+                              {getAvailableStatuses(order).map((status) => (
                                 <option
                                   key={status}
                                   value={status}

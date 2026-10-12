@@ -8,7 +8,11 @@ import Icon from '@/components/ui/AppIcon';
 import ReviewModal from '@/app/components/ReviewModal';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { getOrderStatusLabel, getOrderWorkflowStatus } from '@/lib/orderWorkflow';
+import {
+  appendCancellationReason,
+  getOrderStatusLabel,
+  getOrderWorkflowStatus,
+} from '@/lib/orderWorkflow';
 import { toast } from 'sonner';
 
 type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled' | string;
@@ -446,6 +450,8 @@ export default function OrderStatusContent() {
   const [mounted, setMounted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
+  const [cancellationReason, setCancellationReason] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -523,19 +529,32 @@ export default function OrderStatusContent() {
     if (user) fetchMyOrders();
   }, [user, fetchMyOrders]);
 
-  const handleCancelOrder = async (order: Order) => {
+  const handleCancelOrder = (order: Order) => {
     if (!user || normalizeStatus(order.status) !== 'pending') return;
-    if (!window.confirm(`Cancel order ${order.order_number}? This cannot be undone.`)) return;
+
+    setCancelOrder(order);
+    setCancellationReason('');
+  };
+
+  const confirmCancelOrder = async () => {
+    const reason = cancellationReason.trim();
+    if (!user || !cancelOrder || !reason) return;
+
+    const order = cancelOrder;
 
     setCancellingOrderId(order.id);
     try {
       const { data, error } = await supabase
         .from('orders')
-        .update({ status: 'Cancelled', updated_at: new Date().toISOString() })
+        .update({
+          status: 'Cancelled',
+          notes: appendCancellationReason(order.notes, reason),
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', order.id)
         .eq('user_id', user.id)
         .eq('status', 'Pending')
-        .select('id, status, updated_at')
+        .select('id, status, updated_at, notes')
         .maybeSingle();
 
       if (error) {
@@ -546,14 +565,18 @@ export default function OrderStatusContent() {
 
       if (!data) {
         toast.error('The order status changed before cancellation. Refreshing its latest status.');
+        setCancelOrder(null);
         await fetchMyOrders();
         return;
       }
 
       const cancelledOrder = { ...order, ...data };
       setSelectedOrder(cancelledOrder);
-      setMyOrders(prev => prev.map(item => item.id === order.id ? cancelledOrder : item));
-      toast.success('Your order has been cancelled.');
+      setMyOrders((prev) =>
+        prev.map((item) => (item.id === order.id ? cancelledOrder : item))
+      );
+      setCancelOrder(null);
+      toast.success('Your order has been cancelled. The reason was saved and added to notifications.');
     } catch (error) {
       console.error('Failed to cancel order:', error);
       toast.error('Unable to cancel your order. Please try again.');
@@ -790,6 +813,64 @@ export default function OrderStatusContent() {
           </div>
         )}
       </div>
+
+      {cancelOrder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="customer-cancel-title"
+            aria-describedby="customer-cancel-description"
+          >
+            <div className="flex items-center gap-3">
+              <Icon name="ExclamationTriangleIcon" size={24} className="text-red-600" />
+              <h2 id="customer-cancel-title" className="text-lg font-bold text-foreground">
+                Cancel Order
+              </h2>
+            </div>
+            <p id="customer-cancel-description" className="mt-3 text-sm text-muted-foreground">
+              Cancel order <strong className="text-foreground">{cancelOrder.order_number}</strong>?
+              This cannot be undone. Please provide a reason; it will be saved with the order and
+              shown in your cancellation notification.
+            </p>
+            <label
+              htmlFor="customer-cancellation-reason"
+              className="mt-4 block text-sm font-semibold text-foreground"
+            >
+              Cancellation reason
+            </label>
+            <textarea
+              id="customer-cancellation-reason"
+              autoFocus
+              value={cancellationReason}
+              onChange={(event) => setCancellationReason(event.target.value)}
+              placeholder="Tell us why you are cancelling..."
+              maxLength={500}
+              rows={4}
+              className="mt-2 w-full resize-none rounded-xl border border-border bg-background p-3 text-sm text-foreground outline-none focus:border-primary"
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelOrder(null)}
+                disabled={cancellingOrderId === cancelOrder.id}
+                className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmCancelOrder()}
+                disabled={!cancellationReason.trim() || cancellingOrderId === cancelOrder.id}
+                className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {cancellingOrderId === cancelOrder.id ? 'Cancelling...' : 'Confirm Cancellation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

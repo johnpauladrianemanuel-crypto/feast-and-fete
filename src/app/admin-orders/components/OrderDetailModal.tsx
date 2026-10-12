@@ -4,7 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '@/components/ui/AppIcon';
 import { createClient } from '@/lib/supabase/client';
-import { getAvailableOrderStatuses, getOrderStatusLabel } from '@/lib/orderWorkflow';
+import {
+  appendCancellationReason,
+  getAvailableOrderStatuses,
+  getOrderStatusLabel,
+} from '@/lib/orderWorkflow';
 
 export type OrderStatus =
   | 'Pending'
@@ -114,7 +118,7 @@ export default function OrderDetailModal({
   if (!mounted || !order) return null;
 
   const handleStatusChange = async (newStatus: OrderStatus) => {
-    if (newStatus === currentStatus) return;
+    if (!getAvailableStatuses({ ...order, status: currentStatus }).includes(newStatus)) return;
 
     if (newStatus === 'Confirmed') {
       setPaymentVerified(false);
@@ -126,7 +130,7 @@ export default function OrderDetailModal({
   };
 
   const updateOrderStatus = async (newStatus: OrderStatus) => {
-    if (newStatus === currentStatus) return;
+    if (!getAvailableStatuses({ ...order, status: currentStatus }).includes(newStatus)) return;
 
     const cancellationReason =
       newStatus === 'Cancelled'
@@ -145,7 +149,9 @@ export default function OrderDetailModal({
         .update({
           status: newStatus,
           updated_at: new Date().toISOString(),
-          ...(cancellationReason ? { notes: `Cancelled: ${cancellationReason}` } : {}),
+          ...(cancellationReason
+            ? { notes: appendCancellationReason(order.notes, cancellationReason) }
+            : {}),
         })
         .eq('id', order.id);
 
