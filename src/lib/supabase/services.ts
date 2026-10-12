@@ -111,8 +111,7 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
     (
       (localMenuItem?.categorySlug === 'drinks' &&
         (!databaseImage || databaseImage.includes('rocket.new/generatedImages'))) ||
-      (row.id === 'item-010' &&
-        (!databaseImage || databaseImage.includes('Chicken_Afritada'))) ||
+      row.id === 'item-010' ||
       (row.id === 'item-024' &&
         (!databaseImage || databaseImage.includes('rocket.new/generatedImages'))) ||
       ((row.id === 'item-015' || row.id === 'item-017') &&

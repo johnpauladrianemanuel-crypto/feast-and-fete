@@ -308,7 +308,7 @@ export const MENU_ITEMS: MenuItem[] = [
   description: 'Chicken pieces braised in a vibrant tomato-based sauce with potatoes, carrots, bell peppers, and green peas. A Filipino household staple. Ingredients: chicken, tomato sauce, potatoes, carrots, bell peppers, green peas, garlic, onion, and spices.',
   price: 620,
   servingSize: 'Good for 8–10 persons',
-  image: '/assets/images/chicken-afritada.jpg',
+  image: '/assets/images/Food/chiken%20afritada.webp',
   imageAlt: 'Chicken afritada with chicken pieces, potatoes, and carrots in tomato sauce',
   isActive: true,
   stock: 22,
