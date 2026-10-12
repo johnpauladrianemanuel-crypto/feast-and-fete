@@ -109,13 +109,9 @@ function rowToMenuItem(row: Record<string, unknown>): MenuItem {
   const databaseServingSize = (row.serving_size as string) || (row.servingSize as string) || '';
   const useLocalMenuImage =
     (
-      (localMenuItem?.categorySlug === 'drinks' &&
-        (!databaseImage || databaseImage.includes('rocket.new/generatedImages'))) ||
-      row.id === 'item-010' ||
-      (row.id === 'item-024' &&
-        (!databaseImage || databaseImage.includes('rocket.new/generatedImages'))) ||
-      row.id === 'item-017' ||
-      (row.id === 'item-015' && !databaseImage?.startsWith('/assets/images/'))
+      ['item-010', 'item-015', 'item-017', 'item-024', 'item-026', 'item-027', 'item-028'].includes(
+        String(row.id)
+      )
     );
   const useLocalServingSize =
     (row.id === 'item-025' && databaseServingSize === 'Per Bottle') ||
