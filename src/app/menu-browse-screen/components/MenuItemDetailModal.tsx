@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
@@ -60,6 +60,34 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
   const [addedPulse, setAddedPulse] = useState(false);
   const [visible, setVisible] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ top: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const update = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      if (scrollHeight <= clientHeight + 1) {
+        setThumb(null);
+        return;
+      }
+      const trackPad = 16;
+      const track = clientHeight - trackPad * 2;
+      const height = Math.max(36, (clientHeight / scrollHeight) * track);
+      const top = trackPad + (scrollTop / (scrollHeight - clientHeight)) * (track - height);
+      setThumb({ top, height });
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => {
+      el.removeEventListener('scroll', update);
+      observer.disconnect();
+    };
+  }, [item.id]);
   const [orderNote, setOrderNote] = useState('');
   const [selectedCustomizations, setSelectedCustomizations] = useState<Record<string, string>>(() => {
     const defaults: Record<string, string> = {};
@@ -135,7 +163,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
         </div>
 
         {/* Scrollable Container */}
-        <div className="overflow-y-auto w-full bg-white">
+        <div ref={scrollRef} className="overflow-y-auto w-full bg-white modal-scroll">
           
           {/* Header Image Area */}
           <div className="relative w-full h-[240px] sm:h-[290px] bg-white flex-shrink-0">
@@ -319,6 +347,13 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
             </div>
           </div>
         </div>
+        {thumb && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute right-1 w-1.5 rounded-full bg-[#7B1C2E]/45"
+            style={{ top: thumb.top, height: thumb.height }}
+          />
+        )}
       </div>
     </div>
   );

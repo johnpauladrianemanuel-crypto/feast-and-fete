@@ -9,9 +9,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { getCancellationReason } from '@/lib/orderWorkflow';
 
-type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled';
+export type OrderStatus = 'Pending' | 'Confirmed' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled';
 
-interface CustomerNotification {
+export interface CustomerNotification {
   id: string;
   order_id?: string;
   order_number?: string;
@@ -23,7 +23,7 @@ interface CustomerNotification {
   href?: string;
 }
 
-interface Order {
+export interface Order {
   id: string;
   order_number: string;
   status: OrderStatus;
@@ -33,7 +33,7 @@ interface Order {
   notes: string | null;
 }
 
-const STATUS_MESSAGES: Record<OrderStatus, { title: string; message: (orderNum: string) => string; icon: string; color: string; bg: string }> = {
+export const STATUS_MESSAGES: Record<OrderStatus, { title: string; message: (orderNum: string) => string; icon: string; color: string; bg: string }> = {
   Pending: {
     title: 'Order Received',
     message: (n) => `Your order ${n} has been received and is being reviewed.`,
@@ -78,7 +78,7 @@ const STATUS_MESSAGES: Record<OrderStatus, { title: string; message: (orderNum: 
   },
 };
 
-function buildNotificationsFromOrders(orders: Order[]): CustomerNotification[] {
+export function buildNotificationsFromOrders(orders: Order[]): CustomerNotification[] {
   const notifications: CustomerNotification[] = [];
 
   orders.forEach((order) => {
@@ -120,7 +120,7 @@ function buildNotificationsFromOrders(orders: Order[]): CustomerNotification[] {
   );
 }
 
-function timeAgo(dateStr: string): string {
+export function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'Just now';

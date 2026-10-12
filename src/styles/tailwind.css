@@ -418,6 +418,22 @@ body:has(aside [href="/admin-dashboard"]) option[style] {
     border-radius: 4px;
   }
 
+  .modal-scroll,
+  .no-scrollbar,
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar,
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .modal-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
   .cart-drawer-enter {
     transform: translateX(100%);
   }
