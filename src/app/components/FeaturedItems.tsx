@@ -8,10 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchFeaturedMenuItems, MenuItem } from '@/lib/supabase/services';
 import Icon from '@/components/ui/AppIcon';
 import { toast } from 'sonner';
+import { customerMenuPrice } from '@/lib/vouchers';
 
 export default function FeaturedItems() {
   const { addItem, openCart } = useCart();
   const { user, loading: authLoading } = useAuth();
+  const isCustomer = Boolean(user && !user.is_guest);
   const router = useRouter();
   const [featured, setFeatured] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function FeaturedItems() {
 
     addItem(item);
     const toastId = toast.success(`${item.name} added to cart!`, {
-      description: `₱${item.price.toLocaleString()} — ${item.servingSize}`,
+      description: `₱${customerMenuPrice(item.price, isCustomer).toLocaleString()} — ${item.servingSize}`,
       action: {
         label: 'View Cart',
         onClick: () => {
@@ -127,8 +129,9 @@ export default function FeaturedItems() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-display text-3xl font-black text-primary tabular-nums">₱{hero.price.toLocaleString()}</span>
+                    <span className="font-display text-3xl font-black text-primary tabular-nums">₱{customerMenuPrice(hero.price, isCustomer).toLocaleString()}</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">{hero.servingSize}</span>
+                    {isCustomer && <div className="text-xs text-green-700">20% off · <span className="line-through">₱{hero.price.toLocaleString()}</span></div>}
                   </div>
                   <button
                     onClick={() => handleAdd(hero)}
@@ -166,7 +169,10 @@ export default function FeaturedItems() {
                     <h3 className="font-display text-sm font-bold text-gray-900 mt-0.5 leading-snug line-clamp-2">{item.name}</h3>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="font-display text-lg font-black text-primary tabular-nums">₱{item.price.toLocaleString()}</span>
+                    <div>
+                      <span className="font-display text-lg font-black text-primary tabular-nums">₱{customerMenuPrice(item.price, isCustomer).toLocaleString()}</span>
+                      {isCustomer && <div className="text-xs text-green-700">20% off · <span className="line-through">₱{item.price.toLocaleString()}</span></div>}
+                    </div>
                     <button
                       onClick={() => handleAdd(item)}
                       className="feat-v2-small-add w-8 h-8 rounded-xl flex items-center justify-center"

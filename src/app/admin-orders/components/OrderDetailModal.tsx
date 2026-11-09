@@ -45,6 +45,8 @@ export interface Order {
   deposit_amount?: number | null;
   subtotal: number;
   delivery_fee: number;
+  voucher_code?: string | null;
+  discount_amount?: number;
   total_amount: number;
   is_priority: boolean;
   priority_fee: number;
@@ -382,6 +384,12 @@ export default function OrderDetailModal({
                 <div className="flex justify-between text-amber-700">
                   <span>Priority Order Fee</span>
                   <span>₱{Number(order.priority_fee).toLocaleString()}</span>
+                </div>
+              )}
+              {Number(order.discount_amount) > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <span>{order.voucher_code ? `Voucher ${order.voucher_code}` : 'Customer discount (20% off menu)'}</span>
+                  <span>−₱{Number(order.discount_amount).toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border mt-2">

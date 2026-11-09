@@ -9,6 +9,7 @@ import { MenuItemRatingSummary } from '@/lib/supabase/services';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { getMenuItemUnitLabel } from '@/lib/menuItemUnit';
+import { customerMenuPrice } from '@/lib/vouchers';
 
 interface Props {
   item: MenuItem;
@@ -66,6 +67,8 @@ function StarDisplay({ rating, count }: { rating: number; count: number }) {
 export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail }: Props) {
   const { addItem, openCart } = useCart();
   const { user: authUser } = useAuth();
+  const isCustomer = Boolean(authUser && !authUser.is_guest);
+  const displayPrice = customerMenuPrice(item.price, isCustomer);
   const [addedPulse, setAddedPulse] = useState(false);
   const [visible, setVisible] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -126,7 +129,7 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
     setAddedPulse(true);
     setTimeout(() => setAddedPulse(false), 700);
     const toastId = toast.success(`${item.name} added!`, {
-      description: `₱${item.price.toLocaleString()} — ${item.servingSize}`,
+      description: `₱${displayPrice.toLocaleString()} — ${item.servingSize}`,
       action: {
         label: 'View Cart',
         onClick: () => {
@@ -315,11 +318,16 @@ export default function MenuItemCard({ item, index, ratingSummary, onOpenDetail 
         <div className="flex items-center justify-between pt-2 border-t border-border/40">
           <div>
             <span className={`font-display text-lg md:text-xl font-bold tabular-nums ${isInactive ? 'text-stone-500' : 'text-primary'}`}>
-              ₱{item.price.toLocaleString()}
+              ₱{displayPrice.toLocaleString()}
             </span>
             <span className="text-[11px] text-muted-foreground ml-0.5">
               / {getMenuItemUnitLabel(item)}
             </span>
+            {isCustomer && (
+              <div className="text-xs text-green-700">
+                20% off · <span className="line-through">₱{item.price.toLocaleString()}</span>
+              </div>
+            )}
           </div>
           <button
             onClick={handleAdd}

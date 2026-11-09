@@ -23,6 +23,8 @@ interface OrderData {
   total: number;
   orderType?: 'normal' | 'priority';
   priorityFee?: number;
+  voucherCode?: string | null;
+  discount?: number;
   isGuest?: boolean;
   guestProfileId?: string | null;
 }
@@ -248,6 +250,18 @@ export default function OrderConfirmationContent() {
               <span className="text-muted-foreground">Delivery fee</span>
               <span className="text-foreground tabular-nums">{order.deliveryFee === 0 ? 'Free' : `₱${order.deliveryFee}`}</span>
             </div>
+            {Boolean(order.priorityFee) && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Priority fee</span>
+                <span>₱{order.priorityFee?.toLocaleString()}</span>
+              </div>
+            )}
+            {Boolean(order.discount) && (
+              <div className="flex justify-between text-sm text-green-700">
+                <span>{order.voucherCode ? `Voucher ${order.voucherCode}` : 'Customer discount (20% off menu)'}</span>
+                <span>−₱{order.discount?.toLocaleString()}</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold text-base pt-2 border-t border-border">
               <span className="text-foreground">Total Paid</span>
               <span className="text-primary tabular-nums">₱{order.total.toLocaleString()}</span>

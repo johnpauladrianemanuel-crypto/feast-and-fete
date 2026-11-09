@@ -5,12 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CustomerNavbar from '@/components/CustomerNavbar';
 import CartDrawer from '@/components/CartDrawer';
+import VoucherInput from '@/components/VoucherInput';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
 import { useCart } from '@/lib/cartContext';
 import { useDeliveryFee } from '@/lib/deliveryFee';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import { AppliedVoucher, orderDiscount } from '@/lib/vouchers';
+import { validateClaimedVoucher } from '@/lib/claimedVouchers';
 import {
   PICKUP_ADDRESS,
   PICKUP_GOOGLE_MAPS_URL,
@@ -188,6 +191,7 @@ export default function CustomerReviewPaymentContent() {
   });
   const [errors, setErrors] = useState<Partial<AddressForm>>({});
   const [placing, setPlacing] = useState(false);
+  const [checkingVoucher, setCheckingVoucher] = useState(false);
   const [placeError, setPlaceError] = useState('');
   const [guestProfile, setGuestProfile] = useState<{
     id: string;
@@ -197,6 +201,15 @@ export default function CustomerReviewPaymentContent() {
   const [savedAddress, setSavedAddress] = useState('');
   const [showQRModal, setShowQRModal] = useState(false);
   const [paymentReferenceError, setPaymentReferenceError] = useState('');
+  const [paymentSnapshot, setPaymentSnapshot] = useState<{
+    userId: string | null;
+    subtotal: number;
+    deliveryFee: number;
+    priorityFee: number;
+    total: number;
+    voucherCode: string | null;
+  } | null>(null);
+  const [voucher, setVoucher] = useState<AppliedVoucher | null>(null);
 
   // States para sa Terms & Conditions
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -225,8 +238,12 @@ export default function CustomerReviewPaymentContent() {
   const deliveryFee = deliveryMethod === 'delivery' ? (quote.fee ?? 0) : 0;
   const deliveryFeePending = deliveryMethod === 'delivery' && quote.fee === null;
   const priorityFee = orderType === 'priority' ? PRIORITY_FEE : 0;
-  const total = totalAmount + deliveryFee + priorityFee;
-  const depositAmount = Number((total * 0.5).toFixed(2));
+  const isCustomer = Boolean(user && !user.is_guest);
+  const selectedDiscount = orderDiscount(totalAmount, deliveryFee + priorityFee, isCustomer, voucher);
+  const appliedVoucher = selectedDiscount.voucher;
+  const discount = selectedDiscount.amount;
+  const total = Number((totalAmount + deliveryFee + priorityFee - discount).toFixed(2));
+  const depositAmount = Math.round(Math.round(total * 100) / 2) / 100;
   const itemCount = state.items.reduce((s, i) => s + i.quantity, 0);
   const cashPaymentLabel = deliveryMethod === 'pickup' ? 'Cash On Pick Up' : 'Cash on Delivery';
   const cashPaymentDescription =
@@ -908,7 +925,7 @@ export default function CustomerReviewPaymentContent() {
     return Object.keys(errs).length === 0;
   }
 
-  function handleFormSubmit(e: React.FormEvent) {
+  async function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
     if (deliveryFeePending) {
@@ -917,10 +934,47 @@ export default function CustomerReviewPaymentContent() {
     }
 
     setPlaceError('');
+    if (appliedVoucher) {
+      setCheckingVoucher(true);
+      try {
+        const validated = await validateClaimedVoucher(appliedVoucher.code);
+        if (validated.percentage !== appliedVoucher.percentage) {
+          setVoucher(null);
+          setPlaceError('Voucher validation changed. Please apply it again.');
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to validate voucher before payment:', error);
+        setPlaceError(error instanceof Error ? error.message : 'Could not validate your voucher. Please try again before paying.');
+        return;
+      } finally {
+        setCheckingVoucher(false);
+      }
+    }
+    setPaymentSnapshot({
+      userId: isCustomer ? user.id : null,
+      subtotal: totalAmount,
+      deliveryFee,
+      priorityFee,
+      total,
+      voucherCode: appliedVoucher?.code ?? null,
+    });
     setShowQRModal(true);
   }
 
   async function executeOrder() {
+    if (
+      !paymentSnapshot ||
+      paymentSnapshot.userId !== (isCustomer ? user.id : null) ||
+      paymentSnapshot.subtotal !== totalAmount ||
+      paymentSnapshot.deliveryFee !== deliveryFee ||
+      paymentSnapshot.priorityFee !== priorityFee ||
+      paymentSnapshot.total !== total ||
+      paymentSnapshot.voucherCode !== (appliedVoucher?.code ?? null)
+    ) {
+      setPlaceError('Your account or order total changed. If you already paid, contact Feast & Fête with your GCash reference; otherwise, close this window and review your order.');
+      return;
+    }
     const reference = paymentReference.trim();
     if (!/^\d{13}$/.test(reference)) {
       setPaymentReferenceError('The GCash reference number must be exactly 13 digits.');
@@ -965,13 +1019,16 @@ export default function CustomerReviewPaymentContent() {
           subtotal: totalAmount,
           delivery_fee: deliveryFee,
           total_amount: total,
+          voucher_code: appliedVoucher?.code ?? null,
+          discount_amount: discount,
           status: 'Pending',
         })
         .select('id')
         .single();
 
       if (orderError) {
-        setPlaceError('Failed to place order: ' + orderError.message);
+        setPlaceError('Failed to place order: ' + orderError.message +
+          ' If you already paid, contact Feast & Fête with your GCash reference number.');
         setPlacing(false);
         setShowQRModal(false);
         return;
@@ -1040,6 +1097,8 @@ export default function CustomerReviewPaymentContent() {
       deliveryFee,
       orderType,
       priorityFee,
+      voucherCode: appliedVoucher?.code ?? null,
+      discount,
       total,
       isGuest: (!user || user.is_guest) && !!guestProfile,
       guestProfileId: guestProfile?.id ?? null,
@@ -1614,6 +1673,9 @@ export default function CustomerReviewPaymentContent() {
                   ))}
                 </div>
 
+                {user && !user.is_guest && (
+                  <VoucherInput userId={user.id} voucher={voucher} onChange={setVoucher} />
+                )}
                 <div className="border-t border-border pt-4 space-y-2.5 mb-5">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
@@ -1654,6 +1716,12 @@ export default function CustomerReviewPaymentContent() {
                       )}
                     </span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm text-green-700">
+                      <span>{appliedVoucher ? `Voucher ${appliedVoucher.code} (${appliedVoucher.percentage}%)` : 'Customer discount (20% off menu)'}</span>
+                      <span>−₱{discount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold text-base pt-2 border-t border-border">
                     <span className="text-foreground">Total</span>
                     <span className="text-primary tabular-nums text-lg">
@@ -1710,7 +1778,7 @@ export default function CustomerReviewPaymentContent() {
 
                 <button
                   type="submit"
-                  disabled={placing}
+                  disabled={placing || checkingVoucher}
                   className="w-full py-4 gradient-brand text-primary-foreground font-bold text-base rounded-2xl btn-3d transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {placing ? (
@@ -1761,6 +1829,12 @@ export default function CustomerReviewPaymentContent() {
               <span className="font-bold text-primary">₱{depositAmount.toLocaleString()}</span>
               of ₱{total.toLocaleString()} total.
             </p>
+            {appliedVoucher && (
+              <p className="text-xs text-amber-700 mb-2">
+                The voucher must still be valid when you submit your order. Submit before 5 PM
+                Philippine time; an expired voucher will be rejected.
+              </p>
+            )}
 
             <div className="bg-[#005ce6] p-2 rounded-xl mb-3 flex flex-col items-center justify-center">
               <AppImage

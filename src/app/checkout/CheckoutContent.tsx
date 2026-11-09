@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CustomerNavbar from '@/components/CustomerNavbar';
 import CartDrawer from '@/components/CartDrawer';
+import VoucherInput from '@/components/VoucherInput';
 import Icon from '@/components/ui/AppIcon';
 import { useCart } from '@/lib/cartContext';
 import { useDeliveryFee } from '@/lib/deliveryFee';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { AppliedVoucher, orderDiscount } from '@/lib/vouchers';
 import {
   PICKUP_ADDRESS,
   PICKUP_GOOGLE_MAPS_URL,
@@ -47,6 +49,8 @@ interface PaymentReviewData {
   subtotal: number;
   deliveryFee: number;
   total: number;
+  voucher: AppliedVoucher | null;
+  discount: number;
 }
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
@@ -103,6 +107,7 @@ export default function CheckoutContent() {
   // Payment review state — shown between form submit and order creation
   const [paymentReview, setPaymentReview] = useState<PaymentReviewData | null>(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
+  const [voucher, setVoucher] = useState<AppliedVoucher | null>(null);
 
   const quote = useDeliveryFee(
     deliveryMethod === 'delivery' && Boolean(form.address.trim() && form.city.trim()),
@@ -110,13 +115,17 @@ export default function CheckoutContent() {
   );
   const deliveryFee = deliveryMethod === 'delivery' ? (quote.fee ?? 0) : 0;
   const deliveryFeePending = deliveryMethod === 'delivery' && quote.fee === null;
-  const total = totalAmount + deliveryFee;
+  const isCustomer = Boolean(user && !user.is_guest);
+  const selectedDiscount = orderDiscount(totalAmount, deliveryFee, isCustomer, voucher);
+  const appliedVoucher = selectedDiscount.voucher;
+  const discount = selectedDiscount.amount;
+  const total = Number((totalAmount + deliveryFee - discount).toFixed(2));
 
   // Load guest profile from localStorage
   useEffect(() => {
     const gp = getGuestProfile();
     setGuestProfile(gp);
-    if (gp && !user) {
+    if (gp && (!user || user.is_guest)) {
       // Pre-fill contact field from verified guest profile
       setForm(prev => ({
         ...prev,
@@ -129,7 +138,7 @@ export default function CheckoutContent() {
 
   // Pre-fill form from user profile (authenticated users)
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.is_guest) return;
     const supabase = createClient();
     supabase
       .from('user_profiles')
@@ -203,6 +212,8 @@ export default function CheckoutContent() {
       subtotal: totalAmount,
       deliveryFee,
       total,
+      voucher: appliedVoucher,
+      discount,
     });
     // Store delivery address for later use
     sessionStorage.setItem('feastfete_pending_delivery_address', deliveryAddress);
@@ -211,6 +222,15 @@ export default function CheckoutContent() {
   // Step 2: User confirms on payment review → create order
   async function handleConfirmOrder() {
     if (!paymentReview) return;
+    if (
+      paymentReview.total !== total ||
+      paymentReview.voucher?.code !== appliedVoucher?.code ||
+      paymentReview.subtotal !== totalAmount ||
+      paymentReview.deliveryFee !== deliveryFee
+    ) {
+      setSubmitError('Your order or account changed. Go back and review the updated total.');
+      return;
+    }
     setConfirmingOrder(true);
     setSubmitError('');
 
@@ -229,8 +249,8 @@ export default function CheckoutContent() {
         .from('orders')
         .insert({
           order_number: orderId,
-          user_id: user?.id ?? null,
-          guest_profile_id: (!user && guestProfile) ? guestProfile.id : null,
+          user_id: user && !user.is_guest ? user.id : null,
+          guest_profile_id: (!user || user.is_guest) && guestProfile ? guestProfile.id : null,
           customer_name: form.fullName,
           customer_email: form.email,
           customer_phone: form.phone,
@@ -243,6 +263,8 @@ export default function CheckoutContent() {
           subtotal: totalAmount,
           delivery_fee: deliveryFee,
           total_amount: total,
+          voucher_code: appliedVoucher?.code ?? null,
+          discount_amount: discount,
           status: 'Pending',
         })
         .select('id')
@@ -296,8 +318,10 @@ export default function CheckoutContent() {
       items: state.items,
       subtotal: totalAmount,
       deliveryFee,
+      voucherCode: appliedVoucher?.code ?? null,
+      discount,
       total,
-      isGuest: !user && !!guestProfile,
+      isGuest: (!user || user.is_guest) && !!guestProfile,
       guestProfileId: guestProfile?.id ?? null,
     };
     sessionStorage.setItem('feastfete_order', JSON.stringify(orderPayload));
@@ -463,6 +487,12 @@ export default function CheckoutContent() {
                 <span className="text-muted-foreground">Delivery fee</span>
                 <span className="text-foreground tabular-nums">{paymentReview.deliveryFee === 0 ? 'Free' : `₱${paymentReview.deliveryFee}`}</span>
               </div>
+              {paymentReview.discount > 0 && (
+                <div className="flex justify-between text-sm text-green-700">
+                  <span>{paymentReview.voucher ? `Voucher ${paymentReview.voucher.code} (${paymentReview.voucher.percentage}%)` : 'Customer discount (20% off menu)'}</span>
+                  <span>−₱{paymentReview.discount.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-base pt-2 border-t border-border">
                 <span className="text-foreground">Order Total</span>
                 <span className="text-primary tabular-nums text-lg">₱{paymentReview.total.toLocaleString()}</span>
@@ -1045,6 +1075,9 @@ export default function CheckoutContent() {
                     </div>
                   ))}
                 </div>
+                {user && !user.is_guest && (
+                  <VoucherInput userId={user.id} voucher={voucher} onChange={setVoucher} />
+                )}
                 <div className="border-t border-border pt-3 space-y-2 mb-5">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
@@ -1054,6 +1087,12 @@ export default function CheckoutContent() {
                     <span className="text-muted-foreground">Delivery fee</span>
                     <span className="font-medium text-foreground tabular-nums">{deliveryFeePending ? (quote.loading ? 'Calculating…' : 'Enter address') : deliveryFee === 0 ? 'Free' : `₱${deliveryFee}`}</span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm text-green-700">
+                      <span>{appliedVoucher ? `Voucher ${appliedVoucher.code} (${appliedVoucher.percentage}%)` : 'Customer discount (20% off menu)'}</span>
+                      <span>−₱{discount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="border-t border-border pt-2 flex justify-between">
                     <span className="font-semibold text-foreground">Total</span>
                     <span className="font-bold text-primary text-lg tabular-nums">₱{total.toLocaleString()}</span>

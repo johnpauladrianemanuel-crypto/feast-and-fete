@@ -63,6 +63,9 @@ export interface SlipOrder {
   payment_method?: string | null;
   subtotal?: number | null;
   delivery_fee?: number | null;
+  priority_fee?: number | null;
+  voucher_code?: string | null;
+  discount_amount?: number | null;
   total_amount?: number | null;
   order_items?: Array<{
     menu_item_name: string;
@@ -147,6 +150,8 @@ export function orderSlipHtml(order: SlipOrder, siteUrl: string): string {
     <table style="width:55%;margin-left:auto;border-collapse:collapse;">
       <tr><td style="padding:7px 0;font-size:12px;color:#555;border-bottom:1px solid #d4d4d4;">subtotal:</td><td style="padding:7px 0;font-size:12px;text-align:right;border-bottom:1px solid #d4d4d4;">${formatPeso(order.subtotal)}</td></tr>
       <tr><td style="padding:7px 0;font-size:12px;color:#555;border-bottom:1px solid #d4d4d4;">delivery fee:</td><td style="padding:7px 0;font-size:12px;text-align:right;border-bottom:1px solid #d4d4d4;">${formatPeso(order.delivery_fee)}</td></tr>
+      ${Number(order.priority_fee) > 0 ? `<tr><td style="padding:7px 0;font-size:12px;color:#555;">priority fee:</td><td style="padding:7px 0;font-size:12px;text-align:right;">${formatPeso(order.priority_fee)}</td></tr>` : ''}
+      ${Number(order.discount_amount) > 0 ? `<tr><td style="padding:7px 0;font-size:12px;color:#555;">${order.voucher_code ? `voucher ${escapeHtml(order.voucher_code)}` : 'customer discount (20% off menu)'}:</td><td style="padding:7px 0;font-size:12px;text-align:right;">−${formatPeso(order.discount_amount)}</td></tr>` : ''}
       <tr><td style="padding:9px 0;font-size:12px;font-weight:bold;letter-spacing:1px;border-bottom:2px solid #555;">TOTAL AMOUNT:</td><td style="padding:9px 0;font-size:13px;font-weight:bold;text-align:right;border-bottom:2px solid #555;">${formatPeso(order.total_amount)}</td></tr>
     </table>
 

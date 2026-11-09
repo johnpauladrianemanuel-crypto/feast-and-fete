@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(
-        'order_number, created_at, event_date, delivery_address, customer_name, customer_email, customer_phone, guest_profile_id, status, delivery_method, payment_method, subtotal, delivery_fee, total_amount, notes, order_items(menu_item_name, quantity, unit_price, subtotal)'
+        'order_number, created_at, event_date, delivery_address, customer_name, customer_email, customer_phone, guest_profile_id, status, delivery_method, payment_method, subtotal, delivery_fee, priority_fee, voucher_code, discount_amount, total_amount, notes, order_items(menu_item_name, quantity, unit_price, subtotal)'
       )
       .eq('id', orderId)
       .maybeSingle();

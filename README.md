@@ -25,6 +25,11 @@ A modern Next.js 15 application built with TypeScript and Tailwind CSS.
   ```
 3. Open [http://localhost:4028](http://localhost:4028) with your browser to see the result.
 
+The development server uses `.next-dev` while production builds use `.next`, so running a build
+does not overwrite a running development server's files. Restart the development server after
+updating the configuration. If setting `DIST_DIR`, use different values for development and
+production.
+
 ## 📁 Project Structure
 
 ```
@@ -72,6 +77,35 @@ Build the application for production:
   ```bash
   npm run build
   ```
+
+### Checkout vouchers
+
+Apply the Supabase migrations, including `20261109000000_order_vouchers.sql` and
+`20261109000001_customer_discount.sql`, `20261109000002_claimed_vouchers.sql` and
+`20261109000003_claim_vouchers_anytime.sql`, before
+deploying the updated checkout. Signed-in
+customers automatically receive 20% off the menu subtotal, with no expiry; delivery and
+priority fees are not reduced by this automatic discount. The discount is rounded once on the
+menu subtotal, so separately rounded unit prices can differ by a centavo.
+
+Signed-in customers can instead use one of `FEAST20` (20%), `FETE30` (30%), or
+`CELEBRATE50` (50%) per order. The voucher applies to the whole order, including delivery
+and priority fees. The larger discount is used, not both; ties use the automatic discount.
+Guests do not receive vouchers or discounts.
+
+The promotions are valid daily from 8:00 AM inclusive to 5:00 PM exclusive, Philippine time,
+from November 15 through December 24, 2026. Customers can claim a voucher on the menu at any
+time, but can only use it during that window. Claimed vouchers are saved to the account and reusable
+within that window; customers can see them under My Vouchers on their profile. There is no
+minimum order or per-user usage limit.
+The database checks eligibility and pricing again when the order is submitted, so customers
+should submit before the daily closing time, including after paying a deposit.
+
+### Dish reviews
+
+Reviews submitted from completed orders are saved per menu item and displayed in the dish
+details below the order note. Apply `20261109000004_fix_item_review_menu_id.sql` to create or
+update the review table for the text-based menu item IDs before using this feature.
 
 ### Email notifications
 

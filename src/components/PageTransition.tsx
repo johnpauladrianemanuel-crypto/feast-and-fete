@@ -7,6 +7,8 @@ export default function PageTransition({ children }: { children: React.ReactNode
   const [phase, setPhase] = useState<'enter' | 'exit' | 'idle'>('idle');
   const [displayChildren, setDisplayChildren] = useState(children);
   const prevPathname = useRef(pathname);
+  const latestChildren = useRef(children);
+  latestChildren.current = children;
 
   // Route change — exit → swap → enter
   useEffect(() => {
@@ -15,19 +17,19 @@ export default function PageTransition({ children }: { children: React.ReactNode
 
     setPhase('exit');
     const swap = setTimeout(() => {
-      setDisplayChildren(children);
+      setDisplayChildren(latestChildren.current);
       setPhase('enter');
     }, 200);
     const settle = setTimeout(() => setPhase('idle'), 620);
     return () => { clearTimeout(swap); clearTimeout(settle); };
-  }, [pathname, children]);
+  }, [pathname]);
 
   // Same-route re-renders
   useEffect(() => {
-    if (prevPathname.current === pathname) {
+    if (prevPathname.current === pathname && phase === 'idle') {
       setDisplayChildren(children);
     }
-  }, [children, pathname]);
+  }, [children, pathname, phase]);
 
   const style: React.CSSProperties =
     phase === 'exit'

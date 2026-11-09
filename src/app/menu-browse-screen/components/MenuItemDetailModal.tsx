@@ -8,6 +8,9 @@ import { useCart } from '@/lib/cartContext';
 import { toast } from 'sonner';
 import { MenuItemRatingSummary } from '@/lib/supabase/services';
 import { getMenuItemUnitLabel } from '@/lib/menuItemUnit';
+import { useAuth } from '@/contexts/AuthContext';
+import { customerDiscount, customerMenuPrice } from '@/lib/vouchers';
+import DishReviews from './DishReviews';
 
 interface Props {
   item: MenuItem | null;
@@ -57,6 +60,9 @@ function StarDisplay({ rating, count }: { rating: number; count: number }) {
 
 function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem }) {
   const { addItem, openCart } = useCart();
+  const { user } = useAuth();
+  const isCustomer = Boolean(user && !user.is_guest);
+  const displayPrice = customerMenuPrice(item.price, isCustomer);
   const [addedPulse, setAddedPulse] = useState(false);
   const [visible, setVisible] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -130,7 +136,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
     setAddedPulse(true);
     setTimeout(() => setAddedPulse(false), 800);
     const toastId = toast.success(`${quantity}× ${item.name} added!`, {
-      description: `₱${(item.price * quantity).toLocaleString()} total`,
+      description: `₱${(item.price * quantity - customerDiscount(item.price * quantity, isCustomer)).toLocaleString()} total`,
       action: {
         label: 'View Cart',
         onClick: () => {
@@ -215,8 +221,9 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               </h2>
               <div className="text-right flex-shrink-0">
                 <div className="font-display text-2xl sm:text-3xl font-extrabold text-primary">
-                  ₱{item.price.toLocaleString()}
+                  ₱{displayPrice.toLocaleString()}
                 </div>
+                {isCustomer && <div className="text-xs text-green-700">20% off · <span className="line-through">₱{item.price.toLocaleString()}</span></div>}
                 <div className="text-xs font-semibold text-stone-600">
                   per {getMenuItemUnitLabel(item)}
                 </div>
@@ -311,6 +318,8 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
               />
             </div>
 
+            <DishReviews menuItemId={item.id} />
+
             {/* Quantity + Add to Cart Footer Actions */}
             <div className="flex items-center gap-4 pt-2">
               <div className="flex items-center rounded-xl overflow-hidden border border-stone-300 bg-stone-100">
@@ -342,7 +351,7 @@ function ModalContent({ item, onClose, ratingSummary }: Props & { item: MenuItem
                 aria-label={`Add ${item.name} to Cart`}
               >
                 <Icon name={addedPulse ? 'CheckIcon' : 'ShoppingCartIcon'} size={16} />
-                {addedPulse ? 'Added to Cart!' : `Add ${quantity > 1 ? `${quantity}×` : ''} to Cart — ₱${(item.price * quantity).toLocaleString()}`}
+                {addedPulse ? 'Added to Cart!' : `Add ${quantity > 1 ? `${quantity}×` : ''} to Cart — ₱${(item.price * quantity - customerDiscount(item.price * quantity, isCustomer)).toLocaleString()}`}
               </button>
             </div>
           </div>

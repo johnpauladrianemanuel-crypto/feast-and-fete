@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS public.item_reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  menu_item_id UUID NOT NULL REFERENCES public.menu_items(id) ON DELETE CASCADE,
+  menu_item_id TEXT NOT NULL REFERENCES public.menu_items(id) ON DELETE CASCADE,
   order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   guest_profile_id UUID REFERENCES public.guest_profiles(id) ON DELETE SET NULL,

@@ -47,6 +47,9 @@ interface Order {
   payment_method: string;
   subtotal: number;
   delivery_fee: number;
+  priority_fee?: number;
+  voucher_code?: string | null;
+  discount_amount?: number;
   total_amount: number;
   status: OrderStatus;
   notes: string | null;
@@ -694,7 +697,8 @@ export default function OrderStatusContent() {
         <ReviewModal
           items={reviewItems}
           reviewerName={reviewerName}
-          userId={user?.id}
+          userId={user && !user.is_guest ? user.id : null}
+          guestProfileId={user?.is_guest ? user.guestProfileId : null}
           onClose={() => setShowReview(false)}
           onComplete={() => {
             if (activeOrder?.id) handleReviewComplete(activeOrder.id);
@@ -1137,6 +1141,18 @@ function OrderDetail({
               <div className="flex justify-between text-muted-foreground">
                 <span>Delivery Fee</span>
                 <span>₱{Number(order.delivery_fee).toLocaleString()}</span>
+              </div>
+            )}
+            {Number(order.priority_fee) > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Priority Fee</span>
+                <span>₱{Number(order.priority_fee).toLocaleString()}</span>
+              </div>
+            )}
+            {Number(order.discount_amount) > 0 && (
+              <div className="flex justify-between text-green-700">
+                <span>{order.voucher_code ? `Voucher ${order.voucher_code}` : 'Customer discount (20% off menu)'}</span>
+                <span>−₱{Number(order.discount_amount).toLocaleString()}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border mt-2">

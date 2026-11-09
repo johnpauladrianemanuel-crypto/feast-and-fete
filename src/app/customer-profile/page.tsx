@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import Icon from '@/components/ui/AppIcon';
 import Image from 'next/image';
+import ProfileVouchers from './ProfileVouchers';
 
 interface UserProfile {
   id: string;
@@ -520,6 +521,8 @@ function CustomerProfileContent() {
             <p className="text-sm text-muted-foreground mb-2">{user?.email || (user?.is_guest ? 'Guest account' : '')}</p>
           </div>
         </div>
+
+        {!user.is_guest && <ProfileVouchers key={user.id} userId={user.id} />}
 
         {!user.is_guest && (
         <section className="bg-card border border-border rounded-2xl p-6 mb-6">

@@ -71,7 +71,6 @@ export default function ReviewModal({ items, reviewerName, userId, guestProfileI
   const currentItem = items[currentIndex];
   const currentRating = ratings[currentItem?.menuItemId] ?? 0;
   const currentReview = reviews[currentItem?.menuItemId] ?? '';
-  const skippedAll = currentIndex >= items.length;
 
   async function handleSubmitCurrent() {
     if (!currentItem) return;
@@ -97,8 +96,9 @@ export default function ReviewModal({ items, reviewerName, userId, guestProfileI
       } else {
         setCurrentIndex(prev => prev + 1);
       }
-    } catch {
-      setError('Failed to submit review. Please try again.');
+    } catch (err) {
+      console.error('Failed to submit item review:', err);
+      setError(err instanceof Error ? `Failed to submit review: ${err.message}` : 'Failed to submit review. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -114,7 +114,7 @@ export default function ReviewModal({ items, reviewerName, userId, guestProfileI
   }
 
   function handleClose() {
-    onComplete?.();
+    if (items.every(item => submitted.has(item.menuItemId))) onComplete?.();
     onClose();
   }
 
@@ -147,9 +147,13 @@ export default function ReviewModal({ items, reviewerName, userId, guestProfileI
             <div className="w-16 h-16 rounded-full gradient-brand flex items-center justify-center mx-auto mb-4">
               <Icon name="StarIcon" size={28} className="text-primary-foreground" />
             </div>
-            <h3 className="font-display text-xl font-bold text-foreground mb-2">Reviews Submitted!</h3>
+            <h3 className="font-display text-xl font-bold text-foreground mb-2">
+              {submitted.size > 0 ? 'Reviews Submitted!' : 'No Reviews Submitted'}
+            </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Your feedback helps us improve our food and service. Thank you, {reviewerName}!
+              {submitted.size > 0
+                ? `Your feedback helps us improve our food and service. Thank you, ${reviewerName}!`
+                : 'You can return to your order to leave a review later.'}
             </p>
             <div className="flex items-center justify-center gap-1 mb-6">
               {[1, 2, 3, 4, 5].map(s => (

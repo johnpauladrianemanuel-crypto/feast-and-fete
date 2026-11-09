@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation';
 import AppImage from '@/components/ui/AppImage';
 import { useCart } from '@/lib/cartContext';
 import Icon from '@/components/ui/AppIcon';
+import { useAuth } from '@/contexts/AuthContext';
+import { customerDiscount } from '@/lib/vouchers';
 
 export default function CartDrawer() {
   const { state, removeItem, updateQuantity, closeCart, totalAmount } = useCart();
   const router = useRouter();
+  const { user } = useAuth();
+  const discount = customerDiscount(totalAmount, Boolean(user && !user.is_guest));
 
   useEffect(() => {
     if (!state?.isOpen) return;
@@ -162,6 +166,18 @@ export default function CartDrawer() {
               <span className="text-sm font-medium text-muted-foreground">Subtotal</span>
               <span className="text-base font-bold text-foreground tabular-nums">₱{totalAmount?.toLocaleString()}</span>
             </div>
+            {discount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-sm text-green-700">
+                  <span>Customer discount (20%)</span>
+                  <span>−₱{discount.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between font-semibold">
+                  <span>Menu total</span>
+                  <span>₱{(totalAmount - discount).toLocaleString()}</span>
+                </div>
+              </>
+            )}
             <p className="text-xs text-muted-foreground">Delivery fee calculated at checkout.</p>
             {/* Item count validation summary */}
             <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 rounded-lg border border-primary/20">

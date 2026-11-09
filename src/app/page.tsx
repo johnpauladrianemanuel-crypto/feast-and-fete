@@ -5,7 +5,6 @@ import HeroSection from '@/app/components/HeroSection';
 import CategoryShowcase from '@/app/components/CategoryShowcase';
 import HowItWorks from '@/app/components/HowItWorks';
 import FeaturedItems from '@/app/components/FeaturedItems';
-import TestimonialsSection from '@/app/components/TestimonialsSection';
 import LandingFooter from '@/app/components/LandingFooter';
 
 export default function LandingPage() {
@@ -18,7 +17,6 @@ export default function LandingPage() {
         <CategoryShowcase />
         <HowItWorks />
         <FeaturedItems />
-        <TestimonialsSection />
       </main>
       <LandingFooter />
     </div>

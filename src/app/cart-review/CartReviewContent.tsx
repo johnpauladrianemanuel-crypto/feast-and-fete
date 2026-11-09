@@ -7,14 +7,18 @@ import CartDrawer from '@/components/CartDrawer';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
 import { useCart } from '@/lib/cartContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { customerDiscount } from '@/lib/vouchers';
 
 export default function CartReviewContent() {
   const { state, removeItem, updateQuantity, totalAmount } = useCart();
   const router = useRouter();
+  const { user } = useAuth();
 
   const deliveryFee = 150;
   const subtotal = totalAmount;
-  const total = subtotal + deliveryFee;
+  const discount = customerDiscount(subtotal, Boolean(user && !user.is_guest));
+  const total = subtotal + deliveryFee - discount;
 
   return (
     <div className="min-h-screen bg-background">
@@ -137,6 +141,12 @@ export default function CartReviewContent() {
                     <span className="text-muted-foreground">Estimated delivery fee</span>
                     <span className="font-medium text-foreground tabular-nums">₱{deliveryFee?.toLocaleString()}</span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm text-green-700">
+                      <span>Customer discount (20% off menu)</span>
+                      <span>−₱{discount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="border-t border-border pt-3 flex justify-between">
                     <span className="font-semibold text-foreground">Total</span>
                     <span className="font-bold text-primary text-lg tabular-nums">₱{total?.toLocaleString()}</span>

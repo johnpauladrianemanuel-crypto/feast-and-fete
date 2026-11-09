@@ -8,6 +8,7 @@ import MenuFilters from './MenuFilters';
 import MenuSearch from './MenuSearch';
 import Icon from '@/components/ui/AppIcon';
 import MenuItemDetailModal from './MenuItemDetailModal';
+import VoucherClaimSection from './VoucherClaimSection';
 
 export type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'name-asc' | 'sold-desc';
 
@@ -157,6 +158,8 @@ export default function MenuBrowseContent() {
           Pre-order authentic Filipino food trays for pickup or delivery. Order by 12 noon for next-day service.
         </p>
       </div>
+
+      <VoucherClaimSection />
 
       {/* Sticky Search & Filter Header Container */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md pt-2 pb-4 border-b border-border/40 -mx-4 px-4 lg:-mx-8 lg:px-8 xl:-mx-10 xl:px-10 2xl:-mx-16 2xl:px-16 transition-all">
